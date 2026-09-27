@@ -15,7 +15,7 @@ cbuffer Layer : register(b0)
     float4 mb;        // mb.x = nombre de taps de motion blur (1 = désactivé) ; modes 15 et 17 : demi-taille du plan, translation ; mode 18 : .z = 1 si le plan est incliné, .w = 1 si son warp est projectif
     float4 trail_a;   // mode 8 : coins TL, TR du plan à la frame précédente (px locaux, comme fx) ; mode 18 incliné : en fractions de sortie
     float4 trail_b;   // mode 8 : coins BR, BL du plan à la frame précédente (comme src_prev) ; mode 18 incliné : en fractions de sortie
-    float4 trail_mb;  // mode 8 : x = taps, y = force du flou de mouvement (ceux du mode 0) ; 0 ailleurs
+    float4 trail_mb;  // mode 8 : x = taps, y = force du flou de mouvement (ceux du mode 0) ; mode 18 incliné : le `mb` du mode 8 (profondeur de champ), et `color.xy` sa lampe ; 0 ailleurs
 };
 // Mode 15 (curseur modélisé) : le détail des emplacements est dans `frame_geometry.rs`, en tête
 // de la section « Curseur modélisé » (`cursor_model_cb`). Mode 17 (appareil modelé) : en tête de
@@ -44,7 +44,7 @@ VSOut vs_main(uint vid : SV_VertexID)
 
 Texture2D<float>  texY  : register(t0);
 Texture2D<float2> texUV : register(t1);
-Texture2D<float4> texImg : register(t2); // wallpaper image RGBA (fond, mode 6) ; mode 8 : pyramide de flou
+Texture2D<float4> texImg : register(t2); // wallpaper image RGBA (fond, mode 6) ; mode 18 : l'écran cadré isolé
 // Masque de segmentation du sujet, 0 = fond, 1 = sujet. Produit par `segmentation.rs` a la
 // resolution du modele (256x144) ; l'upscale vers la resolution webcam est fait par le sampler
 // lineaire, ce qui est exactement le filtrage qu'on veut sur un masque.
@@ -52,6 +52,9 @@ Texture2D<float> texMask : register(t3);
 // Champ de distance signé du sprite de curseur (mode 15 seulement), R16F, cf. `cursor_sdf.rs`.
 // Le sprite lui-même est en t2 (texImg), comme aux modes 7 et 13.
 Texture2D<float> texSdf : register(t4);
+// Pyramide de profondeur de champ (`tilted_sample`), lue par le mode 8 et par le repli du mode 18,
+// qui garde t2 pour son rendu isolé : d'où un emplacement à elle.
+Texture2D<float4> texDof : register(t5);
 SamplerState samp : register(s0);
 
 // Plafond de la profondeur de champ du mode 8, en niveau de la pyramide demi-résolution (1.5 =
@@ -207,6 +210,12 @@ float3 quad_st_for_root(float t, float2 e, float2 f, float2 g, float2 h)
 // par le mode 8 (écran incliné) et le mode 13 (curseur posé sur ce même écran). Les deux doivent
 // résoudre exactement la même équation, sinon le curseur glisse par rapport au contenu — d'où
 // une seule implémentation plutôt que deux copies.
+//
+// `ok` = −1 quand `P` n'a AUCUN antécédent : au-delà du pli du warp bilinéaire, qu'aucun point
+// du plan prolongé n'atteint. (s, t) n'y veut rien dire. Ce n'est pas l'origine (0, 0), qui est
+// un vrai point du plan : le mode 18 le renvoyait sur le coin haut-gauche de l'écran, et le fond
+// loin de l'écran prenait la couleur de ce coin. Les appelants qui testent `ok < 0.5` écartent
+// ce pixel comme un pixel hors du quad ; ceux qui prolongent (s, t) hors du quad testent `ok < -0.5`.
 float3 quad_inverse_bilinear(float2 P, float2 c00, float2 c10, float2 c11, float2 c01)
 {
     float2 e = c10 - c00;
@@ -225,11 +234,12 @@ float3 quad_inverse_bilinear(float2 P, float2 c00, float2 c10, float2 c11, float
     // du quad était rejetée, ce qui se voyait comme un écran incliné tranché net.
     if (abs(k2) < 1e-5 * abs(k1))
     {
-        float t = (abs(k1) < 1e-6) ? 0.0 : -k0 / k1;
-        return quad_st_for_root(t, e, f, g, h);
+        // k1 nul aussi : l'équation ne fixe plus `t`, aucun point à rendre.
+        if (abs(k1) < 1e-6) return float3(0.0, 0.0, -1.0);
+        return quad_st_for_root(-k0 / k1, e, f, g, h);
     }
     float disc = k1 * k1 - 4.0 * k2 * k0;
-    if (disc < 0.0) return float3(0.0, 0.0, 0.0);
+    if (disc < 0.0) return float3(0.0, 0.0, -1.0);
     // Forme stable : `q` n'oppose jamais deux quantités voisines, et les deux racines
     // s'en déduisent exactement. `sign()` est évité parce qu'il vaut 0 en 0, ce qui
     // annulerait `q` là où la formule reste parfaitement définie.
@@ -269,6 +279,7 @@ float3 quad_inverse_projective(float2 P, float2 c00, float2 c10, float2 c11, flo
 
 // Le warp inverse d'un calque posé sur le plan : projectif sous la caméra réelle ou un appareil
 // (`projective` = 1, cf. `TiltedQuad::warp_flag`), bilinéaire sous un angle fixe, inchangé.
+// `ok` : 1 dans le quad, 0 dehors, −1 sans antécédent (`quad_inverse_bilinear`).
 float3 quad_inverse(float2 P, float2 c00, float2 c10, float2 c11, float2 c01, float projective)
 {
     if (projective > 0.5)
@@ -300,7 +311,7 @@ float2 quad_forward(float2 st, float2 c00, float2 c10, float2 c11, float2 c01, f
 }
 
 // Un échantillon de l'écran incliné (mode 8) : la vidéo nette, fondue vers la pyramide de
-// profondeur de champ (t2) au-delà d'un demi-texel de cercle de confusion `coc`. Sous ce seuil,
+// profondeur de champ (t5) au-delà d'un demi-texel de cercle de confusion `coc`. Sous ce seuil,
 // l'échantillon net d'avant, à l'octet.
 float3 tilted_sample(float2 uv, float coc)
 {
@@ -308,7 +319,7 @@ float3 tilted_sample(float2 uv, float coc)
     if (coc > 0.5)
     {
         float lod = clamp(log2(coc) - 1.0, 0.0, DOF_MAX_LOD);
-        float3 far_rgb = texImg.SampleLevel(samp, uv, lod).rgb;
+        float3 far_rgb = texDof.SampleLevel(samp, uv, lod).rgb;
         rgb = lerp(rgb, far_rgb, saturate((coc - 0.5) / 1.5));
     }
     return rgb;
@@ -2153,9 +2164,12 @@ float4 ps_main(VSOut i) : SV_Target
     // (courante). Incliné (`mb.z` = 1), le plan : ses coins TL, TR / BR, BL courants dans
     // `fx`/`src_prev`, ceux d'avant dans `trail_a`/`trail_b` ; le tap interpole les coins, et le
     // warp du plan (`mb.w`, celui du mode 8) fait l'aller (le pixel vers le plan) et le retour (le
-    // plan vers le rendu courant). Un point hors de la sortie n'a pas été rendu : dans l'ouverture
+    // plan vers le rendu courant) ; un pixel que le plan prolongé n'atteint pas (aller sans
+    // solution) n'a pas de tap. Un point hors de la sortie n'a pas été rendu : dans l'ouverture
     // arrondie de l'écran (`quad_px`, `radius_px`, 2 px en retrait : la lunette mord dessus), on
-    // relit le métrage (`src` = la coupe) ; ailleurs (un bout de cadre hors champ), le tap est écarté.
+    // relit le métrage (`src` = la coupe) comme le mode 8 l'a dessiné, avec sa profondeur de champ
+    // (`trail_mb` = son `mb`, pyramide en t5) et sa lampe (`color.xy`), nulles à plat ; ailleurs
+    // (un bout de cadre hors champ), le tap est écarté.
     if (mode > 17.5)
     {
         int taps = (int) mb.x;
@@ -2171,7 +2185,9 @@ float4 ps_main(VSOut i) : SV_Target
             {
                 float4 ta = lerp(fx, trail_a, a);
                 float4 tb = lerp(src_prev, trail_b, a);
-                f = quad_inverse(i.pout, ta.xy, ta.zw, tb.xy, tb.zw, mb.w).xy;
+                float3 r = quad_inverse(i.pout, ta.xy, ta.zw, tb.xy, tb.zw, mb.w);
+                if (r.z < -0.5) continue;
+                f = r.xy;
                 q = quad_forward(f, fx.xy, fx.zw, src_prev.xy, src_prev.zw, mb.w);
             }
             else
@@ -2187,7 +2203,10 @@ float4 ps_main(VSOut i) : SV_Target
             }
             else if (sd_round_rect(f * quad_px - quad_px * 0.5, quad_px * 0.5, radius_px) < -2.0)
             {
-                acc += float4(sample_yuv(lerp(src.xy, src.zw, f)), 1.0);
+                float z = (f.x - 0.5) * trail_mb.x + (f.y - 0.5) * trail_mb.y;
+                float3 rgb = tilted_sample(lerp(src.xy, src.zw, f), trail_mb.w * abs(z - trail_mb.z));
+                rgb = saturate(rgb * (1.0 + color.x * (f.x - 0.5) + color.y * (f.y - 0.5)));
+                acc += float4(rgb, 1.0);
                 n += 1.0;
             }
         }
@@ -2299,7 +2318,7 @@ float4 ps_main(VSOut i) : SV_Target
     // mb = [gx, gy, z_focus, k] : profondeur du point r du plan = (r.x - 0.5)*gx + (r.y - 0.5)*gy
     // en px, positive vers la caméra ; z_focus = celle du focus du zoom (`TiltedQuad::depth_mb`) ;
     // k = texels source de flou par px d'écart de profondeur (0 = profondeur de champ coupée).
-    // t2 (texImg) = pyramide demi-résolution de la vidéo, 5 niveaux, mêmes UV que t0/t1 ; liée
+    // t5 (texDof) = pyramide demi-résolution de la vidéo, 5 niveaux, mêmes UV que t0/t1 ; liée
     // explicitement à chaque draw du mode 8 (`draw_video` ne lie que t0/t1).
     // trail_a/trail_b = coins du plan à la frame précédente, trail_mb = [taps, force] : son flou
     // de mouvement (`FrameGeometry::tilt_trail`).
@@ -2481,7 +2500,7 @@ float4 ps_main(VSOut i) : SV_Target
         // Profondeur de champ : cercle de confusion en texels source, nul au focus du zoom.
         // Sous un demi-texel, l'échantillon net d'avant, à l'octet : le texte net ne passe
         // jamais par le RGBA de la pyramide, et `k = 0` (réglage coupé) ne quitte jamais cette
-        // voie. Au-delà, fondu vers la pyramide demi-résolution (t2) au niveau `log2(coc) - 1`
+        // voie. Au-delà, fondu vers la pyramide demi-résolution (t5) au niveau `log2(coc) - 1`
         // (son niveau 0 est déjà une moyenne 2x2), plafonné à DOF_MAX_LOD : au niveau 2, un
         // bloc 4x4 soude les jambages d'un « m » en 1080p (`tilted_sample`).
         float2 rs = saturate(float2(r.x, r.y));
@@ -2491,7 +2510,8 @@ float4 ps_main(VSOut i) : SV_Target
         // Flou de mouvement, celui du mode 0 : l'UV que CE pixel montrait à la frame précédente,
         // par le même warp inverse sur les coins d'avant (`trail_a`/`trail_b`), puis `taps`
         // échantillons de celui-là à celui-ci, raccourcis de la force. Borné à une frame. Hors du
-        // plan d'avant, le warp prolongé donne encore le bon point (sa racine proche). Le
+        // plan d'avant, le warp prolongé donne encore le bon point (sa racine proche) ; sans
+        // solution, il n'y a pas de point d'avant, et l'échantillon reste net. Le
         // mouvement se mesure entre les deux points NON bornés : `uv` l'est, et sur le bord d'un
         // plan immobile, `uv − uv_prev` aurait flouté la frange.
         int taps = (int) trail_mb.x;
@@ -2499,7 +2519,7 @@ float4 ps_main(VSOut i) : SV_Target
         {
             float3 rp = quad_inverse(i.local, trail_a.xy, trail_a.zw, trail_b.xy, trail_b.zw, dst_prev.w);
             float2 duv = (r.xy - rp.xy) * (src.zw - src.xy) * saturate(trail_mb.y);
-            if (dot(duv, duv) >= 1e-9)
+            if (rp.z > -0.5 && dot(duv, duv) >= 1e-9)
             {
                 float3 acc = 0.0;
                 [loop] for (int k = 0; k < 16; k++)

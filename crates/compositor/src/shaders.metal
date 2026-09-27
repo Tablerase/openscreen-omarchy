@@ -114,7 +114,8 @@ constant float DOF_MAX_LOD = 1.5;
 
 // Slots de texture, tenus par les paramètres des entry points :
 //   ps_main      : 0 = texY (Y, R8), 1 = texUV (CbCr, RG8), 2 = texImg (RGBA), 3 = texMask (R8),
-//                  4 = texSdf (champ du sprite de curseur, R16F, mode 15)
+//                  4 = texSdf (champ du sprite de curseur, R16F, mode 15),
+//                  5 = texDof (pyramide de profondeur de champ, RGBA, modes 8 et 18)
 //   ps_fs_*      : 0 = rgbTex (RGBA)
 
 // =================================================================================
@@ -266,6 +267,8 @@ inline float3 quad_st_for_root(float t, float2 e, float2 f, float2 g, float2 h)
 }
 
 // (s, t, ok) du point `P` dans le quad c00->c10->c11->c01 : le warp bilinéaire INVERSE.
+// `ok` = −1 quand `P` n'a AUCUN antécédent (au-delà du pli du warp) : (s, t) n'y veut rien dire,
+// et ce n'est pas l'origine du plan (cf. HLSL, qui fait foi).
 inline float3 quad_inverse_bilinear(float2 P, float2 c00, float2 c10, float2 c11, float2 c01)
 {
     float2 e = c10 - c00;
@@ -277,11 +280,12 @@ inline float3 quad_inverse_bilinear(float2 P, float2 c00, float2 c10, float2 c11
     float k0 = h.x * e.y - h.y * e.x;
     if (abs(k2) < 1e-5 * abs(k1))
     {
-        float t = (abs(k1) < 1e-6) ? 0.0 : -k0 / k1;
-        return quad_st_for_root(t, e, f, g, h);
+        // k1 nul aussi : l'équation ne fixe plus `t`, aucun point à rendre.
+        if (abs(k1) < 1e-6) return float3(0.0, 0.0, -1.0);
+        return quad_st_for_root(-k0 / k1, e, f, g, h);
     }
     float disc = k1 * k1 - 4.0 * k2 * k0;
-    if (disc < 0.0) return float3(0.0, 0.0, 0.0);
+    if (disc < 0.0) return float3(0.0, 0.0, -1.0);
     float q = -0.5 * (k1 + (k1 >= 0.0 ? 1.0 : -1.0) * sqrt(disc));
     float3 r0 = quad_st_for_root(q / k2, e, f, g, h);
     float3 r1 = quad_st_for_root(abs(q) > 0.0 ? k0 / q : q / k2, e, f, g, h);
@@ -316,6 +320,7 @@ inline float3 quad_inverse_projective(float2 P, float2 c00, float2 c10, float2 c
 
 // Warp inverse d'un calque posé sur le plan : projectif sous la caméra réelle ou un appareil
 // (`projective` = 1), bilinéaire sous un angle fixe, inchangé.
+// `ok` : 1 dans le quad, 0 dehors, −1 sans antécédent (`quad_inverse_bilinear`).
 inline float3 quad_inverse(float2 P, float2 c00, float2 c10, float2 c11, float2 c01, float projective)
 {
     if (projective > 0.5)
@@ -346,18 +351,18 @@ inline float2 quad_forward(float2 st, float2 c00, float2 c10, float2 c11, float2
 }
 
 // Un échantillon de l'écran incliné (mode 8) : la vidéo nette, fondue vers la pyramide de
-// profondeur de champ (texture(2)) au-delà d'un demi-texel de cercle de confusion `coc`. Sous ce
+// profondeur de champ (texture(5)) au-delà d'un demi-texel de cercle de confusion `coc`. Sous ce
 // seuil, l'échantillon net d'avant, à l'octet. Miroir de `tilted_sample` (HLSL).
 inline float3 tilted_sample(float2 uv, float coc,
                             texture2d<float, access::sample> texY,
                             texture2d<float, access::sample> texUV,
-                            texture2d<float, access::sample> texImg)
+                            texture2d<float, access::sample> texDof)
 {
     float3 rgb = sample_yuv(uv, texY, texUV);
     if (coc > 0.5)
     {
         float lod = clamp(log2(coc) - 1.0, 0.0, DOF_MAX_LOD);
-        float3 far_rgb = texImg.sample(samp, uv, level(lod)).rgb;
+        float3 far_rgb = texDof.sample(samp, uv, level(lod)).rgb;
         rgb = mix(rgb, far_rgb, clamp((coc - 0.5) / 1.5, 0.0, 1.0));
     }
     return rgb;
@@ -2016,15 +2021,21 @@ fragment float4 ps_main(VSOut i [[stage_in]],
                         // Champ de distance du sprite de curseur (mode 15 seulement), R16F, cf.
                         // `cursor_sdf.rs`. Le sprite lui-même est en texture(2), comme aux
                         // modes 7 et 13.
-                        texture2d<float, access::sample> texSdf [[texture(4)]])
+                        texture2d<float, access::sample> texSdf [[texture(4)]],
+                        // Pyramide de profondeur de champ (`tilted_sample`), lue par le mode 8 et
+                        // par le repli du mode 18, qui garde texture(2) pour son rendu isolé.
+                        texture2d<float, access::sample> texDof [[texture(5)]])
 {
     // mode 18 : l'écran CADRÉ (ombre, cadre, métrage, appareil) flouté comme UN objet rigide
     // (`FrameGeometry::screen_trail`), port 1:1 du HLSL. texImg = son rendu isolé, prémultiplié,
     // à la taille de la sortie. À plat, sa boîte va de `dst_prev` (frame précédente) à `fx`
     // (courante) ; incliné (`mb.z` = 1), les coins du plan vont de `trail_a`/`trail_b` à
-    // `fx`/`src_prev`, et le warp du plan (`mb.w`, celui du mode 8) fait l'aller et le retour.
+    // `fx`/`src_prev`, et le warp du plan (`mb.w`, celui du mode 8) fait l'aller et le retour ;
+    // un pixel que le plan prolongé n'atteint pas (aller sans solution) n'a pas de tap.
     // Hors de la sortie rien n'a été rendu : dans l'ouverture arrondie de l'écran (`quad_px`,
-    // `radius_px`, 2 px en retrait) on relit le métrage (`src` = la coupe), ailleurs le tap est écarté.
+    // `radius_px`, 2 px en retrait) on relit le métrage (`src` = la coupe) comme le mode 8 l'a
+    // dessiné, avec sa profondeur de champ (`trail_mb` = son `mb`, pyramide en texture(5)) et sa
+    // lampe (`color.xy`), nulles à plat ; ailleurs le tap est écarté.
     if (layer.mode > 17.5)
     {
         int taps = int(layer.mb.x);
@@ -2040,7 +2051,9 @@ fragment float4 ps_main(VSOut i [[stage_in]],
             {
                 float4 ta = mix(layer.fx, layer.trail_a, a);
                 float4 tb = mix(layer.src_prev, layer.trail_b, a);
-                f = quad_inverse(i.pout, ta.xy, ta.zw, tb.xy, tb.zw, layer.mb.w).xy;
+                float3 r = quad_inverse(i.pout, ta.xy, ta.zw, tb.xy, tb.zw, layer.mb.w);
+                if (r.z < -0.5) continue;
+                f = r.xy;
                 q = quad_forward(f, layer.fx.xy, layer.fx.zw,
                                  layer.src_prev.xy, layer.src_prev.zw, layer.mb.w);
             }
@@ -2058,7 +2071,11 @@ fragment float4 ps_main(VSOut i [[stage_in]],
             else if (sd_round_rect(f * layer.quad_px - layer.quad_px * 0.5, layer.quad_px * 0.5,
                                    layer.radius_px) < -2.0)
             {
-                acc += float4(sample_yuv(mix(layer.src.xy, layer.src.zw, f), texY, texUV), 1.0);
+                float z = (f.x - 0.5) * layer.trail_mb.x + (f.y - 0.5) * layer.trail_mb.y;
+                float3 rgb = tilted_sample(mix(layer.src.xy, layer.src.zw, f),
+                                           layer.trail_mb.w * abs(z - layer.trail_mb.z), texY, texUV, texDof);
+                rgb = clamp(rgb * (1.0 + layer.color.x * (f.x - 0.5) + layer.color.y * (f.y - 0.5)), 0.0, 1.0);
+                acc += float4(rgb, 1.0);
                 n += 1.0;
             }
         }
@@ -2202,7 +2219,7 @@ fragment float4 ps_main(VSOut i [[stage_in]],
     // mb = [gx, gy, z_focus, k] : profondeur du point r du plan = (r.x - 0.5)*gx + (r.y - 0.5)*gy
     // en px, positive vers la caméra ; z_focus = celle du focus du zoom (`TiltedQuad::depth_mb`) ;
     // k = texels source de flou par px d'écart de profondeur (0 = profondeur de champ coupée).
-    // texture(2) (texImg) = pyramide demi-résolution de la vidéo, 5 niveaux, mêmes UV que
+    // texture(5) (texDof) = pyramide demi-résolution de la vidéo, 5 niveaux, mêmes UV que
     // texture(0/1) ; liée explicitement à chaque draw du mode 8. Cf. commentaires HLSL.
     if (layer.mode > 7.5 && layer.mode < 8.5)
     {
@@ -2243,7 +2260,7 @@ fragment float4 ps_main(VSOut i [[stage_in]],
         float2 rs = clamp(float2(r.x, r.y), 0.0, 1.0);
         float z = (rs.x - 0.5) * layer.mb.x + (rs.y - 0.5) * layer.mb.y;
         float coc = layer.mb.w * abs(z - layer.mb.z);
-        float3 rgb = tilted_sample(uv, coc, texY, texUV, texImg);
+        float3 rgb = tilted_sample(uv, coc, texY, texUV, texDof);
         // Flou de mouvement, celui du mode 0 : l'UV que CE pixel montrait à la frame précédente,
         // par le même warp inverse sur les coins d'avant (`trail_a`/`trail_b`), puis `taps`
         // échantillons de celui-là à celui-ci, raccourcis de la force. Borné à une frame. Le
@@ -2255,14 +2272,15 @@ fragment float4 ps_main(VSOut i [[stage_in]],
                                      layer.trail_b.xy, layer.trail_b.zw, layer.dst_prev.w);
             float2 duv = (r.xy - rp.xy) * (layer.src.zw - layer.src.xy)
                        * clamp(layer.trail_mb.y, 0.0, 1.0);
-            if (dot(duv, duv) >= 1e-9)
+            // Sans antécédent sur le plan d'avant, pas de point d'avant : l'échantillon reste net.
+            if (rp.z > -0.5 && dot(duv, duv) >= 1e-9)
             {
                 float3 acc = float3(0.0);
                 for (int k = 0; k < 16; k++)
                 {
                     if (k >= taps) break;
                     float t = float(k) / float(taps - 1);
-                    acc += tilted_sample(uv - duv * (1.0 - t), coc, texY, texUV, texImg);
+                    acc += tilted_sample(uv - duv * (1.0 - t), coc, texY, texUV, texDof);
                 }
                 rgb = acc / float(taps);
             }

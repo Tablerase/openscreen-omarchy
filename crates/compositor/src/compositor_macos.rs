@@ -1373,7 +1373,7 @@ impl Compositor {
     }
 
     /// Écran incliné (mode 8) : le calque partagé (`frame_geometry::tilted_screen_cb`), avec la
-    /// pyramide de profondeur de champ en texture(2).
+    /// pyramide de profondeur de champ en texture(5).
     #[allow(clippy::too_many_arguments)]
     unsafe fn draw_tilted_screen(
         &self,
@@ -1396,9 +1396,9 @@ impl Compositor {
         dof_pyramid: Option<&metal::Texture>,
     ) {
         let render_px = [self.render_w as f32, self.render_h as f32];
-        // texture(2) EXPLICITE : `draw_video` ne lie que 0/1, et le slot 2 garde sinon ce que
-        // le draw précédent y a laissé. `None` quand l'effet est coupé : `k = 0`, rien n'y est lu.
-        enc.set_fragment_texture(2, dof_pyramid.map(|t| &**t));
+        // La pyramide en texture(5), que `draw_video` ne lie pas. `None` quand l'effet est
+        // coupé : `k = 0`, rien n'y est lu.
+        enc.set_fragment_texture(5, dof_pyramid.map(|t| &**t));
         // La pyramide liée décide seule si la profondeur de champ tourne.
         let cb = crate::frame_geometry::tilted_screen_cb(
             quad,
@@ -2391,8 +2391,11 @@ impl Compositor {
         if trail {
             enc.end_encoding();
             enc = self.begin_pass(cmd_buf, &self.rt, None, &self.pipeline_main)?;
+            // texture(2) = l'écran cadré isolé ; texture(5) = la pyramide, avec laquelle le repli
+            // relit le métrage hors de la sortie comme le mode 8 l'a dessiné.
             enc.set_fragment_texture(2, Some(&self.trail));
-            self.draw_video(enc, &g.screen_trail_cb([rw, rh]), &sy, &suv);
+            enc.set_fragment_texture(5, dof_pyramid.as_ref().map(|t| &**t));
+            self.draw_video(enc, &g.screen_trail_cb([rw, rh], dof_pyramid.is_some()), &sy, &suv);
         }
 
         enc.end_encoding();
@@ -3584,7 +3587,7 @@ mod tests {
     //
     // Le seul golden de l'effet qui tourne en CI : celui de Windows est opt-in (source vidéo),
     // celui de Linux aussi (`OPENSCREEN_LINUX_COMPOSE`). C'est aussi le premier vrai passage de
-    // `fill_dof_pyramid`, de `generate_mipmaps` et du `texture(2)` du mode 8. Le piège qu'il
+    // `fill_dof_pyramid`, de `generate_mipmaps` et du `texture(5)` du mode 8. Le piège qu'il
     // garde : un `level(lod)` qui retomberait au niveau 0 laisserait macOS net là où Windows
     // floute.
     // -----------------------------------------------------------------------
