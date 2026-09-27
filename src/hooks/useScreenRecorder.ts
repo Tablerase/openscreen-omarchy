@@ -19,6 +19,7 @@ import {
 import type { CursorCaptureMode, RecordedVideoAssetInput } from "@/lib/recordingSession";
 import { requestCameraAccess } from "@/lib/requestCameraAccess";
 import { loadUserPreferences, saveUserPreferences } from "@/lib/userPreferences";
+import { canRecordMicrophone } from "@/utils/platformUtils";
 import { createRecorderHandle, type RecorderHandle } from "./recorderHandle";
 import { webcamDeviceIdentityFrom } from "./webcamDeviceIdentity";
 
@@ -278,7 +279,9 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 			cursorCaptureMode: CursorCaptureMode;
 		}) => {
 			if (cancelled) return;
-			setMicrophoneEnabled(prefs.micEnabled);
+			// Not applied where a take cannot record the microphone (#700): it would ask
+			// for the microphone, for a take that comes out without it.
+			setMicrophoneEnabled(prefs.micEnabled && canRecordMicrophone());
 			setMicrophoneDeviceId(prefs.micDeviceId ?? undefined);
 			setMicrophoneDeviceName(prefs.micDeviceName ?? undefined);
 			const isCliRecord =
@@ -1414,6 +1417,9 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 			}
 			if (result.microphoneDefaulted) {
 				toast.error(t("recording.microphoneDefaulted"));
+			}
+			if (result.microphoneUnavailable) {
+				toast.error(t("recording.microphoneUnavailable"));
 			}
 
 			// The IPC call above only resolves once the helper's stdout confirms its

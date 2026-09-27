@@ -431,6 +431,7 @@ interface Window {
 		quitApp: () => void;
 		setTitleBarOverlay: (color: string, symbolColor: string) => void;
 		getPlatform: () => string;
+		getSystemVersion: () => string;
 		getAppInfo: () => Promise<{ version: string; canCheckForUpdates: boolean }>;
 		checkForUpdates: () => Promise<void>;
 		showAbout: () => Promise<void>;

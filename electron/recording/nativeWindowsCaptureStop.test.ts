@@ -6,6 +6,7 @@ import {
 	isSalvageableFragmentedCapture,
 	NATIVE_WINDOWS_SALVAGEABLE_OUTPUT_BYTES,
 	readMicrophoneDefaulted,
+	readMicrophoneUnavailable,
 	readStoppedPath,
 	readWebcamFormat,
 	readWebcamUnavailable,
@@ -121,6 +122,23 @@ describe("readMicrophoneDefaulted", () => {
 		const output =
 			'{"event":"audio-format","schemaVersion":2,"microphone":true,"microphoneDeviceName":"Microphone (Logitech PRO X)"}\n';
 		expect(readMicrophoneDefaulted(output)).toBe(false);
+	});
+});
+
+describe("readMicrophoneUnavailable", () => {
+	// The line ScreenCaptureRecorder.swift emits on macOS 13 and 14, which have no
+	// `captureMicrophone`, before recording the take without it (#700).
+	it("sees the macOS helper record without the microphone", () => {
+		const output =
+			'{"code":"microphone-unavailable","event":"warning","message":"Native microphone capture requires ScreenCaptureKit microphone support on this macOS version."}\n' +
+			'{"event":"ready","schemaVersion":1}\n';
+		expect(readMicrophoneUnavailable(output)).toBe(true);
+	});
+
+	it("is false when the microphone was only defaulted", () => {
+		const output =
+			'{"event":"warning","code":"microphone-defaulted","message":"The requested microphone could not be resolved; capturing the default input."}\n';
+		expect(readMicrophoneUnavailable(output)).toBe(false);
 	});
 });
 

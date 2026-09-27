@@ -48,6 +48,7 @@
 		"cameraNotFound": "Fotocamera non trovata.",
 		"cameraCaptureUnavailable": "Impossibile aprire la fotocamera. Registrazione senza di essa.",
 		"microphoneDefaulted": "Impossibile identificare il microfono scelto. Registrazione dall'ingresso predefinito.",
+		"microphoneUnavailable": "Questa versione di macOS non può registrare il microfono. Registrazione senza microfono.",
 		"permissionDenied": "Autorizzazione di registrazione negata. Consenti la registrazione dello schermo.",
 		"accessibilityAllowAndRetry": "Consenti l'accesso all'accessibilità per OpenScreen, poi premi di nuovo registra per avviare il conto alla rovescia.",
 		"selectSource": "Seleziona una sorgente da registrare"

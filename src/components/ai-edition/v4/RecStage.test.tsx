@@ -347,6 +347,40 @@ describe("RecStage controls", () => {
 		expect(screen.queryByText("rec.hideDesktopIcons")).toBeNull();
 	});
 
+	// ScreenCaptureKit captures the microphone from macOS 15 only (#700).
+	it("offers no microphone on macOS 14, and leaves a saved one unapplied", async () => {
+		const { setRecordingPrefs } = stubRecordingPrefs({
+			micEnabled: true,
+			systemAudioEnabled: true,
+		});
+		Object.assign(window.electronAPI as object, {
+			getPlatform: () => "darwin",
+			getSystemVersion: () => "14.6.1",
+		});
+		renderRecStage();
+		// The saved prefs have landed once system audio reads on.
+		const systemAudioRow = (await screen.findByText("rec.systemAudio")).parentElement;
+		if (!systemAudioRow) throw new Error("system audio row is missing");
+		await within(systemAudioRow).findByRole("button", { name: "rec.on" });
+
+		expect(screen.queryByText("rec.microphone")).toBeNull();
+		expect(microphoneHook.call).toHaveBeenLastCalledWith(false, undefined, undefined);
+		expect(audioMeter.call).toHaveBeenLastCalledWith({ enabled: false, deviceId: undefined });
+		expect(setRecordingPrefs).not.toHaveBeenCalled();
+		cleanup();
+
+		stubRecordingPrefs({ micEnabled: true });
+		Object.assign(window.electronAPI as object, {
+			getPlatform: () => "darwin",
+			getSystemVersion: () => "15.0",
+		});
+		renderRecStage();
+		expect(await screen.findByText("rec.microphone")).toBeInTheDocument();
+		await waitFor(() =>
+			expect(microphoneHook.call).toHaveBeenLastCalledWith(true, undefined, undefined),
+		);
+	});
+
 	it("applies pushed preference events and ignores older initial preference and source reads", async () => {
 		let resolvePrefs: ((value: RecordingPrefs) => void) | undefined;
 		let resolveSource: ((value: SelectedSource) => void) | undefined;

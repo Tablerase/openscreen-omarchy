@@ -14,6 +14,8 @@ type SelectedSourceChangedListener = Parameters<
 >[0];
 
 const platformState = vi.hoisted(() => ({ value: "darwin" as NativePlatform }));
+// A macOS whose ScreenCaptureKit captures the microphone, unless a test says otherwise.
+const systemVersionState = vi.hoisted(() => ({ value: "15.5" }));
 const linuxHelperAvailable = vi.hoisted(() => ({ value: true }));
 const resizeCallbacks = vi.hoisted(() => [] as Array<ResizeObserverCallback>);
 
@@ -77,15 +79,19 @@ vi.mock("../../hooks/useScreenRecorder", () => ({
 
 const micDevicesState = vi.hoisted(() => ({
 	value: [] as Array<{ deviceId: string; label: string; groupId: string }>,
+	enabled: undefined as boolean | undefined,
 }));
 
 vi.mock("../../hooks/useMicrophoneDevices", () => ({
-	useMicrophoneDevices: () => ({
-		devices: micDevicesState.value,
-		selectedDeviceId: "default",
-		setSelectedDeviceId: vi.fn(),
-		isReady: true,
-	}),
+	useMicrophoneDevices: (enabled: boolean) => {
+		micDevicesState.enabled = enabled;
+		return {
+			devices: micDevicesState.value,
+			selectedDeviceId: "default",
+			setSelectedDeviceId: vi.fn(),
+			isReady: true,
+		};
+	},
 }));
 
 const cameraDevicesState = vi.hoisted(() => ({
@@ -225,6 +231,7 @@ function stubElectronAPI(getSelectedSource: Window["electronAPI"]["getSelectedSo
 		// invisible while only `nativeBridgeClient` was consulted for it — and
 		// silently wrong the moment anything read the platform through here.
 		getPlatform: vi.fn(() => platformState.value),
+		getSystemVersion: vi.fn(() => systemVersionState.value),
 		// Only the Linux tests read this; the helper being present is what hands
 		// source selection to the portal.
 		isNativeLinuxCaptureAvailable: vi.fn(async () => ({
@@ -314,6 +321,8 @@ function resetLaunchMocks() {
 	recorderState.value.recordingPrefsLoaded = true;
 	cameraDevicesState.isReady = true;
 	micDevicesState.value = [];
+	micDevicesState.enabled = undefined;
+	systemVersionState.value = "15.5";
 	audioLevelMeter.call.mockClear();
 	hudCursorListeners = [];
 	selectedSourceChangedListeners = [];
@@ -1492,6 +1501,54 @@ describe("LaunchWindow device settings", () => {
 
 		expect(button).toBeEnabled();
 		expect(button).toHaveTextContent("Check for updates");
+	});
+});
+
+// ScreenCaptureKit captures the microphone from macOS 15 only; on 13 and 14 every take
+// came out without the voice, and without a word (#700).
+describe("LaunchWindow microphone before macOS 15", () => {
+	beforeEach(() => {
+		platformState.value = "darwin";
+		resetLaunchMocks();
+		micDevicesState.value = [{ deviceId: "mic-a", label: "Mic A", groupId: "g" }];
+	});
+
+	afterEach(() => {
+		cleanup();
+		vi.unstubAllGlobals();
+	});
+
+	async function openDeviceSettings() {
+		renderLaunchWindow();
+		fireEvent.click(await screen.findByTestId("launch-device-settings-button"));
+		return screen.findByTestId("hud-device-settings");
+	}
+
+	it("offers no microphone on macOS 14: no button, no picker, no meter", async () => {
+		systemVersionState.value = "14.6.1";
+
+		const panel = await openDeviceSettings();
+
+		expect(screen.queryByTestId("launch-microphone-button")).toBeNull();
+		expect(within(panel).queryByText("Input device")).toBeNull();
+		expect(within(panel).queryByRole("menuitemradio", { name: /Mic A/ })).toBeNull();
+		// Nothing asks for the microphone: enumerating it is what raises the prompt.
+		expect(micDevicesState.enabled).toBe(false);
+		expect(audioLevelMeter.call).toHaveBeenLastCalledWith(
+			expect.objectContaining({ enabled: false }),
+		);
+		expect(screen.getByTestId("launch-webcam-button")).toBeInTheDocument();
+	});
+
+	it("offers it from macOS 15", async () => {
+		systemVersionState.value = "15.0";
+
+		const panel = await openDeviceSettings();
+
+		expect(screen.getByTestId("launch-microphone-button")).toBeInTheDocument();
+		expect(within(panel).getByText("Input device")).toBeInTheDocument();
+		expect(within(panel).getByRole("menuitemradio", { name: /Mic A/ })).toBeInTheDocument();
+		expect(micDevicesState.enabled).toBe(true);
 	});
 });
 

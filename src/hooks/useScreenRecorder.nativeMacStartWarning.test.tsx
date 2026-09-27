@@ -31,6 +31,8 @@ function stubElectronAPI() {
 			cursorCaptureMode: "system",
 		})),
 		getPlatform: vi.fn(() => "darwin"),
+		// ScreenCaptureKit captures the microphone from macOS 15.
+		getSystemVersion: vi.fn(() => "15.5"),
 		getSelectedSource: vi.fn(async () => SOURCE),
 		isNativeMacCaptureAvailable: vi.fn(async () => ({ success: true, available: true })),
 		startNativeMacRecording: vi.fn(async () => ({
@@ -87,6 +89,46 @@ describe("useScreenRecorder native macOS start warnings", () => {
 		);
 		expect(view.result.current.recording).toBe(true);
 		expect(toast.error).toHaveBeenCalledWith("recording.microphoneDefaulted");
+	});
+
+	it("says so when the helper records without the microphone", async () => {
+		api.startNativeMacRecording.mockResolvedValue({
+			success: true,
+			recordingId: 7,
+			microphoneUnavailable: true,
+		});
+		const view = renderHook(() => useScreenRecorder());
+		await settle();
+
+		await act(async () => {
+			view.result.current.toggleRecording();
+		});
+		await settle(3_500);
+
+		expect(view.result.current.recording).toBe(true);
+		expect(toast.error).toHaveBeenCalledWith("recording.microphoneUnavailable");
+	});
+
+	// macOS 13 and 14 have no `captureMicrophone`: a saved "mic on" would ask for the
+	// microphone and record a take without it (#700).
+	it("does not apply a saved microphone on macOS 14", async () => {
+		api.getSystemVersion.mockReturnValue("14.6.1");
+		const view = renderHook(() => useScreenRecorder());
+		await settle();
+		expect(view.result.current.microphoneEnabled).toBe(false);
+
+		await act(async () => {
+			view.result.current.toggleRecording();
+		});
+		await settle(3_500);
+
+		expect(api.startNativeMacRecording).toHaveBeenCalledWith(
+			expect.objectContaining({
+				audio: expect.objectContaining({
+					microphone: expect.objectContaining({ enabled: false }),
+				}),
+			}),
+		);
 	});
 
 	it("does not warn after the recording start is cancelled", async () => {
