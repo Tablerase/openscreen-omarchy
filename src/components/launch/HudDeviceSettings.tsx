@@ -85,6 +85,7 @@ function CameraPreview({
  * the panel and are entirely separate from the recorder's capture streams.
  */
 export const HudDeviceSettings = memo(function HudDeviceSettings({
+	showMicrophone,
 	micDevices,
 	cameraDevices,
 	activeMicId,
@@ -101,6 +102,8 @@ export const HudDeviceSettings = memo(function HudDeviceSettings({
 	onClose,
 	panelRef,
 }: {
+	/** False where a take cannot record the microphone (see `canRecordMicrophone`). */
+	showMicrophone: boolean;
 	micDevices: MicrophoneDevice[];
 	cameraDevices: CameraDevice[];
 	activeMicId: string | undefined;
@@ -123,7 +126,7 @@ export const HudDeviceSettings = memo(function HudDeviceSettings({
 	// on a machine with no webcam fires a getUserMedia that can only fail.
 	const hasCamera = cameraDevices.length > 0 && !cameraError && !cameraLoading;
 	const { level } = useAudioLevelMeter({
-		enabled: micDevices.length > 0,
+		enabled: showMicrophone && micDevices.length > 0,
 		deviceId: activeMicId && activeMicId !== "default" ? activeMicId : undefined,
 	});
 	const { stream, error: previewError } = useCameraPreviewStream({
@@ -153,32 +156,36 @@ export const HudDeviceSettings = memo(function HudDeviceSettings({
 				</button>
 			</div>
 
-			<div className={styles.hudMenuSectionLabel}>{labels.microphone}</div>
-			{micDevices.length === 0 ? (
-				<div className={styles.hudModalEmpty}>{labels.noMicrophones}</div>
-			) : (
-				micDevices.map((device) => {
-					const isActive = device.deviceId === activeMicId;
-					return (
-						<button
-							key={device.deviceId}
-							type="button"
-							role="menuitemradio"
-							aria-checked={isActive}
-							onClick={() => onSelectMic(device)}
-							className={`${styles.languageMenuItem} ${isActive ? styles.languageMenuItemActive : ""}`}
-						>
-							<span className="truncate">{device.label}</span>
-							{isActive ? <Check size={14} className="text-white/85" /> : null}
-						</button>
-					);
-				})
-			)}
-			<div className={styles.hudModalMeterRow}>
-				<span className={styles.hudModalMeterLabel}>{labels.micLevel}</span>
-				<LevelMeter level={level} />
-			</div>
-			<div className={styles.hudModalHint}>{labels.micHint}</div>
+			{showMicrophone ? (
+				<>
+					<div className={styles.hudMenuSectionLabel}>{labels.microphone}</div>
+					{micDevices.length === 0 ? (
+						<div className={styles.hudModalEmpty}>{labels.noMicrophones}</div>
+					) : (
+						micDevices.map((device) => {
+							const isActive = device.deviceId === activeMicId;
+							return (
+								<button
+									key={device.deviceId}
+									type="button"
+									role="menuitemradio"
+									aria-checked={isActive}
+									onClick={() => onSelectMic(device)}
+									className={`${styles.languageMenuItem} ${isActive ? styles.languageMenuItemActive : ""}`}
+								>
+									<span className="truncate">{device.label}</span>
+									{isActive ? <Check size={14} className="text-white/85" /> : null}
+								</button>
+							);
+						})
+					)}
+					<div className={styles.hudModalMeterRow}>
+						<span className={styles.hudModalMeterLabel}>{labels.micLevel}</span>
+						<LevelMeter level={level} />
+					</div>
+					<div className={styles.hudModalHint}>{labels.micHint}</div>
+				</>
+			) : null}
 
 			<div className={styles.hudMenuSectionLabel}>{labels.camera}</div>
 			{cameraLoading ? (

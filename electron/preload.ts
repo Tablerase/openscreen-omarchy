@@ -421,6 +421,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
 		ipcRenderer.send("set-titlebar-overlay", color, symbolColor);
 	},
 	getPlatform: () => PLATFORM,
+	/** The OS version, as the main process reads it: "14.6.1" on macOS, not the Darwin
+	 *  kernel's "23.6.0" that `os.release()` gives. Part of the sandboxed preload's `process`. */
+	getSystemVersion: () => process.getSystemVersion(),
 	/** App identity for the HUD's settings panel: the running version, and whether this copy
 	 *  may offer an update check at all — a Store/Flathub/Snap/Nix install may not, see
 	 *  electron/install-channel.ts. */

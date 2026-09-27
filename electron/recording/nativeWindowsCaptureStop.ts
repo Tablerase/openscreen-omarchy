@@ -123,6 +123,17 @@ export function readMicrophoneDefaulted(output: string) {
 }
 
 /**
+ * Did the macOS helper record without the microphone it was asked for?
+ *
+ * It captures the mic through ScreenCaptureKit's `captureMicrophone`, macOS 15
+ * API. Earlier it says so and records the take anyway, and nothing read that:
+ * the take came back with no voice and no word (getopenscreen/openscreen#700).
+ */
+export function readMicrophoneUnavailable(output: string) {
+	return output.includes('"code":"microphone-unavailable"');
+}
+
+/**
  * Index of the `}` that closes the object starting at `start`, or -1.
  *
  * Stopping at the first `}` is wrong for a value that contains one, and a

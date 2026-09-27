@@ -48,6 +48,7 @@
 		"cameraNotFound": "Kamera nenalezena.",
 		"cameraCaptureUnavailable": "Kameru se nepodařilo otevřít. Nahrávání probíhá bez ní.",
 		"microphoneDefaulted": "Vybraný mikrofon se nepodařilo identifikovat. Nahrávání bude pokračovat s výchozím vstupem.",
+		"microphoneUnavailable": "Tato verze macOS neumí nahrávat mikrofon. Nahrávání probíhá bez něj.",
 		"permissionDenied": "Oprávnění k nahrávání odepřeno. Povolte prosím záznam obrazovky.",
 		"accessibilityAllowAndRetry": "Povolte přístup k usnadnění pro OpenScreen a poté znovu stiskněte tlačítko nahrávání pro zahájení odpočítávání.",
 		"selectSource": "Vyberte prosím zdroj pro nahrávání"

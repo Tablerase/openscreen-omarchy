@@ -3,6 +3,7 @@ import { useI18n, useScopedT } from "@/contexts/I18nContext";
 import { getAvailableLocales, getLocaleName } from "@/i18n/loader";
 import { loadUserPreferences, saveUserPreferences } from "@/lib/userPreferences";
 import { nativeBridgeClient } from "@/native";
+import { canRecordMicrophone } from "@/utils/platformUtils";
 import { type CameraDevice } from "../../hooks/useCameraDevices";
 import { useCameraHudSync } from "../../hooks/useCameraHudSync";
 import {
@@ -184,6 +185,8 @@ export function LaunchWindow() {
 		setWebcamDeviceId,
 		setWebcamDeviceName,
 	});
+	// macOS 13 and 14 cannot record the microphone (#700): no button, no picker, no meter.
+	const microphoneOffered = canRecordMicrophone();
 	// The microphone list stays lazy: enumerating it asks for mic permission,
 	// which would light the OS "in use" indicator just for opening the HUD.
 	const {
@@ -192,7 +195,7 @@ export function LaunchWindow() {
 		setSelectedDeviceId: setSelectedMicId,
 		isReady: micDevicesReady,
 	} = useMicrophoneDevices(
-		microphoneEnabled || isDeviceSettingsOpen,
+		microphoneOffered && (microphoneEnabled || isDeviceSettingsOpen),
 		microphoneDeviceId,
 		microphoneDeviceName,
 	);
@@ -1154,12 +1157,16 @@ export function LaunchWindow() {
 					<div
 						className={`${styles.hudControlGroup} ${isVertical ? styles.hudControlGroupVertical : ""}`}
 					>
-						<HudMicButton
-							enabled={microphoneEnabled}
-							disabled={controlsLocked}
-							label={microphoneEnabled ? t("audio.disableMicrophone") : t("audio.enableMicrophone")}
-							onClick={toggleMicrophone}
-						/>
+						{microphoneOffered && (
+							<HudMicButton
+								enabled={microphoneEnabled}
+								disabled={controlsLocked}
+								label={
+									microphoneEnabled ? t("audio.disableMicrophone") : t("audio.enableMicrophone")
+								}
+								onClick={toggleMicrophone}
+							/>
+						)}
 						<HudCameraButton
 							enabled={webcamEnabled}
 							disabled={controlsLocked}
@@ -1260,6 +1267,7 @@ export function LaunchWindow() {
 					<div className={styles.hudAbove}>
 						{isDeviceSettingsOpen && (
 							<HudDeviceSettings
+								showMicrophone={microphoneOffered}
 								micDevices={micDevices}
 								cameraDevices={cameraDevices}
 								activeMicId={microphoneDeviceId || selectedMicId}

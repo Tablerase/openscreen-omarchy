@@ -115,6 +115,7 @@ import {
 	isSalvageableFragmentedCapture,
 	NATIVE_WINDOWS_SALVAGEABLE_OUTPUT_BYTES,
 	readMicrophoneDefaulted,
+	readMicrophoneUnavailable,
 	readWebcamFormat,
 	readWebcamUnavailable,
 	terminateNativeWindowsCapture,
@@ -3121,6 +3122,17 @@ export function registerIpcHandlers(
 					deviceName: request.audio.microphone.deviceName,
 				});
 			}
+			// Where this happens the app offers no microphone (#700). A take that asks for one
+			// anyway (`openscreen record --mic`) records without it, and this line is what the
+			// CLI prints about it.
+			const microphoneUnavailable =
+				request.audio.microphone.enabled && readMicrophoneUnavailable(nativeMacCaptureOutput);
+			if (microphoneUnavailable) {
+				console.warn(
+					"[native-sck] recording without the microphone; ScreenCaptureKit captures it from macOS 15",
+					{ macOS: process.getSystemVersion() },
+				);
+			}
 			nativeMacCursorOffsetMs =
 				cursorCaptureMode === "editable-overlay"
 					? Math.max(0, captureStartedAtMs - cursorStartTimeMs)
@@ -3137,6 +3149,7 @@ export function registerIpcHandlers(
 				path: outputPath,
 				helperPath,
 				microphoneDefaulted,
+				microphoneUnavailable,
 			};
 		} catch (error) {
 			console.error("Failed to start native macOS recording:", error);

@@ -19,7 +19,7 @@ import { useCameraDevices } from "@/hooks/useCameraDevices";
 import { useCameraPreviewStream } from "@/hooks/useCameraPreviewStream";
 import { useMicrophoneDevices } from "@/hooks/useMicrophoneDevices";
 import { usePortalOwnsSource } from "@/hooks/usePortalOwnsSource";
-import { getPlatform } from "@/utils/platformUtils";
+import { canRecordMicrophone, getPlatform } from "@/utils/platformUtils";
 import styles from "./EditorShellV4.module.css";
 
 interface RecordingPrefsState {
@@ -47,10 +47,10 @@ const DEFAULT_PREFS: RecordingPrefsState = {
 };
 
 function normalizedRecordingPrefs(prefs: Partial<RecordingPrefsState>): RecordingPrefsState {
-	return {
-		...DEFAULT_PREFS,
-		...prefs,
-	};
+	const next = { ...DEFAULT_PREFS, ...prefs };
+	// A saved microphone is not applied where a take cannot record it (#700): no
+	// meter holding the microphone open for a take that will not have it.
+	return { ...next, micEnabled: next.micEnabled && canRecordMicrophone() };
 }
 
 /**
@@ -337,59 +337,61 @@ export function RecStage({
 						</button>
 					</div>
 
-					<div className={styles.recRow}>
-						<div className={styles.recRowLabel}>
-							{prefs.micEnabled ? <MicOn size={15} /> : <MicOff size={15} />}
-							{t("rec.microphone")}
+					{canRecordMicrophone() ? (
+						<div className={styles.recRow}>
+							<div className={styles.recRowLabel}>
+								{prefs.micEnabled ? <MicOn size={15} /> : <MicOff size={15} />}
+								{t("rec.microphone")}
+							</div>
+							<div className={styles.recRowControl}>
+								{prefs.micEnabled ? (
+									micDevices.isLoading || !micDevices.isReady ? (
+										<span className={styles.recRowMuted}>
+											<Loader2 size={13} className="animate-spin" />
+											{t("rec.loading")}
+										</span>
+									) : micDevices.error ? (
+										<span className={styles.recRowMuted} title={micDevices.error}>
+											{t("rec.microphoneUnavailable")}
+										</span>
+									) : micDevices.devices.length === 0 ? (
+										<span className={styles.recRowMuted}>{t("rec.noMicrophoneFound")}</span>
+									) : (
+										<select
+											className={styles.recSelect}
+											value={micDevices.selectedDeviceId}
+											onChange={(e) => {
+												const deviceId = e.target.value;
+												micDevices.setSelectedDeviceId(deviceId);
+												// The label travels with the id: the native Windows
+												// helper selects a microphone by NAME, and records the
+												// Windows default endpoint when it is missing.
+												updatePrefs({
+													micDeviceId: deviceId,
+													micDeviceName:
+														micDevices.devices.find((d) => d.deviceId === deviceId)?.label ?? null,
+												});
+											}}
+										>
+											{micDevices.devices.map((d) => (
+												<option key={d.deviceId} value={d.deviceId}>
+													{d.label}
+												</option>
+											))}
+										</select>
+									)
+								) : null}
+								<button
+									type="button"
+									className={`${styles.recToggleBtn}${prefs.micEnabled ? ` ${styles.on}` : ""}`}
+									aria-pressed={prefs.micEnabled}
+									onClick={() => updatePrefs({ micEnabled: !prefs.micEnabled })}
+								>
+									{prefs.micEnabled ? t("rec.on") : t("rec.off")}
+								</button>
+							</div>
 						</div>
-						<div className={styles.recRowControl}>
-							{prefs.micEnabled ? (
-								micDevices.isLoading || !micDevices.isReady ? (
-									<span className={styles.recRowMuted}>
-										<Loader2 size={13} className="animate-spin" />
-										{t("rec.loading")}
-									</span>
-								) : micDevices.error ? (
-									<span className={styles.recRowMuted} title={micDevices.error}>
-										{t("rec.microphoneUnavailable")}
-									</span>
-								) : micDevices.devices.length === 0 ? (
-									<span className={styles.recRowMuted}>{t("rec.noMicrophoneFound")}</span>
-								) : (
-									<select
-										className={styles.recSelect}
-										value={micDevices.selectedDeviceId}
-										onChange={(e) => {
-											const deviceId = e.target.value;
-											micDevices.setSelectedDeviceId(deviceId);
-											// The label travels with the id: the native Windows
-											// helper selects a microphone by NAME, and records the
-											// Windows default endpoint when it is missing.
-											updatePrefs({
-												micDeviceId: deviceId,
-												micDeviceName:
-													micDevices.devices.find((d) => d.deviceId === deviceId)?.label ?? null,
-											});
-										}}
-									>
-										{micDevices.devices.map((d) => (
-											<option key={d.deviceId} value={d.deviceId}>
-												{d.label}
-											</option>
-										))}
-									</select>
-								)
-							) : null}
-							<button
-								type="button"
-								className={`${styles.recToggleBtn}${prefs.micEnabled ? ` ${styles.on}` : ""}`}
-								aria-pressed={prefs.micEnabled}
-								onClick={() => updatePrefs({ micEnabled: !prefs.micEnabled })}
-							>
-								{prefs.micEnabled ? t("rec.on") : t("rec.off")}
-							</button>
-						</div>
-					</div>
+					) : null}
 
 					<div className={styles.recRow}>
 						<div className={styles.recRowLabel}>
