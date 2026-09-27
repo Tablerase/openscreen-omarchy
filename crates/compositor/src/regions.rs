@@ -951,12 +951,13 @@ pub fn zoom_state_in(
     }
 }
 
-/// Port de `computeCameraFullscreenRegionStrength` (TS) : progrès EXACTEMENT contenu dans
-/// [startSec, endSec] (contrairement au zoom, qui anticipe avant `startSec`) — ease-in depuis
-/// 0 pile à `startSec`, plein régime, ease-out jusqu'à 0 pile à `endSec`. Fenêtres bornées à la
-/// moitié de la durée de la région pour que les régions courtes s'animent pleinement sans
-/// déborder. Fenêtres mesurées à l'écran, comme celles du zoom (`ScreenClock`).
-fn camera_fullscreen_region_strength(
+/// Port de `computeCameraFullscreenRegionStrength` (TS), avant son ease : phase LINÉAIRE
+/// EXACTEMENT contenue dans [startSec, endSec] (contrairement au zoom, qui anticipe avant
+/// `startSec`) — montée depuis 0 pile à `startSec`, plein régime, descente jusqu'à 0 pile à
+/// `endSec`. Fenêtres bornées à la moitié de la durée de la région pour que les régions courtes
+/// s'animent pleinement sans déborder. Fenêtres mesurées à l'écran, comme celles du zoom
+/// (`ScreenClock`). Le rect et la bulle y appliquent chacun leur courbe.
+fn camera_fullscreen_region_phase(
     region: &SceneCameraFullscreenRegion,
     t: f32,
     clock: &ScreenClock,
@@ -973,40 +974,60 @@ fn camera_fullscreen_region_strength(
     let lead_in_end = start + lead_in;
     let lead_out_start = end - lead_out;
     if t < lead_in_end {
-        let progress = if lead_in > 0.0 {
+        return if lead_in > 0.0 {
             (t - start) / lead_in
         } else {
             1.0
         };
-        return ease_out_screen_studio(progress);
     }
     if t <= lead_out_start {
         return 1.0;
     }
-    let progress = if lead_out > 0.0 {
+    if lead_out > 0.0 {
         (end - t) / lead_out
     } else {
         0.0
-    };
-    ease_out_screen_studio(progress)
+    }
 }
 
-/// Progrès Full Camera (0..1) au temps `t` : 0 = webcam à sa taille normale, 1 = plein cadre.
-/// Régions superposées (ne devrait pas arriver, gardé défensif comme le web) → la plus forte
-/// gagne.
-pub fn camera_fullscreen_progress_at(
+/// Phase Full Camera (0..1) au temps `t`. Régions superposées (ne devrait pas arriver, gardé
+/// défensif comme le web) → la plus forte gagne.
+fn camera_fullscreen_phase_at(
     regions: &[SceneCameraFullscreenRegion],
     t: f32,
     clock: &ScreenClock,
 ) -> f32 {
     let mut strongest = 0.0f32;
     for r in regions {
-        let s = camera_fullscreen_region_strength(r, t, clock);
+        let s = camera_fullscreen_region_phase(r, t, clock);
         if s > strongest {
             strongest = s;
         }
     }
     strongest
+}
+
+/// Progrès Full Camera (0..1) au temps `t` : 0 = webcam à sa taille normale, 1 = plein cadre.
+pub fn camera_fullscreen_progress_at(
+    regions: &[SceneCameraFullscreenRegion],
+    t: f32,
+    clock: &ScreenClock,
+) -> f32 {
+    ease_out_screen_studio(camera_fullscreen_phase_at(regions, t, clock))
+}
+
+/// Ce qui reste de la bulle PiP (coins arrondis, ombre) au temps `t` : 1 = bulle entière,
+/// 0 = plein cadre net. Pas `1 - progrès` : le rect part en ease-out et a fait 90 % du chemin au
+/// premier tiers de la montée, donc des coins qui le suivaient étaient carrés presque tout du
+/// long, et ne se rearrondissaient qu'à l'arrivée au retour. La bulle tient toute la première
+/// moitié de la montée et se dissout dans la seconde, quand la caméra touche déjà les bords ; au
+/// retour, elle revient dans la première moitié, avant que la caméra ne quitte le cadre.
+pub fn camera_fullscreen_shape_at(
+    regions: &[SceneCameraFullscreenRegion],
+    t: f32,
+    clock: &ScreenClock,
+) -> f32 {
+    1.0 - smoothstep(0.5, 1.0, camera_fullscreen_phase_at(regions, t, clock))
 }
 
 // ============ Rotation 3D (tilt perspective, présets iso/left/right) ================
@@ -1968,6 +1989,25 @@ mod zoom_focus_tests {
                 camera_fullscreen_progress_at(&full_camera(1.0), t / 4.0, &ScreenClock::default());
             assert!((a - b).abs() < 1e-4, "Full Camera t={t} : {a} vs {b}");
         }
+    }
+
+    /// Les coins suivent la phase, pas le rect. Avec `1 - progrès`, ils étaient carrés presque
+    /// tout du long de la montée et ne revenaient qu'à la toute fin du retour.
+    #[test]
+    fn full_camera_corners_dissolve_late_and_come_back_early() {
+        let r = [SceneCameraFullscreenRegion { clip_index: None, start_sec: 10.0, end_sec: 20.0 }];
+        let clock = ScreenClock::default();
+        let at = |t: f32| {
+            (camera_fullscreen_progress_at(&r, t, &clock), camera_fullscreen_shape_at(&r, t, &clock))
+        };
+        // Premier tiers de la montée : la caméra a fait l'essentiel du chemin, coins intacts.
+        let (progress, shape) = at(10.0 + TRANSITION_WINDOW_S / 3.0);
+        assert!(progress > 0.85 && shape == 1.0, "montée : {progress} / {shape}");
+        // Mi-retour : les coins sont revenus, la caméra a à peine quitté le cadre.
+        let (progress, shape) = at(20.0 - FULLSCREEN_LEAD_OUT_WINDOW_S / 2.0);
+        assert!(progress > 0.95 && shape > 0.999, "retour : {progress} / {shape}");
+        assert_eq!(at(15.0), (1.0, 0.0), "plein cadre : plus de coins");
+        assert_eq!(at(5.0), (0.0, 1.0), "hors région : la bulle entière");
     }
 
     /// Le cas réel : la speed region commence au milieu de l'ease-in. Le zoom doit durer autant de

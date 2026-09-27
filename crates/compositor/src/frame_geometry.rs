@@ -2943,6 +2943,8 @@ pub fn plan_frame(input: &FrameGeometryInput) -> FrameGeometry {
             crate::regions::camera_fullscreen_progress_at(cam_regions, source_t, &clock);
         let cam_progress_prev =
             crate::regions::camera_fullscreen_progress_at(cam_regions, source_t_prev, &clock);
+        let shape_fade =
+            crate::regions::camera_fullscreen_shape_at(cam_regions, source_t, &clock);
         // rétrécissement réactif : la webcam rétrécit pendant un zoom actif, de la MOITIÉ de ce
         // que prendrait 1/zoom : ×0,78 au zoom par défaut (1,8), ×0,6 au zoom maximal (5). En
         // 1/zoom elle tombait à ×0,56 au zoom par défaut et un visage ne se lisait plus. Ignoré
@@ -3334,12 +3336,11 @@ pub fn plan_frame(input: &FrameGeometryInput) -> FrameGeometry {
         // était une SECONDE, indépendante — fraction différente (0.12 vs 0.06 côté web) et sans
         // bornes — donc écran et caméra ne pouvaient pas s'accorder.
         let app_webcam_radius_frac = scene.and_then(|s| s.layout.webcam_radius_frac);
-        // Full Camera dissout la forme en même temps qu'elle prend le cadre : le rayon fond
-        // vers 0 avec `cam_progress`, donc le cercle devient un rect à coins de plus en plus
-        // francs puis un plein cadre net — aucun masque ne survit au plein écran (parité
-        // `computeCameraFullscreenRect`, qui ramène `maskShape` à "rectangle" et lerpe le
-        // rayon vers 0 pour exactement la même raison).
-        let shape_fade = (1.0 - cam_progress).clamp(0.0, 1.0);
+        // Full Camera dissout la forme en prenant le cadre : le rayon fond vers 0, donc le cercle
+        // devient un rect à coins de plus en plus francs puis un plein cadre net — aucun masque
+        // ne survit au plein écran. Il fond sur sa propre courbe, en retard sur le rect
+        // (`camera_fullscreen_shape_at`). `computeCameraFullscreenRect` (TS) le lerpe encore
+        // avec le progrès, mais ce rayon-là n'habille qu'une `<video>` cachée.
         let w_radius = shape_fade
             * w_nominal_min
             * match app_webcam_radius_frac {

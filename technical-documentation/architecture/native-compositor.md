@@ -132,8 +132,10 @@ what `shaders.hlsl` actually implements:
    mirror, mask shape (rectangle / circle / square / rounded), and reactive
    scale applied
    ([`compositor.rs:2127`](../../crates/compositor/src/compositor_windows.rs), `mode = 0`).
-   Full Camera lerps the destination to `[0, 0, 1, 1]` and dissolves the mask
-   shape — same rule as `computeCameraFullscreenRect` on the TS side.
+   Full Camera lerps the destination to `[0, 0, 1, 1]`, same rule as
+   `computeCameraFullscreenRect` on the TS side, and dissolves the mask shape
+   on its own, later curve (`camera_fullscreen_shape_at`): the corners hold
+   while the camera grows and square off once it reaches the frame edges.
 7. **Annotations.** Highest layer. One full-frame `CopySubresourceRegion` of
    the composed scene is taken at the top of `draw_annotations` so that
    multiple blur annotations on the same frame read from a consistent snapshot
