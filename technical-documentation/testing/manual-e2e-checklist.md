@@ -8,29 +8,32 @@ Sections marked **v1.8.0** cover what that release changed: chat-driven editing 
 
 Sections marked **post-1.10.0** cover what has landed on `main` since the v1.10.0 tag: the AI camera background, the caption anchor model, pixel-resolution crop, editor window bounds, update settings, the Windows recording encoder and AAC changes, **imported audio and voice-over recording**, and **transcript word editing with word insertion**. Run the whole file for a release candidate; the marked sections are the ones with no prior release to fall back on.
 
+Sections and checks marked **v2.0.0** cover what v2 changed: the editor's Record mode and automatic zooms after a take, Apple's source picker and the permissions window on macOS, and the export destinations. The v2 editor also reshaped controls older sections name (the top bar, the transport, the inspector); those checks were rewritten in place rather than marked.
+
 ## How to run this
 
-1. Drive the real Electron app with computer-use — real OS mouse and keyboard events. Start a dev build with `npm run dev`, or launch the packaged build under test.
+1. Drive the real Electron app with computer-use — real OS mouse and keyboard events. For a release candidate, launch the CI-built artifact (see [Running the pass on a CI-built artifact](#running-the-pass-on-a-ci-built-artifact) below); for a change under development, a dev build started with `npm run dev`.
 
    "Manual" here usually means an agent holding the mouse, so the tempting shortcut is not a browser shim: it is driving the real app through CDP instead. **Do not.** Playwright's `.click()`, `javascript_tool`-dispatched pointer events and anything else synthesised into the renderer arrive *below* the OS hit-test. On Windows and macOS the HUD is input-transparent until a real cursor move lifts it, so an injected click fires the DOM handler and comes back green while the path a user actually takes was never exercised at all.
 
    That trap is specific to the HUD and the countdown overlay — they are the only click-through windows; the editor is an ordinary one, and an injected click there does reach the handler a user would reach. The reason not to inject in the editor either is the first line of this file: this checklist covers what unit, browser and **Playwright** tests cannot. Drive it the way those tests already drive it and you have re-run the coverage you had, then written "passed" beside the parts nothing checked.
 2. The app is single-instance per `userData` path. If a leftover Electron/OpenScreen process still holds the lock, stop that process before relaunching; a second launch can exit successfully without opening a window. The lock is held by the OS and is released when the process dies, so there is nothing to delete on disk.
-3. From a worktree, link or junction `node_modules` to the main checkout and provide the prebuilt native capture binaries for the platform before starting the dev build. **Date those binaries against the change you came to test.** Nothing rebuilds them, so an older helper runs the old code path in silence: the recording succeeds and the thing you were checking for is simply absent. See AGENTS.md for how to check one and how to rebuild it; when you cannot, test the CI-built artifact, because a dev build cannot answer a native question.
+3. For a dev build from a worktree, link or junction `node_modules` to the main checkout and provide the prebuilt native capture binaries for the platform before starting the dev build. **Date those binaries against the change you came to test.** Nothing rebuilds them, so an older helper runs the old code path in silence: the recording succeeds and the thing you were checking for is simply absent. See AGENTS.md for how to check one and how to rebuild it; when you cannot, test the CI-built artifact, because a dev build cannot answer a native question.
 
    **A junctioned `node_modules` is only as current as the checkout it points at.** Diff the two `package.json` dependency sets before trusting it: a dependency added after that checkout's HEAD is simply absent, and the failure does not name it — `vite` logs one `Rollup failed to resolve import` line among the build noise, the main process starts anyway, and the IPC handlers in the module that failed to bundle are never registered. Symptom seen: `No handler registered for 'get-app-info'` and no visible window, from a missing `electron-updater`. Installing the one missing package into the shared tree reconciles that tree against the *older* lockfile, so re-check the packages you need afterwards rather than assuming the install was additive.
-4. Grant computer-use access to the process name that actually owns the window: `electron.exe` or `Electron.app` for a dev build, and `Openscreen.exe` or `Openscreen.app` for a packaged build. Do not grant access only to the installed app name when testing a dev build — it resolves to the *installed* executable and reports success while the dev window stays masked. This is step 4 and not step 1 for a reason: a dev build is not an installed app, so the resolver cannot find it until it is running and owns a window, and one unresolvable name voids the whole request.
+4. Grant computer-use access to the process name that actually owns the window: `electron.exe` or `Electron.app` for a dev build, and the installed name `Openscreen` for a packaged build or CI artifact. Do not grant access only to the installed app name when testing a dev build — it resolves to the *installed* executable and reports success while the dev window stays masked. This is step 4 and not step 1 for a reason: a dev build is not an installed app, so the resolver cannot find it until it is running and owns a window, and one unresolvable name voids the whole request.
 
    **Ask for everything in ONE call — after the launches above, before the first check.** `request_access` takes a list, and once a grant is in place the rest of the pass runs without a single further prompt: a full capture-to-export run is dozens of clicks and none of them ask again. So the only thing keeping a human at the keyboard is *how many* dialogs you raise and *when*. Raise one, before the first check, and the operator can walk away for the rest of the run; discover a fourth app you need an hour in and they cannot. That is also why this cannot move earlier — the resolver needs the app running, and one unresolvable name voids the batch. Beyond the app under test, ask for:
 
    - the desktop shell — the tray icon and the native save dialogs live there, and the tray is the only reliable way back to the HUD;
-   - the OS settings app — needed to change display scaling, which is how DPI checks are run (see AGENTS.md; "the machine is at 100%" is not a reason to skip them).
+   - the OS settings app — needed to change display scaling, which is how DPI checks are run (see AGENTS.md; "the machine is at 100%" is not a reason to skip them), and on macOS to grant permissions;
+   - on macOS 15.2+, whatever draws Apple's source picker, and on macOS the permission prompts; on Linux, the portal's source picker. None of them is an OpenScreen window, and which process owns each is **to confirm on the first run**: the screenshot note names a masked window's process, so ask for that name, then write it here.
 
    **Name them the way the Start menu does, in the system's own language.** The resolver matches installed-app display names, not executables: on a French Windows the shell is `Explorateur de fichiers` and `explorer.exe` fails outright — `notInstalled`, with a nonsense suggestion attached — which then voids every other name in the same call. On an English install it is `File Explorer`. When unsure, ask rather than guess; the tool lists the installed names it knows.
 
    There is no way to pre-approve any of this in config: the request has to be answered live. That is upstream ([claude-code#46907](https://github.com/anthropics/claude-code/issues/46907), closed stale), and `bypassPermissions` does not cover it either ([#43172](https://github.com/anthropics/claude-code/issues/43172)). Batching is the whole mitigation.
 5. Read [AGENTS.md](../../AGENTS.md) for the computer-use mechanics, screenshot permissions, tray interaction, and cleanup procedure. Read one check, perform it, observe the result, then continue; close each modal or popover with `Esc` before the next check.
-6. The recording HUD is protected from capture by default and is invisible in screenshots. For this session only, launch with `OPENSCREEN_DISABLE_CONTENT_PROTECTION=1`; this is the environment variable checked before `setContentProtection(true)`. Unset it before making any recording whose HUD must not appear in the video.
+6. The recording HUD is protected from capture by default and is invisible in screenshots. For this session only, launch with `OPENSCREEN_DISABLE_CONTENT_PROTECTION=1`; this is the environment variable checked before `setContentProtection(true)`. A packaged build gets it only when its executable is started from the shell where it is set. macOS 26 and later need no flag, and Linux has no protection to lift. Unset it before making any recording whose HUD must not appear in the video.
 7. A preview screenshot is downscaled. Settle every pixel-level question by exporting a frame and measuring the exported frame, not by judging fine edges, corners, shadows, or alignment from the preview screenshot.
 8. Keep the first real recording or imported project available for the editor sections. Log crashes, hangs, data loss, security issues, and reproducible visual failures as soon as they occur.
 9. Several v1.8.0 sections need a configured AI provider (chat editing, caption translation) or a built native compositor addon (preview, export). A dev build from a worktree needs the compositor addon installed for its platform, not only the capture binaries. When a prerequisite is missing, record the section as skipped with the reason; do not mark it passed.
@@ -38,28 +41,83 @@ Sections marked **post-1.10.0** cover what has landed on `main` since the v1.10.
    The **AI camera background** needs two more things that nothing else does: the ONNX Runtime shared library staged beside the addon (`npm run fetch:onnxruntime`, which a plain `npm run dev` does not run) and a recording that actually has a webcam track. Without the library the control is *correctly* absent — so an absent control is only a defect once you have confirmed the library is there. Check both directions before writing a verdict.
 10. Prefer a project with at least two clips from the same asset for the modifier sections. A single-clip project cannot exercise anchoring, reorder, or cross-boundary splitting at all, which is where the v1.8.0 timeline model changed.
 
+### Running the pass on a CI-built artifact
+
+A release candidate is tested on what CI built, not on a dev build. The artifact carries one matched native payload built from the commit under test, so the stale-binary traps of a dev build do not apply to it. It comes from `.github/workflows/build.yml` dispatched by hand on the branch under test with `release_tag` left empty, which builds every platform and publishes nothing: `gh workflow run build.yml -R getopenscreen/openscreen --ref <branch> -f arch=both` (`arch` picks the macOS architectures).
+
+**Get the artifact.** The run's page lists the artifacts at the bottom, under Artifacts, for anyone logged in to GitHub; each one downloads as a zip. From a terminal, find the run, then download an artifact by name. Artifacts expire after 30 days.
+
+```bash
+gh run list -R getopenscreen/openscreen --workflow build.yml --branch <branch>
+gh run download <run-id> -R getopenscreen/openscreen -n openscreen-windows
+```
+
+| Artifact | What it holds |
+|---|---|
+| `openscreen-windows` | `Openscreen.Setup.<version>.exe`, the NSIS installer, with its `.blockmap` and `latest.yml` |
+| `openscreen-windows-store` | `Openscreen.Setup.<version>.appx`, the Store package |
+| `openscreen-mac-arm64`, `openscreen-mac-x64` | `Openscreen-macOS-Apple-Silicon-<version>.dmg` or `Openscreen-macOS-Intel-<version>.dmg`, with the update ZIP and its JSON |
+| `openscreen-linux` | `Openscreen-Linux-<version>` as `.AppImage`, `.deb`, `.rpm` and `.pacman`, with `latest-linux.yml` |
+
+`<version>` comes from `package.json`, not from the branch, so it does not tell two candidates apart. The results row carries the run id, and the version About OpenScreen reports.
+
+**Windows.**
+
+- Run the Setup `.exe`. It is not code-signed, so SmartScreen's "Windows protected your PC" is expected; going past it is the machine owner's decision, not the agent's. The installer asks whether to install for the current user (`%LOCALAPPDATA%\Programs\Openscreen\`) or for all users (`C:\Program Files\Openscreen\`).
+- If the installer started the app when it finished, quit that copy (*Quit OpenScreen* on the HUD, or tray → *Quit*). It runs without the flag below, and its single-instance lock makes the next launch exit silently.
+- Launch from PowerShell, so the flag reaches the process (adjust the path for an all-users install):
+
+  ```powershell
+  $env:OPENSCREEN_DISABLE_CONTENT_PROTECTION = "1"
+  & "$env:LOCALAPPDATA\Programs\Openscreen\Openscreen.exe"
+  ```
+
+- Grant `Openscreen`, not `electron.exe`.
+- `openscreen-windows-store` is unsigned as well, and Windows does not install an unsigned package. From a source checkout, `powershell -File scripts/verify-appx-native.ps1 -Appx <file> -KeepRegistered` registers it for a pass by hand, then grant the name its Start-menu entry shows. Loose registration needs Developer Mode, a machine-wide setting its owner turns on or not.
+
+**macOS.**
+
+- Take the artifact that matches the Mac: `arm64` for Apple Silicon, `x64` for Intel.
+- The DMG is signed with the Developer ID, notarized and stapled only when the run has all six Apple secrets (`MAC_CERTIFICATE_P12`, `MAC_CERTIFICATE_PASSWORD`, `MAC_CSC_NAME`, `APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_APP_SPECIFIC_PASSWORD`). Without them the `.app` is ad-hoc signed and the DMG is neither signed nor notarized; the job's *Notarize DMG* step then shows as skipped. On the Mac, `spctl -a -vv -t install <dmg>` answers `accepted` and `source=Notarized Developer ID` for a notarized DMG.
+- Gatekeeper refuses an unnotarized DMG that a browser downloaded. Clearing its quarantine attribute is a security override the Mac's owner decides on, not the agent. macOS ties permission grants to the code signature, and an ad-hoc signature changes with every build, so grants made to one candidate may not carry to the next.
+- Open the DMG and drag Openscreen into Applications.
+- On macOS 26 and later no flag is needed: launch it as a user would. On macOS 13 to 15 the flag takes a launch from Terminal, `OPENSCREEN_DISABLE_CONTENT_PROTECTION=1 /Applications/Openscreen.app/Contents/MacOS/Openscreen`. Whether macOS then files the permission prompts under Terminal rather than OpenScreen is **to confirm on the first run**.
+- Grant `Openscreen`, plus the picker and prompt processes from step 4.
+
+**Linux.**
+
+- AppImage: `chmod +x Openscreen-Linux-<version>.AppImage`, then run it; add `--no-sandbox` if Chromium's sandbox cannot start. A package: install it with the distribution's tool (`sudo apt install ./Openscreen-Linux-<version>.deb`, `sudo dnf install ./Openscreen-Linux-<version>.rpm`, `sudo pacman -U Openscreen-Linux-<version>.pacman`), then run `openscreen`.
+- No flag is needed. Which name to grant is **to confirm on the first run**: a package installs a desktop entry, an AppImage has none until it is integrated.
+
+**Logs of a packaged build.** OpenScreen writes no log file. The main process logs to its standard output, so a launch from a terminal shows it there, `[content-protection] OFF for the HUD window` included; whether the Windows executable prints into the PowerShell that started it is **to confirm on the first run**. Launched with `OPENSCREEN_DIAGNOSTIC=1` as well, the app keeps the last 500 main-process lines, and tray → *Save Diagnostics* writes them to a JSON file of your choice, with the capture helper's recent output. The renderer's `console` calls are stripped from packaged builds. Recordings and their `.cursor.json` and `.session.json` sidecars are in the `recordings` folder of `%APPDATA%\Openscreen`, `~/Library/Application Support/Openscreen` or `~/.config/Openscreen`.
+
 ## Launch and HUD
 
-- [ ] Start the app and confirm one launch window appears without a startup crash.
+- [ ] Start the app and confirm one launch window, the HUD, appears without a startup crash (on macOS the permissions window may open beside it: see the macOS section).
 - [ ] Confirm the launch window remains usable after the first device enumeration completes.
 - [ ] Confirm the HUD is visible when content protection is disabled for the test session.
-- [ ] Activate `[data-testid="launch-tray-layout-button"]` and confirm the tray changes between horizontal and vertical layouts.
-- [ ] Confirm the chosen tray layout remains coherent when the HUD grows to show recording controls.
+- [ ] Activate `[data-testid="launch-tray-layout-button"]` and confirm the bar switches between horizontal and vertical.
+- [ ] Confirm the chosen bar layout remains coherent when the HUD grows to show recording controls.
 - [ ] Activate `[data-testid="hud-drag-handle"]`, drag the HUD across most of the primary display, and confirm it follows the pointer without drift.
 - [ ] Release the drag and confirm the HUD stays at the dropped position instead of jumping.
 - [ ] Activate the language button by its visible language code and confirm a menu of locale choices opens.
 - [ ] Press `Esc` with the language menu open and confirm it closes without changing the locale.
-- [ ] Activate the minimize control and confirm the HUD hides without quitting the app.
+- [ ] Activate the camera toggle `[data-testid="launch-webcam-button"]` and the microphone toggle `[data-testid="launch-microphone-button"]` (absent on macOS 13 and 14) and confirm each turns on with one click.
+- [ ] Open the gear `[data-testid="launch-device-settings-button"]` (*Device settings*) and confirm it lists the input devices with a level meter that moves when you speak, and the cameras with a live preview; pick another device, close with *Done*, and confirm the toggle now records from it.
+- [ ] Activate *Hide recording bar* and confirm the HUD hides without quitting the app.
 - [ ] Refocus the app from its system-tray icon and confirm the HUD returns to the foreground.
-- [ ] Activate the close control while idle and confirm the HUD closes cleanly.
+- [ ] Activate *Quit OpenScreen* while idle and confirm the app exits cleanly, tray icon included.
 - [ ] Relaunch the app after closing it and confirm the single-instance behavior does not leave a duplicate HUD.
 
 ## Source selection and recording
 
-- [ ] Activate `[data-testid="launch-source-selector-button"]` and confirm the source selector opens.
-- [ ] Select a screen or application card with `data-testid="source-selector-card"`, activate `[data-testid="source-selector-share-button"]`, and confirm the selector closes with the source name on the HUD.
-- [ ] Confirm `[data-testid="launch-record-button"]` is disabled until a source is selected, then activate it and confirm recording starts with a red stop state and an increasing elapsed timer.
-- [ ] Confirm the configured system-audio, microphone, webcam, and cursor states remain visible while recording.
+The in-app source selector below is the Windows one, and the macOS one before 15.2. macOS 15.2+ picks in Apple's picker (see the macOS section), and Linux in the portal's, after record is pressed (see the Linux section).
+
+- [ ] Activate `[data-testid="launch-source-selector-button"]` and confirm the source selector opens on its *Screens* and *Windows* tabs.
+- [ ] Select a screen or application card with `data-testid="source-selector-card"`, activate `[data-testid="source-selector-share-button"]` (*Select*), and confirm the selector closes with the source name on the HUD.
+- [ ] With no source picked, confirm `[data-testid="launch-record-button"]` is enabled with the tooltip "Choose a screen or window to record", that activating it opens the source selector, and that picking a source starts the recording without a second click.
+- [ ] Confirm recording starts with a red stop state and an increasing elapsed timer, beside the pause, restart and cancel controls.
+- [ ] Confirm the configured system-audio, microphone, webcam, and cursor states remain visible, and locked, while recording.
 - [ ] Activate the recording control's pause action and confirm the timer stops advancing, then resume and confirm it advances again.
 - [ ] Activate the restart action while recording and confirm the current recording is discarded and a fresh recording begins.
 - [ ] Activate the cancel action while recording and confirm recording ends without opening an editor for the canceled take.
@@ -69,32 +127,47 @@ Sections marked **post-1.10.0** cover what has landed on `main` since the v1.10.
 - [ ] Record once with system audio only and confirm the resulting playback contains audible system audio.
 - [ ] Record with microphone and system audio enabled and confirm both sources are audible and reasonably balanced.
 
+### Record mode and automatic zooms — v2.0.0
+
+Record mode is the editor's pre-flight panel for the HUD: it edits the same settings, and *Start recording* hands them over. The HUD is closed while the editor is open, so every check here that ends in a take goes through that hand-over.
+
+- [ ] On a first run, with no saved project (otherwise the editor reopens the most recent one), open the editor and confirm the empty state leads with *Record your screen*, followed by *Import a video* and an *Open project* link; activate *Record your screen* and confirm it opens the **Record** tab.
+- [ ] Confirm Record mode lists Source, System audio, Microphone (absent on macOS 13 and 14), Camera, Cursor highlight, Auto-zoom after recording (only while Cursor highlight is On), and Hide desktop icons (macOS and Windows only).
+- [ ] Turn Camera on and confirm a live preview; turn Microphone on and confirm its level meter moves when you speak; switch each device from its menu and confirm the preview or the meter follows.
+- [ ] Pick a source from the Source row and confirm its name shows on the row and on the preview's badge. On Linux the row is plain text, "Your system will ask what to share", with nothing to pick.
+- [ ] Activate *Cancel* and confirm the editor returns to Edit mode.
+- [ ] Activate *Start recording* and confirm the editor window closes, the HUD comes back with the same source, audio, camera and cursor settings, and the take starts without another click (through the source picker first when no source was picked).
+- [ ] With Cursor highlight and Auto-zoom after recording On, click a few places during a take, stop, and confirm the editor opens with zoom regions already on the timeline at those clicks.
+- [ ] Turn Auto-zoom after recording Off, record again, and confirm the new take opens with no zoom region; restart the app and confirm the row is still Off.
+- [ ] Turn Cursor highlight Off and confirm the Auto-zoom after recording row disappears; confirm a take recorded that way opens without automatic zooms.
+- [ ] On Windows, turn Hide desktop icons On, record a screen, and confirm the recording shows the wallpaper where the icons were, and that the icons are back when the take stops. On macOS, confirm the icons are absent from the recording while they stay on the desktop.
+
 ## Editor opens and loads the project
 
-- [ ] Confirm the editor opens after a successful stop with the expected project title and asset.
+- [ ] Confirm the editor opens after a successful stop, in Edit mode, with the expected project title and asset and a "Recording added to a new project" toast.
 - [ ] Confirm `[data-testid="preview"]` is present and its current-time value starts at the beginning of the project.
 - [ ] Confirm the loaded video is visible in the preview rather than an empty state or broken-video state.
 - [ ] Confirm the timeline contains a clip for the recorded or imported asset.
-- [ ] Activate the project rename control by its `aria-label`, enter a new non-empty title, and confirm the title changes.
-- [ ] Confirm the top bar shows an unsaved state after changing the project title.
-- [ ] Switch among the Media, Edit, and Rec editor modes and confirm each selected tab visibly changes state.
-- [ ] Confirm the editor's preview, timeline, and inspector remain usable after switching modes.
-- [ ] Activate the left-panel toggle by its `aria-label` and confirm the chat panel opens or closes without changing the project.
+- [ ] Activate the project name ("Rename project"), enter a new non-empty title, and confirm the title changes.
+- [ ] Confirm the dot after the project name reports "Saved" on hover after the rename: edits are saved as they land, with no save step.
+- [ ] Switch among the Media, Edit, and Record tabs and confirm each selected tab visibly changes state.
+- [ ] Return to Edit after visiting Media and Record and confirm the preview, timeline, and inspector are back and usable. Media shows the media library over a short arrange-only timeline; Record shows its settings panel and no timeline.
+- [ ] In Edit mode, activate "Toggle chat panel" and confirm the chat panel opens or closes without changing the project.
 - [ ] Resize the chat panel by its visible divider and confirm the preview area resizes without moving the timeline content.
 - [ ] Resize the timeline by its visible top divider and confirm the timeline height changes without a layout crash.
 
 ## Transport and preview
 
-- [ ] Activate the playback control with the `aria-label` for play/pause and confirm `[data-testid="preview"]` changes `data-is-playing` from `false` to `true`.
+The transport sits in the timeline header: Play / Pause and the time readout, nothing else. The ruler seeks, and Left / Right step 1/60 s.
+
+- [ ] Activate Play / Pause (also `Space`) and confirm `[data-testid="preview"]` changes `data-is-playing` from `false` to `true`.
 - [ ] Activate play/pause again and confirm playback stops and the preview reports `data-is-playing="false"`.
 - [ ] Confirm the transport time readout advances while playback is running.
 - [ ] Confirm the playhead advances with the video instead of remaining at its starting position.
 - [ ] Seek while paused and confirm the preview frame changes to the selected time.
 - [ ] Seek while playing and confirm playback continues from the new time without a visible stuck frame.
-- [ ] Activate the loop control and confirm its pressed state changes.
-- [ ] Play through the end with looping enabled and confirm playback returns to the loop start.
-- [ ] Activate the fullscreen control and confirm the preview enters fullscreen presentation.
-- [ ] Exit fullscreen and confirm the normal editor layout returns.
+- [ ] While paused, press Left and Right and confirm the playhead and the preview step back and forward by 1/60 s.
+- [ ] Play through the end of the last clip and confirm playback stops at the total time and `data-is-playing` returns to `false`.
 - [ ] With a webcam recording, confirm the webcam picture-in-picture appears aligned with the screen content.
 - [ ] Add a full-camera segment, scrub into it, and confirm the webcam grows to fullscreen then returns at the segment end.
 - [ ] Confirm the preview's webcam, cursor, background, and region effects remain synchronized while scrubbing.
@@ -106,56 +179,60 @@ Sections marked **post-1.10.0** cover what has landed on `main` since the v1.10.
 - [ ] Drag across the ruler or timeline track and confirm the playhead follows the pointer.
 - [ ] Hold `Ctrl` while scrolling over the timeline and confirm the timeline zooms around the pointer position.
 - [ ] Hold `Shift` while scrolling over the timeline and confirm the visible time range pans without changing the project.
-- [ ] Drag the timeline with the middle mouse button and confirm the visible time range pans.
 - [ ] Confirm the playhead remains aligned with the ruler and clip positions after zooming and panning.
 - [ ] Drag the navigator window and confirm the main timeline follows its visible range.
 - [ ] Drag a navigator handle and confirm the visible range narrows or widens without changing clip data.
 - [ ] Confirm an empty-area click clears any selected region and closes its selection inspector.
 - [ ] Confirm the reworked ruler keeps readable labels at the narrowest and widest zoom levels rather than colliding or disappearing.
 - [ ] Confirm the playhead stays exactly on the time it reports after zooming, panning, and resizing the timeline.
-- [ ] Change the project title, save, and toggle the export control's availability, and confirm the top bar keeps its layout instead of reflowing on each state change.
+- [ ] Rename the project, save it with `Ctrl/Cmd+S`, and toggle the export button's availability, and confirm the top bar keeps its layout instead of reflowing on each state change.
 
 ## Clip operations
 
-- [ ] Open the Media panel and confirm the project asset is listed with its source name.
-- [ ] Drag a listed media asset into the timeline clip area and confirm a new clip appears.
+- [ ] Switch to the Media tab and confirm the project asset appears as a card with its file name, duration, and size.
+- [ ] Drag a listed media asset onto the timeline strip below and confirm a new clip appears.
+- [ ] Click an asset card, activate *Add to timeline* in its detail pane, and confirm a clip is appended with an "Added <name> to the timeline" toast.
 - [ ] Click a clip and confirm it receives a selected visual state.
 - [ ] Drag a selected clip before another clip and confirm the clip order changes.
-- [ ] Double-click a clip and confirm the Edit Clip dialog opens.
-- [ ] Change the clip start in-point in the dialog and confirm the clip duration changes.
-- [ ] Change the clip end in-point in the dialog and confirm the clip duration changes.
-- [ ] Confirm the clip's crop or in/out changes affect the preview after closing the dialog.
-- [ ] Select a clip and activate the delete control with the `aria-label` for deleting a clip; confirm only that clip is removed.
+- [ ] Double-click a clip and confirm the *Edit clip* dialog opens; confirm its "Edit start and end" pencil on the clip card opens the same dialog.
+- [ ] Drag the "Adjust clip start" grip in *Edit clip* and confirm "Trim range" and "Final duration" change.
+- [ ] Drag the "Adjust clip end" grip and confirm "Trim range" and "Final duration" change.
+- [ ] Pick a ratio preset in *Edit clip* and confirm the crop frame snaps to it and keeps that shape while a corner is dragged; *Free* unlocks it.
+- [ ] Change the crop or the grips, press *Apply*, and confirm the preview and the clip reflect it; confirm *Cancel* leaves the clip unchanged.
+- [ ] Select a clip and activate "Delete clip"; confirm only that clip is removed.
 - [ ] Select a clip, use the configured copy and paste shortcuts, and confirm a duplicate clip appears.
-- [ ] Select more than one clip when supported and confirm the edit control offers a clip picker rather than editing an unspecified clip.
+- [ ] With two or more clips on the timeline, activate the inspector rail's *Edit clip* button and confirm a "Choose a clip to edit" menu lists the clips with their time ranges and opens *Edit clip* for the one picked. Only one clip can be selected at a time.
 
 ## Regions (trim/skip, zoom, speed, annotation)
+
+The timeline toolbar adds each kind: *Add zoom (Z)*, *Add trim (T)*, *Add speed (S)*, *Add annotation (A)*, *Add Full Camera (C)*. Selecting a pill opens its settings in the inspector.
 
 - [ ] Drag a trim region's left edge and confirm its start time changes.
 - [ ] Drag a trim region's right edge and confirm its end time changes.
 - [ ] Scrub across a trim region and confirm the preview skips the marked interval during playback.
-- [ ] Delete the selected trim region from its inspector and confirm the interval is restored.
-- [ ] Activate the timeline tool with the visible zoom label and confirm a zoom region appears.
-- [ ] Select the zoom region and cycle its level through multiple available depths; confirm the preview scale changes.
+- [ ] Select a trim, activate *Bring this part back* in its inspector, and confirm the interval is restored.
+- [ ] Activate *Add zoom (Z)* and confirm a zoom region appears.
+- [ ] Select the zoom region and pick each level in the *Zoom level* row, then type one in the field beside it; confirm the preview scale follows. Levels deeper than the recording can take without blurring are not offered, and a typed value out of range answers "Zoom goes from 1× to …×".
 - [ ] Drag the zoom focus point in the preview and confirm the zoom follows the new focus.
-- [ ] Change the zoom's 3D camera among Off, 3D Orbit, Left and Right, and confirm the preview orientation changes; with 3D Orbit under Auto focus, move the cursor or click from one side of the recording to the other and confirm the screen turns to that side; under Manual focus, drag the focus point to one side and confirm the camera settles on that side and stays there while the cursor moves.
-- [ ] Set a zoom region to automatic focus and confirm its focus follows cursor telemetry across the whole region.
-- [ ] Use the automatic-zooms menu and confirm it adds suggested zoom regions when cursor telemetry supports suggestions.
-- [ ] Select a zoom region and delete it from the selection inspector; confirm it disappears from the lane.
-- [ ] Activate the timeline tool with the visible speed label and confirm a speed region appears.
-- [ ] Change the speed region through its preset selector and confirm the lane label and preview timing change.
-- [ ] Enter a custom speed in the speed field, commit it, and confirm the custom value remains selected.
+- [ ] Change the zoom's *3D camera* among Off, 3D Orbit, Screen turned left and Screen turned right, and confirm the preview orientation changes; with 3D Orbit under Auto focus, move the cursor or click from one side of the recording to the other and confirm the screen turns to that side; under Manual focus, drag the focus point to one side and confirm the camera settles on that side and stays there while the cursor moves.
+- [ ] With the cursor hidden (Cursor facet, *Show cursor* off) and the zoom under Auto focus, confirm 3D Orbit is not offered; switch the zoom to Manual focus and confirm it is.
+- [ ] Set a zoom region's *Focus mode* to Auto and confirm its focus follows cursor telemetry across the whole region.
+- [ ] Use *Auto-enhance* → *Automatic zooms* and confirm it adds suggested zoom regions when cursor telemetry supports suggestions, or says why not ("No room for automatic zooms" on a take whose zooms were already placed after recording).
+- [ ] Select a zoom region and activate *Delete zoom* in the inspector; confirm it disappears from the lane.
+- [ ] Activate *Add speed (S)* and confirm a speed region appears.
+- [ ] Pick each speed in the *Playback speed* row (0.5×, 1×, 1.5×, 2×, 4×) and confirm the lane label and preview timing change.
+- [ ] Enter a custom speed in the *Custom speed* field, commit it, and confirm the value is kept, with no preset pressed.
 - [ ] Play across a speed region and confirm the preview reflects the region's speed.
-- [ ] Select a speed region and delete it from its inspector; confirm normal speed returns.
-- [ ] Activate the timeline tool with the visible annotation or comment label and confirm an annotation region appears.
-- [ ] Select a text annotation, replace its text, and confirm the new text appears in the preview.
-- [ ] Change the text color and toggle its background; confirm both changes are visible in the preview.
-- [ ] Change the text animation using the control with the `aria-label` for selecting text animation and confirm the animation runs when the playhead enters the region.
-- [ ] Convert an annotation to an image, upload a supported image, and confirm the image appears in the preview.
-- [ ] Convert an annotation to a figure, change its arrow direction and stroke width, and confirm the figure changes.
-- [ ] Convert an annotation to blur, change its blur type and shape, and confirm the selected area is obscured.
-- [ ] Drag an annotation in the preview and confirm its position persists when the playhead leaves and returns.
-- [ ] Select an annotation and delete it from its inspector; confirm it disappears from the preview and lane.
+- [ ] Select a speed region and activate *Delete speed region*; confirm normal speed returns.
+- [ ] Activate *Add annotation (A)* and confirm an annotation region appears.
+- [ ] Select a text annotation, replace its text, and confirm the new text appears in the preview, its box fitted to the text.
+- [ ] Change the text's size (24, 32, 48, 72 or typed), its colour, and its *Background* plate (None, Dark, Light); confirm each change is visible in the preview and that the text stays readable on every plate.
+- [ ] Pick each *Text animation* (the row labelled "Select animation") and confirm the animation runs when the playhead enters the region.
+- [ ] Switch the annotation's type to Image, upload a supported image (JPG, PNG, GIF or WebP), and confirm the image appears in the preview.
+- [ ] Switch the type to Arrow, change its direction, colour and thickness, and confirm the arrow changes.
+- [ ] Switch the type to Blur, change its blur type (Smooth, Mosaic) and shape (Rectangle, Oval), and confirm the selected area is obscured.
+- [ ] Drag a text, image or arrow annotation in the preview, over the padding too, and confirm its position persists when the playhead leaves and returns; confirm a blur annotation cannot leave the footage it hides.
+- [ ] Select an annotation and activate *Delete annotation*; confirm it disappears from the preview and lane.
 - [ ] Use undo and redo after adding, editing, and deleting at least one region and confirm each operation restores the prior state.
 
 ### Modifiers under a trim — post-1.10.0
@@ -187,10 +264,9 @@ Zoom, speed, annotation, and full-camera regions are stored against a clip in th
 - [ ] Delete a clip and confirm modifiers anchored only to that clip disappear while modifiers on other clips are untouched.
 - [ ] Duplicate a clip and confirm its modifiers are duplicated with the copy.
 - [ ] Change a clip's in and out points in the Edit Clip dialog and confirm anchored modifiers clamp to the new range rather than drifting past it.
-- [ ] Select a zoom, copy its attributes with the configured copy shortcut, select another zoom, paste, and confirm the copied toast appears and the target adopts level, rotation, and focus without changing its own span.
-- [ ] Repeat the attribute copy and paste for a speed region and for a text annotation.
-- [ ] Trigger copy with nothing selected and confirm the "select a region" message rather than a silent no-op.
-- [ ] Trigger paste before anything was copied and confirm the "nothing copied yet" message.
+- [ ] Select a zoom, copy it with the configured copy shortcut, move the playhead, and paste; confirm the "Region copied" and "Region pasted" toasts and a new zoom at the playhead with the copied length, level, 3D camera and focus, anchored to the clip it lands on.
+- [ ] Repeat the copy and paste for a speed region, a text annotation, and a trim (a trim pastes as a new trim of the copied length).
+- [ ] Copy with nothing selected, and paste before anything was copied, and confirm neither changes the project.
 - [ ] Save, reopen the project, and confirm every modifier is still on the same clip content after the reorder performed above.
 - [ ] Zoom and pan the timeline and confirm each pill's span still matches the time at which its effect fires in the preview.
 - [ ] Export a short range that covers a reordered clip and a trim, and confirm the exported frames agree with the preview about where each modifier fires.
@@ -210,7 +286,8 @@ the fades. Export and probe.
 - [ ] Import an audio file and confirm it appears as a pill on an audio lane with a waveform, and that a clip lane above is unchanged.
 - [ ] Confirm the pill's label names the imported file rather than the project or the primary asset.
 - [ ] Play the project and confirm the imported audio is heard **over** the recording rather than replacing it.
-- [ ] Open the track's inspector and confirm gain, fade-in, fade-out, loop and mute controls are present.
+- [ ] Open the track's inspector and confirm output level (gain), fade-in, fade-out, loop and mute controls are present.
+- [ ] **v2.0.0** — Confirm a newly imported music track starts at -18 dB with 1 s fades, and that its inspector's *Reset audio* returns to those values. Play it under speech and confirm the music dips while the voice speaks, in the preview and in the export (about 10 dB in the file).
 - [ ] Change the gain and confirm the change is audible in the preview; export and confirm the same level in the file.
 - [ ] Mute the track, confirm silence in the preview, and confirm the exported file has that track absent rather than merely quiet.
 - [ ] Set a fade-in and a fade-out, then **export and inspect the waveform of the result** — the ramps must be at the track's own edges. A fade timed to the end of the programme instead of the end of the track is the specific defect here.
@@ -232,18 +309,20 @@ the fades. Export and probe.
 
 ## Transcript and captions
 
-- [ ] With no transcript, confirm the pane offers a transcribe action instead of showing an empty editor.
+The transcript is the inspector's Transcript facet. Captions have no facet of their own: the facet's *Captions* button opens their settings in place of the transcript.
+
+- [ ] With no transcript, confirm the Transcript facet offers *Transcribe now* instead of showing an empty editor.
 - [ ] Start transcription for the loaded asset and confirm a visible in-progress state appears.
 - [ ] Confirm a completed transcription displays words in timeline clip order.
 - [ ] Click a transcript word and confirm the playhead seeks to that word's start.
 - [ ] Play the project and confirm the current word receives the cue highlight as playback advances.
 - [ ] Place the caret in the transcript and press `Backspace` or `Delete`; confirm the affected word becomes marked as skipped rather than disappearing from the transcript.
-- [ ] Hover a skipped word and activate its restore control by the `aria-label` for restoring that word; confirm the word is kept again.
-- [ ] Open the inspector facet with the visible Captions label and confirm caption controls appear.
-- [ ] Toggle caption visibility and confirm captions appear or disappear in the preview.
-- [ ] Change caption font, alignment, position, size, color, and background controls and confirm each committed change is visible.
-- [ ] Select a caption translation language, run translation with a configured provider, and confirm translated captions appear.
-- [ ] Switch the caption language back to Original and confirm the source transcript returns.
+- [ ] Hover a skipped word and activate its restore control (`Restore "<word>"`); confirm the word is kept again.
+- [ ] Activate *Captions* in the Transcript facet and confirm the caption settings open in place of the transcript.
+- [ ] Toggle *Show captions* and confirm captions appear or disappear in the preview; with no transcript, confirm the toggle is unavailable.
+- [ ] Pick each *Style* (Classic, Bold, Minimal, Light), then under *Customize* change the font, Bold, size, text colour, background plate and its opacity; confirm each committed change is visible.
+- [ ] Pick a language beside *Translate*, run it with a configured provider, and confirm translated captions appear, with a *Display* row to switch languages.
+- [ ] Switch *Display* back to "Original (transcript)" and confirm the source transcript returns.
 
 ### Local transcription and captions — v1.8.0
 
@@ -251,8 +330,8 @@ the fades. Export and probe.
 - [ ] With the Whisper helper binary absent, activate the transcribe action and confirm the UI reports why nothing happened, and that the main-process log carries exactly one matching `[stt]` line. The failure now reaches a toast (`transcriptionStore.ts`) and the log (`whisperServer.ts`), but the sentence shown is one the app writes for itself — `whisper-stt-server binary not found; build it via scripts/build-whisper-stt.sh`, produced before any helper process starts — so it points a packaged-build user at a script they do not have. Helper stderr is a separate source, and only ever for a helper that did start. Verify against a build whose helper was deliberately not packaged, not only against a working one.
 - [ ] Run transcription in the packaged build and confirm the model is fetched or reused without an error about a missing cache directory.
 - [ ] Confirm a second transcription reuses the cached model instead of downloading it again.
-- [ ] Confirm the completed transcript reports the detected language on the media asset card.
-- [ ] Choose an explicit language on the asset card, regenerate, and confirm the new transcript replaces the old one with its own word timings.
+- [ ] Confirm the completed transcript reports the detected language on the asset's card in the Media tab.
+- [ ] Choose an explicit language under *Regenerate as* on that card, regenerate, and confirm the new transcript replaces the old one with its own word timings.
 - [ ] Confirm word timings are monotonic: click several words in order and confirm each seek lands later than the previous one.
 - [ ] Confirm silent stretches appear as a silence span with its duration rather than as missing text.
 - [ ] Activate a silence span's trim control and confirm a trim appears on the timeline covering that interval.
@@ -267,12 +346,12 @@ the fades. Export and probe.
 
 Captions are placed by an **anchor and a margin**, not by an invisible band: `anchorV` (top/bottom) with `insetY`, and `anchorH` (left/center/right) with `insetX`. The margin is reserved on the anchored side and applies to the plate, not the text, so it is measurable in an exported frame. Projects from before this change migrate their `insetX`.
 
-- [ ] Open the Captions facet, enable captions, and seek to a moment with speech; confirm a caption renders with its plate.
-- [ ] Confirm the Position row offers **Bottom / Top** and a separate **Left / Center / Right** row, and that the hint text names which edge stays put.
-- [ ] Choose Top and confirm the caption moves to the top of the frame, the hint changes to say long captions grow downward, and the slider relabels to "Distance from top".
-- [ ] Choose Left and confirm the caption band moves to the left edge with its margin, and that the label reads "Distance from left".
+- [ ] Open the caption settings (Transcript facet → *Captions*), enable captions, and seek to a moment with speech; confirm a caption renders with its plate.
+- [ ] Confirm *Position* is a grid of six anchors, the camera position's minus its middle row: Top left, Top, Top right, Bottom left, Bottom, Bottom right.
+- [ ] Choose a top anchor and confirm the caption moves to the top of the frame and the slider relabels to "Distance from top".
+- [ ] Choose a left anchor and confirm the caption band moves to the left edge with its margin, and that a second slider reads "Distance from left"; choose a centre anchor and confirm that slider is absent.
 - [ ] Drag the distance slider to each extreme and confirm the caption reaches the true frame edge rather than stopping short at an invisible band boundary.
-- [ ] Drag the slider away from a preset's value and confirm the preset button stops being highlighted; click the preset again and confirm the slider snaps back.
+- [ ] Pick a *Style*, change the size under *Customize*, and confirm no style shows as selected any more; pick the style again and confirm its look returns.
 - [ ] **Export a frame and measure the plate's edge against the inset**: with `insetX: 10` on a 1920-wide output, the plate's left edge is at x=192. Measure the exported frame, not the preview screenshot.
 - [ ] Confirm the plate's margin is reserved on the *anchored* side — a right-anchored caption keeps its margin on the right as the text grows.
 - [ ] Open a project saved before this change and confirm its captions land where they did, with `insetX` migrated rather than reset.
@@ -312,7 +391,7 @@ must be visible, and at the insertion point rather than at the end of the clip.
 
 ## AI chat and providers — requires a configured provider
 
-- [ ] Open the chat panel with the top-bar control identified by its `aria-label` and confirm the chat surface appears.
+- [ ] In Edit mode, open the chat panel with the top bar's *Toggle chat panel* and confirm the chat surface appears.
 - [ ] Confirm the chat header shows controls for AI settings, history, and a new conversation.
 - [ ] Send a short request and confirm the user message appears in the conversation.
 - [ ] Confirm the provider returns an assistant response without an unhandled error.
@@ -356,10 +435,10 @@ The agent may only call the fixed tool set in [ai-agent.md](../architecture/ai-a
 - [ ] Activate Compact context on a short conversation and confirm the "not enough history" message rather than a failure.
 - [ ] Confirm a compaction failure leaves the conversation history unchanged.
 - [ ] Use the copy control on an assistant message and confirm the message text reaches the clipboard.
-- [ ] Open the timeline toolbar's auto-enhance menu, choose the AI option, and confirm the chat panel opens with the prompt prefilled and sent through the normal send path.
+- [ ] Open the timeline toolbar's *Auto-enhance* menu, choose *Smart cuts* (it needs a transcript), and confirm the chat panel opens with the prompt prefilled and sent through the normal send path.
 - [ ] Confirm the edit produced by that auto-enhance request can be rewound like any other turn.
-- [ ] Choose the AI auto-enhance option with no provider connected and confirm the setup view appears instead of a failed send.
-- [ ] Choose the cursor-based automatic zooms option and confirm it adds zooms without involving the provider.
+- [ ] Choose *Smart cuts* with no provider connected and confirm the setup view appears instead of a failed send.
+- [ ] Choose *Automatic zooms* and confirm it adds zooms without involving the provider.
 - [ ] Restart the app and confirm conversations are gone while the provider configuration persists; this is a known gap, not a defect to file.
 - [ ] Confirm the provider API key is never displayed in the settings form after it is saved.
 
@@ -377,23 +456,28 @@ The agent may only call the fixed tool set in [ai-agent.md](../architecture/ai-a
 - [ ] On macOS, export a frame containing a blur annotation and confirm the area is actually obscured.
 - [ ] On macOS, export a range with the cursor visible and confirm the cursor and its trail are rendered.
 - [ ] On macOS, export frames with each 3D camera preset and confirm the tilt matches the Windows render.
-- [ ] On macOS, export a frame with background blur enabled and confirm it matches the Windows render.
+- [ ] On macOS, export a frame with *Blur background* above 0% and confirm it matches the Windows render.
 - [ ] Export a range containing a zoom with an annotation and captions on screen, and confirm neither follows the zoom in the exported frames.
 - [ ] Confirm the packaged macOS app refuses to start or reports clearly when the compositor addon is missing, rather than failing at first render.
 
 ## Export
 
-- [ ] Confirm the top-bar export control is disabled when the project has no asset.
-- [ ] With a loaded project, activate the export control by its `aria-label` and confirm the export dialog opens.
-- [ ] Confirm the dialog initially offers MP4 and GIF format choices.
-- [ ] Select MP4 and confirm quality choices include a lower tier, a balanced tier, and Source.
-- [ ] Select each available MP4 quality and confirm the displayed output dimensions update.
+The dialog opens on four destinations, each a named set of the settings under *Advanced*, which starts collapsed: Web / YouTube (MP4 1080p, 60 fps), Social (MP4 1080p, 30 fps), Studio (MP4 at Source size, 60 fps), README GIF (GIF Small, 15 fps). All MP4 destinations use H.264.
+
+- [ ] Confirm the top bar's *Export* button is disabled when the project has no asset.
+- [ ] **v2.0.0** — With a loaded project, activate *Export* and confirm the dialog opens on the Destination grid, each destination with its summary line (for example `MP4 · 1920 × 1080 · 60 fps`), and *Web / YouTube* selected.
+- [ ] **v2.0.0** — Pick each destination and confirm it shows as selected and its summary matches what *Advanced* then shows.
+- [ ] **v2.0.0** — Open *Advanced*, set the frame rate to 24, and confirm no destination shows as selected any more.
+- [ ] In *Advanced*, select MP4 and confirm the quality choices are 720p, 1080p, and Source.
+- [ ] Select each MP4 quality and confirm the displayed output dimensions update.
 - [ ] Select 24, 30, and 60 FPS and confirm the selected frame rate remains visible.
 - [ ] Select H.264 and H.265 and confirm the selected codec remains visible.
-- [ ] Select GIF and confirm GIF frame-rate, size, and loop controls appear.
+- [ ] Select GIF and confirm GIF frame-rate (15, 20, 25, 30 FPS), size (Small, Medium, Large, Original), and *Loop GIF* controls appear.
 - [ ] Change GIF frame rate and size, toggle looping, and confirm the summary reflects the choices.
-- [ ] Start an MP4 export and confirm the native rendering progress reports advancing frames or percentage.
-- [ ] Confirm the export dialog reports a saved output path after MP4 completes.
+- [ ] Start an MP4 export with *Export MP4* and confirm the native rendering progress reports advancing frames or percentage.
+- [ ] Confirm the export dialog reports *Saved to* with the output path after MP4 completes, and that *Show in folder* opens it.
+- [ ] **v2.0.0** — Confirm the one-time star prompt under *Saved to*, when it appears, goes away on either answer and does not come back on the next export.
+- [ ] **v2.0.0** — Export a take with speech at the Audio facet's default output level and measure it (`ffmpeg -i <file> -af ebur128=peak=sample -f null -`): integrated loudness about -16 LUFS (a very quiet voice gets at most +12 dB), sample peak under -1.5 dBFS.
 - [ ] Open the exported MP4 outside the app and confirm it plays through the expected duration with audio when the source has audio.
 - [ ] Start a GIF export and confirm frame rendering and file writing complete without an unhandled error.
 - [ ] During GIF rendering, press Cancel and confirm it waits for native cleanup, returns to the same export options, leaves no partial GIF, and preserves an existing destination; retry and confirm a complete GIF is saved.
@@ -419,35 +503,44 @@ The percentage is computed in the renderer against a predicted frame total, and 
 
 ## Settings, shortcuts, themes, i18n
 
-- [ ] Change one shortcut, save it, use the new key in the editor, and confirm it triggers the configured action.
-- [ ] Confirm `Ctrl/Cmd+S` saves the current project.
+The inspector's rail holds five facets: Composition (background, format, frame, motion), Camera layout, Audio, Cursor, and Transcript, whose *Captions* button opens the caption settings.
+
+- [ ] Open OpenScreen menu → *Keyboard Shortcuts*, change one shortcut, save it, use the new key in the editor, and confirm it triggers the configured action.
+- [ ] Confirm `Ctrl/Cmd+S` saves the current project with a "Project saved" toast.
 - [ ] Confirm `Ctrl/Cmd+O` opens the project dialog.
-- [ ] Open the Background facet and switch among image, color, and gradient tabs.
+- [ ] Open the Composition facet and switch its Background among the Image, Gradient, and Color tabs.
 - [ ] Select a built-in wallpaper and confirm the preview background changes.
-- [ ] Choose a color swatch or enter a valid hex color and confirm the background changes.
-- [ ] Choose a gradient preset and confirm the preview background changes.
-- [ ] Open the Effects facet and toggle background blur, motion blur, shadow, roundness, and padding; confirm each changes the preview.
-- [ ] Open the Layout facet and choose each available webcam layout; confirm the preview arrangement changes.
-- [ ] Change webcam mirror, reactive zoom when supported, shape, and size; confirm each change is visible.
-- [ ] Open the Cursor facet and toggle cursor visibility and clip-to-bounds; confirm the preview changes.
-- [ ] Change cursor size, smoothing, motion blur, and click bounce; confirm each committed value remains visible.
-- [ ] Toggle the theme control by its `aria-label` and confirm the editor switches between dark and light themes.
-- [ ] Open the top-bar language control by its `aria-label`, choose a non-English locale, and confirm visible UI strings change.
+- [ ] Choose a color swatch, or a hex value in the Color tab's *Custom* row, and confirm the background changes.
+- [ ] Choose a gradient preset, then a one-colour gradient from the Gradient tab's *Custom* row, and confirm the preview background changes.
+- [ ] With an image or gradient wallpaper, pick each *Animation* (None, Drift, Aurora, Waves) and confirm the background moves in the preview; confirm the row is absent under a solid colour.
+- [ ] Drag *Blur background*, *Padding*, *Roundness* and *Motion blur*, and pick each *Shadow* (None, Light, Medium, Strong); confirm each changes the preview. Roundness is hidden at 0% padding unless a frame is on.
+- [ ] Pick each frame *Style* (Window, Laptop, Phone, Screen) and each *Theme* (Light, Dark), and confirm the preview draws it around the recording; export and confirm the frame is in the file.
+- [ ] With a zoom on a 3D camera in the project, confirm *Depth of field* appears under Motion (and is absent without one); turn it on and confirm the tilted zoom changes in the preview and in an export.
+- [ ] Open the Camera layout facet and choose each *Preset* (Picture in picture, Dual frame, Vertical stack, No webcam); confirm the preview arrangement changes.
+- [ ] Change *Mirror webcam*, *Shrink on zoom*, *Camera shape* (Rectangle, Square) and its roundness, *Webcam size*, and each *Position*; confirm each change is visible.
+- [ ] In *Webcam crop*, drag the frame to move the camera's framing and a corner to zoom it; confirm the preview follows.
+- [ ] Open the Audio facet, change *Output level*, and confirm the preview and an export follow it; *Reset audio* brings it back.
+- [ ] Open the Cursor facet and toggle *Show cursor* and *Auto-hide when inactive*; confirm the preview changes.
+- [ ] Change *Size*, *Smoothing* and *Motion blur*, pick each *Click bounce* (None, Light, Strong), and toggle *Click impact*; confirm each committed value remains visible.
+- [ ] Pick each *Cursor style* and toggle *3D cursor*; confirm the preview cursor changes. Under *Cursor types*, switch a type off and confirm that type is drawn as the arrow.
+- [ ] Open OpenScreen menu → *Switch to light theme* (or dark) and confirm the editor switches between dark and light themes.
+- [ ] Open OpenScreen menu → *Change language*, choose a non-English locale, and confirm visible UI strings change.
 - [ ] Switch back to English and confirm the top bar, transport, inspector, and export labels return to English.
-- [ ] Select a different aspect ratio from the timeline aspect-ratio menu and confirm the preview frame changes shape.
-- [ ] Pick **Auto** in the Format menu, drag padding from 0 to 100, and confirm the frame reshapes live with one border thickness on all four sides; switch the camera layout to side by side, then top / bottom, and confirm the frame widens, then turns portrait, with a square camera. Export and confirm the file has the preview frame's shape and the same even border. Then add a clip of another shape, a differently cropped clip, or a clip without a camera, and confirm the frame does not move and the Auto row stays listed, disabled with the reason shown; pick 16:9, reopen the menu, and confirm Auto is no longer offered.
+- [ ] In the Composition facet, pick another *Format* (16:9, 9:16, 1:1, 4:3, 4:5, 16:10, 10:16, or a timeline shape under *Original*) and confirm the preview frame changes shape.
+- [ ] With a Format whose shape differs from the recording's, confirm the *Recording* row offers *Whole* and *Follow cursor*; confirm Follow cursor fills the frame with a window on the recording that follows the cursor, and Whole shows all of it.
+- [ ] Pick **Auto** in the Format row, drag padding from 0 to 100, and confirm the frame reshapes live with one border thickness on all four sides; switch the camera layout to Dual frame, then Vertical stack, and confirm the frame widens, then turns portrait, with a square camera. Export and confirm the file has the preview frame's shape and the same even border. Then add a clip of another shape, a differently cropped clip, or a clip without a camera, and confirm the frame does not move and Auto stays listed, disabled with the reason shown ("Clips differ"); pick 16:9 and confirm Auto is no longer offered.
 - [ ] Press `Esc` or click outside an open menu, popover, or dialog and confirm it closes.
 
 ### App menu, About, and updates
 
-- [ ] On macOS, open the application menu and confirm About OpenScreen is followed by Check for Updates.
+- [ ] On macOS, open the application menu and confirm it lists About OpenScreen, Permissions…, Save Diagnostics, Star on GitHub and Check for Updates.
 - [ ] On Windows and Linux, right-click the tray icon and confirm it lists Check for Updates and About OpenScreen. Outside the editor the tray is the only surface reachable by default there: the HUD is frameless and the editor and notes windows auto-hide their menu bar, so the Help menu appears only while Alt is held over one of those two windows.
 - [ ] On Windows and Linux, open the editor, hold Alt, and confirm the Help menu lists Check for Updates and About OpenScreen.
-- [ ] In the editor, click the OpenScreen wordmark in the top bar and confirm it opens a menu listing Keyboard Shortcuts, AI settings, Check for Updates and About OpenScreen. This is the discoverable path on Windows and Linux, where the two above are not.
+- [ ] In the editor, click the OpenScreen wordmark in the top bar and confirm it opens a menu listing New project, Open project and Save project; Keyboard Shortcuts, AI settings, the theme switch and Change language; then Check for Updates, About OpenScreen and Star on GitHub. This is the discoverable path on Windows and Linux, where the two above are not.
 - [ ] Confirm the About row in that menu shows the running version, and that it matches what the About box then reports.
 - [ ] Open the wordmark menu and pick Keyboard Shortcuts; confirm the shortcuts configuration dialog opens and that only one dialog appears.
 - [ ] Open the wordmark menu and pick AI settings; confirm it opens the same provider dialog the AI panel's gear does, and that only one dialog appears.
-- [ ] Repeat that in Media mode, in Rec mode, and in Edit mode with the chat panel collapsed — the three states in which the dialog had no owner before, and the reason the row must not be Edit-only.
+- [ ] Repeat that in Media mode, in Record mode, and in Edit mode with the chat panel collapsed — the three states in which the dialog had no owner before, and the reason the row must not be Edit-only.
 - [ ] Connect or disconnect a provider from the menu's dialog while the chat panel is open behind it, close the dialog, and confirm the composer and the model pill follow without reopening the panel.
 - [ ] Open the wordmark menu, then press Escape, click elsewhere in the top bar, and click the wordmark again — confirm each closes it and that the window does not start dragging instead of registering the click.
 - [ ] **post-1.10.0** — In a **packaged** build on a channel that owns its updates, right-click the tray icon and confirm an **Update Settings** submenu offers "Notify when an update is available", "Download updates automatically", and "Download and install updates automatically".
@@ -458,7 +551,7 @@ The percentage is computed in the renderer against a predicted frame total, and 
 - [ ] **post-1.10.0** — Confirm no mode installs on quit: closing the HUD must not fire the installer.
 - [ ] **post-1.10.0** — Reach **Save Diagnostics** from the tray context menu while idle, and from the Help menu on Windows and Linux (Alt) or the app menu on macOS; confirm each writes a bundle. It is deliberately not in the wordmark menu.
 - [ ] With the wordmark menu open, walk it with the Down and Up arrows and confirm focus wraps at both ends.
-- [ ] Switch the app language and confirm the wordmark menu's four labels follow — the first two matching the dialogs they open, the last two the wording the macOS app menu and the tray use.
+- [ ] Switch the app language and confirm the wordmark menu's labels follow — Keyboard Shortcuts and AI settings matching the dialogs they open, Check for Updates and About OpenScreen the wording the macOS app menu and the tray use.
 - [ ] Open About and confirm it names the running version, the Electron/Chromium/Node versions, and the install channel.
 - [ ] Confirm the About box opens in front of the HUD rather than behind it.
 - [ ] On Windows and Linux, press Copy in the About box and confirm the clipboard holds that same block.
@@ -471,55 +564,50 @@ The percentage is computed in the renderer against a predicted frame total, and 
 
 ### New effects and controls — v1.8.0
 
-- [ ] Set a zoom's custom scale beyond the preset levels, commit it, and confirm the preview scale and the retained value both follow.
-- [ ] Activate the timeline's global auto-focus toggle and confirm every zoom switches to automatic focus.
-- [ ] With the global toggle on, open a zoom's focus-mode control and confirm it reports being controlled globally instead of silently ignoring a per-zoom change.
+- [ ] Type a zoom level outside the preset row (1.25, say) in the *Custom zoom* field, commit it, and confirm the preview scale and the retained value both follow, with no preset pressed.
+- [ ] Activate the timeline toolbar's *Auto-Focus all zooms* and confirm every zoom switches to automatic focus.
+- [ ] With the global toggle on, open a zoom's *Focus mode* row and confirm it shows Auto, disabled, with the note that the timeline's Auto-Focus button sets it, instead of silently ignoring a per-zoom change.
 - [ ] Turn the global toggle off and confirm per-zoom focus mode becomes settable again.
-- [ ] Set a speed above the native playback limit and confirm the preview reports that it is frame-stepped and muted.
-- [ ] Export that range and confirm the exported timing is correct despite the frame-stepped preview.
-- [ ] Enter a speed above the maximum and confirm the limit message rather than a silently clamped value.
-- [ ] Enable the webcam's shrink-on-zoom option and confirm the camera shrinks while a zoom plays and returns afterwards.
-- [ ] Choose each webcam layout preset, including vertical stack and dual frame, and confirm the preview arrangement changes.
+- [ ] Set a speed of 16×, the maximum, and confirm the preview plays it; export that range and confirm the exported timing is correct.
+- [ ] Enter a speed above 16× and confirm the "Speed can't go higher than 16×" message rather than a silently clamped value.
+- [ ] Enable the webcam's *Shrink on zoom* and confirm the camera shrinks while a zoom plays and returns afterwards.
+- [ ] Choose each webcam layout preset, Vertical stack and Dual frame included, and confirm the preview arrangement changes.
 - [ ] Choose each webcam shape and confirm the mask changes in the preview.
-- [ ] Turn the cursor's clip-to-canvas option off, zoom in, and confirm the cursor may extend past the frame edge; turn it on and confirm it is kept inside.
 - [ ] Apply each text animation in turn and confirm the animation runs when the playhead enters the region.
-- [ ] Toggle an annotation's background off and back on and confirm the previously chosen colour returns instead of black.
-- [ ] Switch a blur annotation between gaussian and mosaic and confirm intensity and block-size controls follow the chosen type.
-- [ ] Set a blur shape to oval and confirm the obscured area is elliptical in the preview.
-- [ ] Draw a freehand blur shape and confirm the preview follows the drawn outline.
-- [ ] Export a frame containing that freehand blur and confirm the export covers its bounding box, which over-covers rather than under-covers, as the inspector states.
-- [ ] Add a Google font through the custom-font dialog and confirm it appears in the font selector and renders in the preview.
-- [ ] Enter an invalid font URL and confirm the error message rather than a stuck adding state.
-- [ ] Open the crop dialog, change the ratio with aspect lock on and off, apply, and confirm the preview reframes.
+- [ ] Switch a text's *Background* plate from Dark to None and back, and confirm the dark plate returns rather than another colour.
+- [ ] Switch a blur annotation between Smooth and Mosaic and confirm the obscured area changes accordingly in the preview.
+- [ ] Set a blur shape to Oval and confirm the obscured area is elliptical in the preview.
+- [ ] Confirm a new blur offers only Rectangle and Oval: Freehand is listed only for a blur that already uses it, in a project from an earlier release, with the note that the export fills the rectangle around it.
+- [ ] Export a frame containing such a freehand blur and confirm the export covers its bounding box, which over-covers rather than under-covers, as that note states.
+- [ ] In *Edit clip*, change the crop *Ratio* between a preset and *Free*, apply, and confirm the preview reframes.
 - [ ] Confirm a cropped project exports with the cropped framing rather than the original.
 
 ### AI camera background — post-1.10.0
 
 The mask comes from the native compositor (ONNX Runtime + the vendored selfie-segmentation model), not from the renderer. Three things have to line up — the addon, the ONNX Runtime shared library beside it in `electron/native/bin/<tag>/`, and the model under `public/mediapipe/` — and `probeSegmentation` answers with `ready` only when all three do. Check both directions: a control that silently does nothing is the defect this replaced.
 
-- [ ] With a webcam recording loaded, open the Layout facet and confirm a **Camera Background** row offers Original, Cutout, Blur and Custom.
+- [ ] With a webcam recording loaded, open the Camera layout facet and confirm a **Camera background** row offers Original, Cutout, Blur and Custom.
 - [ ] Choose Cutout and confirm the camera's background disappears in the preview, leaving the subject over the project background.
 - [ ] Choose Blur and confirm the background blurs while the subject stays sharp, and that a blur-intensity slider appears.
 - [ ] Choose Custom and confirm an image/color/gradient chooser appears and the selected wallpaper replaces the camera's background.
 - [ ] Confirm the first frames after switching modes may render unsegmented — the worker starts lazily. Scrub or let the preview advance before judging; a still, paused preview is not evidence the effect is inert.
 - [ ] Export a range with a camera background set and confirm the exported frames carry the same mask as the preview, not the untouched camera.
-- [ ] **Remove the ONNX Runtime library from `electron/native/bin/<tag>/`, restart, and confirm the whole Camera Background row is absent** rather than present and inert. The persisted mode stays in the document and the camera renders unsegmented; that is correct.
+- [ ] **Remove the ONNX Runtime library from `electron/native/bin/<tag>/` (in a packaged build, under its `resources` folder), restart, and confirm the whole Camera background row is absent** rather than present and inert. The persisted mode stays in the document and the camera renders unsegmented; that is correct.
 - [ ] Put the library back, restart, and confirm the row returns without any other change.
 - [ ] On an Intel Mac, confirm the row is absent: upstream publishes no ONNX Runtime for osx-x64, so the probe can never answer `ready` there.
 
 ## Editor shell and dialogs — post-1.10.0
 
 - [ ] Double-click a clip and confirm the Edit Clip preview box carries the **source's own aspect ratio**, not a fixed 16:9 box — a portrait source must fill it rather than letterbox.
-- [ ] Focus a crop W or H field and press the down arrow once; confirm the value moves by **one source pixel**, not by one percent (on a 1920-wide source, 100 → 99.9479).
-- [ ] Type a partial value into a crop field and confirm it stays editable mid-entry instead of being rounded or reset under the caret.
-- [ ] Change the ratio with aspect lock on and off, apply, and confirm the preview reframes and the clip's stale crop metadata does not survive.
+- [ ] Focus the crop frame in *Edit clip* and press an arrow key; confirm the frame moves by 1% of the source, and that with Shift held it resizes from its right or bottom edge, keeping a picked ratio. The arrows must not seek the timeline behind the dialog.
+- [ ] Change the *Ratio* between a preset and *Free*, apply, and confirm the preview reframes and the clip's stale crop metadata does not survive.
 - [ ] Hold Ctrl and scroll **over the ruler, over the hint labels, and over the navigator bar** — not only over the lanes — and confirm the timeline zooms in each case.
 - [ ] Hold Shift and scroll over those same three places and confirm the visible range pans.
 - [ ] Open the clip picker, click outside it, and confirm it closes.
-- [ ] Confirm the timeline clip's delete icon carries the same dark chip treatment as its filename label rather than sitting bare on the waveform.
+- [ ] Select a clip and confirm its delete button is the same round raised button as the edit pencil, rather than sitting bare on the waveform; on a clip too narrow to hold them, confirm both sit beside it.
 - [ ] Switch to the light theme and confirm the gradient picker and the dialogs follow it instead of staying dark.
 - [ ] Confirm the top bar carries no second settings button beside the wordmark menu.
-- [ ] Start a transcription and confirm the spinner says **initializing** before it says **transcribing**, on every spinner that shows one.
+- [ ] Start a transcription and confirm the status reads **Downloading speech model** (first run) or **Starting speech model** before **Transcribing**, then a percentage, on every surface that shows it.
 - [ ] Regenerate a transcript and confirm the busy label stays visible for the duration and is scoped to the timeline rather than leaking to unrelated surfaces.
 - [ ] Open the media asset card's **Regenerate as** picker and confirm it lists every whisper language (101 entries including Auto), sorted by localized name — not a hand-picked handful.
 - [ ] Choose a language, regenerate, and confirm the new transcript replaces the old one.
@@ -533,17 +621,18 @@ The mask comes from the native compositor (ONNX Runtime + the vendored selfie-se
 
 ## Persistence (save, reopen, reload)
 
-- [ ] Make a project change and confirm the top bar shows an unsaved indicator.
-- [ ] Activate the top-bar save control by its `aria-label` and confirm the indicator changes to the saved state.
-- [ ] Close and reopen the project from the Open Project dialog and confirm the asset and project title match before closing.
+Edits are saved as they land. The dot after the project name reads "Unsaved" (hover title) only in the middle of a drag, or when a save failed.
+
+- [ ] Make a project change and confirm the dot after the project name reads "Saved" once it lands, with no save step.
+- [ ] Save with OpenScreen menu → *Save project* (or `Ctrl/Cmd+S`) and confirm the "Project saved" toast.
+- [ ] Close and reopen the project from the Open project dialog and confirm the asset and project title match before closing.
 - [ ] Confirm clip order and each clip's in/out and crop settings survive reopen.
 - [ ] Confirm trim, zoom, speed, annotation, and full-camera regions survive reopen with their positions and values.
 - [ ] Confirm background, effects, layout, webcam, cursor, aspect-ratio, and caption settings survive reopen.
 - [ ] Confirm the transcript and skipped-word ranges survive reopen.
 - [ ] Confirm the seekable duration after reopen reaches the recording duration, not merely the end of the last region.
-- [ ] Make a change, attempt to open another project, choose Cancel in the unsaved-changes prompt, and confirm the current project remains loaded.
-- [ ] Make a change, choose Save in the unsaved-changes prompt, and confirm the next project opens after saving.
-- [ ] Make a change, choose Discard in the unsaved-changes prompt, and confirm the next project opens without the discarded change.
+- [ ] Make a change, open another project, and confirm it opens with no unsaved-changes prompt, since the change was already saved; reopen the first project and confirm the change is there.
+- [ ] When the unsaved-changes prompt does appear (a change that has not reached the disk, such as after a failed save), confirm Cancel keeps the current project loaded, *Save & continue* opens the next project after saving, and *Discard* opens it without the change.
 - [ ] Open a project saved by a previous release and confirm it loads without a schema error.
 - [ ] Confirm every modifier in that migrated project sits on the clip content it covered before, not at a shifted ruler position.
 - [ ] Confirm a migrated project that had a region straddling two clips still renders it as one pill while the clips remain adjacent.
@@ -561,7 +650,7 @@ The mask comes from the native compositor (ONNX Runtime + the vendored selfie-se
 - [ ] Disable hardware H.264 if the test machine supports that diagnostic path and confirm the software-encoder notice is clear and non-blocking.
 - [ ] Switch the recording HUD between displays and confirm it remains positioned on the intended display.
 - [ ] Switch the desktop to an odd-pixel window size and confirm the recorded frame dimensions remain valid.
-- [ ] Open Settings diagnostics when available and confirm a diagnostic bundle can be written.
+- [ ] Run tray → *Save Diagnostics* and confirm a diagnostic bundle can be written.
 - [ ] **post-1.10.0** — Record with no encoder override and confirm the helper's `encoder-selection` log line reports `videoEncoderRuntime: "hardware"`. The plain sink-writer path never asked for hardware transforms before, so every ordinary recording ran the software encoder; on a slow machine that is what blew the stop-shutdown budget.
 - [ ] **post-1.10.0** — Confirm forcing the software encoder still reports `"software"`, so the default is a default and not a hard-wire.
 - [ ] **post-1.10.0** — Record with microphone and system audio and confirm the resulting MP4 carries a valid AAC track at a legal rate (48 kHz).
@@ -572,11 +661,11 @@ The mask comes from the native compositor (ONNX Runtime + the vendored selfie-se
 ### macOS
 
 - [ ] Run the complete capture-to-export flow on real macOS with the packaged build.
-- [ ] Grant screen-recording, microphone, and camera permissions and confirm the app reflects the granted devices.
+- [ ] Grant the permissions through the permissions window (below) and confirm the HUD reflects the granted devices.
 - [ ] Record while switching Spaces with the HUD visible and confirm recording continues.
 - [ ] Stop a recording and confirm the editor opens without a crash during native recorder shutdown.
 - [ ] Confirm the tray or menu-bar item can refocus the HUD after it is hidden.
-- [ ] Confirm the HUD and notes window are excluded from captured video when content protection is enabled.
+- [ ] Confirm the HUD and notes window are absent from a full-screen recording. The capture leaves them out by window id on every macOS version, so this holds with the content-protection flag set too.
 - [ ] Confirm a physical webcam picture-in-picture records and plays back with the selected layout.
 - [ ] Export MP4 and GIF and confirm both files open in a native macOS media viewer.
 - [ ] Confirm closing and relaunching the packaged app does not leave an orphaned capture or editor window.
@@ -588,6 +677,30 @@ The mask comes from the native compositor (ONNX Runtime + the vendored selfie-se
 - [ ] **On a Retina/HiDPI display**, record the screen and confirm the recorded frame is filled edge to edge — not the desktop drawn small in one corner of a black rectangle. Then do the same for a single window. Issue #418 shipped exactly this, invisible on every 1× display because a point size and a pixel size are the same number there; `SCStreamConfiguration` does not scale a frame up to fill an oversized buffer, so the surplus stays background black. Check the frame, not just the file's dimensions — the reporter's `.mp4` was 3024×1898 as expected and still wrong inside.
 - [ ] **With a second display attached at a different scale factor**, record each display in turn and confirm both fill their frame. A machine whose displays all share one scale factor cannot catch a units mix-up.
 
+#### Permissions window — v2.0.0
+
+On macOS 15.2+ it opens at launch, until it has been closed once, while one of its rows was never asked. Before 15.2 it opens at launch while Screen Recording is missing or waits on a relaunch. Tray → *Permissions…* and the app menu open it any time. To see a first run on a Mac that has run OpenScreen before, its grants have to be reset first, which is the Mac owner's decision.
+
+- [ ] On a first launch, confirm the window "OpenScreen needs a few permissions" lists, on macOS 15.2+, System audio (Optional), Accessibility (Recommended), Microphone (Optional) and Camera (Optional); before 15.2, or with `OPENSCREEN_MAC_SOURCE_PICKER=legacy`, Screen & system audio (Required) comes first instead of System audio.
+- [ ] Activate each row's button (*Allow*, or *Continue* for the screen row) and confirm macOS raises its prompt, and that a granted row turns to *Allowed* on its own while the window stays open.
+- [ ] Refuse one, reopen the window from the tray, and confirm that row now offers *Open Settings*, which opens its System Settings pane.
+- [ ] Before 15.2: confirm *Get started* stays disabled until Screen Recording is allowed; that the window offers *Restart OpenScreen* when macOS needs a relaunch to apply it; and that after System Settings' Quit & Reopen the window comes back.
+- [ ] Close the window with *Get started* and confirm it does not open again at the next launch.
+
+#### Apple's source picker — macOS 15.2+, v2.0.0
+
+- [ ] Activate the HUD's source button and confirm Apple's picker opens and the HUD hides until it closes.
+- [ ] Pick a display, then on another take a window, and confirm the HUD comes back with the pick's name on the source button and records what was picked, with no Screen Recording grant and no "bypass the system private window picker" alert.
+- [ ] Dismiss the picker without a choice and confirm the HUD comes back idle; press record with no source and confirm it opens the picker, then starts once a source is picked.
+- [ ] From Record mode, activate the Source row and confirm it opens the same picker rather than the app's own list.
+- [ ] After picking a display, change *Hide desktop icons* in Record mode and confirm the pick is dropped, so the next take asks for a source again.
+- [ ] With system audio never asked for (not from the permissions window either), turn system audio on and confirm macOS asks for it at once, not at the countdown; allow it and confirm the next take carries system audio. Refused, confirm the permissions window's System audio row offers *Open Settings*, and that turning OpenScreen on under "System Audio Recording Only" there brings system audio back.
+- [ ] Launch with `OPENSCREEN_MAC_SOURCE_PICKER=legacy` and confirm the app's own selector opens instead, with Screen Recording required.
+
+#### Microphone on macOS 13 and 14 — v2.0.0
+
+- [ ] On macOS 13 or 14, confirm the HUD, its *Device settings* and Record mode offer no microphone, and that a take records without trying to.
+
 ### Linux
 
 - [ ] Run the complete editor-to-export flow on real Linux with the supported packaged or development build.
@@ -597,11 +710,11 @@ The mask comes from the native compositor (ONNX Runtime + the vendored selfie-se
 - [ ] Record twice in a row and confirm the portal picker appears BOTH times, and that choosing a different source the second time actually changes what is recorded.
 - [ ] Confirm the HUD shows no in-app source button on Linux, and that the record button starts a recording directly instead of opening a picker.
 - [ ] Confirm the portal picker appears BEFORE the 3-2-1 countdown, not during or after it.
-- [ ] Start the same flow from the editor's Rec stage ("Start recording") and confirm it behaves identically to the HUD — no source row, picker first, then countdown.
+- [ ] Start the same flow from the editor's Record mode (*Start recording*) and confirm it behaves identically to the HUD — no source to pick, picker first, then countdown.
 - [ ] Cancel the countdown after answering the picker and confirm the compositor's "screen is being shared" indicator goes away rather than lingering.
 - [ ] Confirm the system tray or supported desktop indicator can refocus the HUD when it is hidden.
 - [ ] Confirm microphone capture works with a physical device and the chosen device is audible in playback.
-- [ ] Confirm the webcam toggle reflects the available physical camera or clearly reports that no camera is available.
+- [ ] Confirm the HUD's *Device settings* lists the physical camera, or reports "No camera found" when there is none.
 - [ ] Confirm the native compositor preview loads without a blank surface or renderer crash.
 - [ ] Export MP4 and GIF and confirm the files open in a system media player.
 - [ ] Close and relaunch the app and confirm a saved project can be reopened without data loss.
