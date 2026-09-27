@@ -10,7 +10,7 @@ keywords:
 
 # Um gravador de tela grátis com zoom automático
 
-O OpenScreen é um gravador de tela gratuito, com licença MIT, com zoom automático para Windows, macOS e Linux. Depois de uma gravação, **Melhoria automática → Zooms automáticos** lê o movimento de cursor que o OpenScreen gravou e adiciona um zoom onde o ponteiro pausou, sem chamada de rede e sem modelo de IA. Screen Studio, Cap e Camtasia também dão zoom automaticamente; o OpenScreen faz isso de graça, nos três sistemas.
+O OpenScreen é um gravador de tela gratuito, com licença MIT, com zoom automático para Windows, macOS e Linux. Depois de cada gravação, ele lê o movimento de cursor que gravou e adiciona um zoom onde o ponteiro pausou, sem chamada de rede e sem modelo de IA. Screen Studio, Cap e Camtasia também dão zoom automaticamente; o OpenScreen faz isso de graça, nos três sistemas.
 
 Esta página é publicada pelo projeto OpenScreen. Os dados sobre Screen Studio, Cap e Camtasia vêm de screen.studio, cap.so e techsmith.com e foram verificados em setembro de 2026. As fontes estão listadas no final.
 
@@ -46,7 +46,7 @@ Alguns detalhes importam na prática:
 - **Cada clipe recebe seus próprios zooms.** Em uma linha do tempo com vários clipes, cada clipe é associado ao próprio trecho da gravação, mesmo quando dois clipes vêm da mesma gravação.
 - **Um único desfazer remove o lote.** Todo o processo é uma única edição.
 - **Os resultados são zooms comuns.** Clique em um para mudar sua profundidade, câmera 3D ou foco, arraste as bordas para mover o início e o fim, ou apague-o.
-- **Ele roda quando você pede.** Na versão 1.11.0, nada é adicionado depois de uma gravação até você escolher Zooms automáticos no editor, ou passar `--auto-zoom` na linha de comando.
+- **Ele roda depois de cada gravação.** Cada nova gravação recebe seus zooms ao abrir no editor. Para evitar isso, desative **Zoom automático após a gravação** no modo **Gravar** do editor. Para rodá-lo quando quiser, escolha **Zooms automáticos** no editor, ou passe `--auto-zoom` na linha de comando.
 - **Ele avisa quando nada se qualifica.** O editor informa que nenhum momento de zoom automático foi encontrado.
 - **Não precisa de dados de clique.** Uma gravação feita sem cliques, como uma gravação no Linux quando seu usuário não está no grupo `input`, ainda recebe zooms automáticos.
 - **Pausas longas ficam a seu critério.** Um ponteiro parado por mais de 2,6 segundos, por exemplo enquanto você fala sobre um slide, é deixado como está. Adicione um zoom manualmente com `Z`.
@@ -74,7 +74,7 @@ O rebote de clique precisa de cliques gravados. No macOS isso exige a permissão
 
 ## Pela linha de comando {#from-the-command-line}
 
-O comando `export` da [CLI](/docs/cli/) aceita `--auto-zoom`. Antes de renderizar, ele roda o mesmo detector de pausas sobre os dados de cursor da gravação e adiciona zooms que nunca se sobrepõem aos do próprio projeto. Cada um desses zooms dura um segundo ou 5% da gravação, o que for maior. Um vídeo sem dados de cursor do OpenScreen não lhe dá nada com que trabalhar.
+O comando `export` da [CLI](/docs/cli/) aceita `--auto-zoom`. Antes de renderizar, ele roda o mesmo detector de pausas sobre os dados de cursor da gravação e adiciona zooms que nunca se sobrepõem aos do próprio projeto. Cada um desses zooms dura dois segundos, como no editor. Um vídeo sem dados de cursor do OpenScreen não lhe dá nada com que trabalhar.
 
 ## Outras ferramentas que dão zoom automaticamente {#other-tools-that-zoom-automatically}
 
@@ -96,7 +96,7 @@ Assim como o OpenScreen, o Cap e o Camtasia precisam de dados capturados pelo pr
 1. Baixe o OpenScreen na [página de download](/download/). No Windows, a Microsoft Store é o caminho recomendado.
 2. Siga a [Instalação](/docs/installation/). No macOS, conceda as permissões de Gravação de Tela e Acessibilidade antes da primeira gravação.
 3. Faça uma primeira gravação com o [início rápido](/docs/quick-start/), e deixe o modo de cursor em Sobreposição editável.
-4. No editor, escolha **Melhoria automática → Zooms automáticos**, depois ajuste os zooms como descrito em [Edição e linha do tempo](/docs/editing-timeline/).
+4. A gravação abre no editor com os zooms automáticos já posicionados. Ajuste-os como descrito em [Edição e linha do tempo](/docs/editing-timeline/).
 
 Fazendo uma demo completa? O [guia de vídeo de demonstração de produto](/docs/guides/product-demo-video/) mostra como ritmar uma gravação para esses zooms, e a [página de legendas](/features/captions/) cobre a transcrição no dispositivo. O OpenScreen roda em [Windows](/screen-recorder-windows/), [macOS](/screen-recorder-mac/) e [Linux](/screen-recorder-linux/). Ou volte para a [página inicial do OpenScreen](/).
 

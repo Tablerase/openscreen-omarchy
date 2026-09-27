@@ -61,7 +61,7 @@ Der Tab **Composition** gestaltet das Bild. Sein Hintergrundabschnitt bietet 18 
 
 ## 4. Automatische Zooms hinzufügen {#4-add-automatic-zooms}
 
-Öffne in der Werkzeugleiste der Zeitleiste **Auto-enhance** und wähle **Automatic zooms**. OpenScreen liest die aufgezeichnete Cursorbewegung und setzt Zoombereiche auf diese Pausen, ohne Netzwerk und ohne Modell. Setzt der Durchlauf nichts, sagt OpenScreen dir das. Die üblichen Ursachen sind eine Aufnahme ohne Cursordaten, keine Pause in diesem Abschnitt oder vorhandene Zooms, die diese Momente schon abdecken.
+OpenScreen setzt sie, sobald sich die Aufnahme im Editor öffnet: Es liest die aufgezeichnete Cursorbewegung und setzt Zoombereiche auf diese Pausen, ohne Netzwerk und ohne Modell. Hat sich die Aufnahme ohne sie geöffnet, öffne in der Werkzeugleiste der Zeitleiste **Auto-enhance** und wähle **Automatic zooms**. Setzt der Durchlauf nichts, sagt OpenScreen dir das. Die üblichen Ursachen sind eine Aufnahme ohne Cursordaten, keine Pause in diesem Abschnitt oder vorhandene Zooms, die diese Momente schon abdecken.
 
 Prüfe die Zooms anschließend. Klicke auf einen Zoom, um seine Stufe (von 1.25× bis 5×), seinen Fokusmodus (Auto folgt dem Cursor, Manual hält einen festen Punkt) und eine optionale 3D-Kamera einzustellen. Mit `Z` fügst du einen Zoom von Hand hinzu, mit `Ctrl/Cmd+D` löschst du einen, den du nicht willst.
 

@@ -61,7 +61,7 @@ L'onglet **Composition** met en forme le cadre. Sa section d'arrière-plan propo
 
 ## 4. Ajouter des zooms automatiques {#4-add-automatic-zooms}
 
-Dans la barre d'outils de la timeline, ouvrez **Amélioration auto** et choisissez **Zooms automatiques**. OpenScreen lit le mouvement enregistré du curseur et place des régions de zoom sur ces pauses, sans réseau ni modèle. S'il ne place rien, il vous le signale. Les causes habituelles sont un enregistrement sans données de curseur, aucune pause sur cette plage, ou des zooms existants qui couvrent déjà ces moments.
+OpenScreen les ajoute à l'ouverture de la prise dans l'éditeur : il lit le mouvement enregistré du curseur et place des régions de zoom sur ces pauses, sans réseau ni modèle. Si la prise s'est ouverte sans eux, ouvrez **Amélioration auto** dans la barre d'outils de la timeline et choisissez **Zooms automatiques**. S'il ne place rien, il vous le signale. Les causes habituelles sont un enregistrement sans données de curseur, aucune pause sur cette plage, ou des zooms existants qui couvrent déjà ces moments.
 
 Vérifiez-les ensuite. Cliquez sur un zoom pour régler son niveau (de 1.25× à 5×), son mode de focus (Auto suit le curseur, Manuel garde un point fixe) et une éventuelle caméra 3D. Appuyez sur `Z` pour ajouter un zoom à la main, et sur `Ctrl/Cmd+D` pour supprimer un zoom dont vous ne voulez pas.
 

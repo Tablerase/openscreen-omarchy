@@ -10,7 +10,7 @@ keywords:
 
 # 一款带自动缩放的免费录屏软件
 
-OpenScreen 是一款面向 Windows、macOS 和 Linux 的免费录屏软件，采用 MIT 许可证，具备自动缩放功能。录制结束后，**自动增强 → 自动缩放**会读取 OpenScreen 录制下来的光标移动，在指针暂停的每个位置添加缩放，无需联网、无需 AI 模型。Screen Studio、Cap 和 Camtasia 也都具备自动缩放功能；OpenScreen 在这三个系统上都免费提供这项功能。
+OpenScreen 是一款面向 Windows、macOS 和 Linux 的免费录屏软件，采用 MIT 许可证，具备自动缩放功能。每次录制结束后，OpenScreen 会读取它录制下来的光标移动，在指针暂停的每个位置添加缩放，无需联网、无需 AI 模型。Screen Studio、Cap 和 Camtasia 也都具备自动缩放功能；OpenScreen 在这三个系统上都免费提供这项功能。
 
 本页由 OpenScreen 项目发布。关于 Screen Studio、Cap 和 Camtasia 的信息来自 screen.studio、cap.so 和 techsmith.com，核实于 2026 年 9 月。信息来源列于文末。
 
@@ -46,7 +46,7 @@ OpenScreen 是一款面向 Windows、macOS 和 Linux 的免费录屏软件，采
 - **每个片段都有自己的缩放。** 在多片段时间轴上，即使两个片段来自同一次录制，每个片段也会匹配自己那一段录制内容。
 - **一次撤销即可移除整批缩放。** 整个处理过程算作一次编辑。
 - **结果是普通的缩放。** 点击任意一个即可修改其深度、3D 镜头或焦点，拖动边缘可调整起止时间，也可以删除它。
-- **只在你要求时才运行。** 在 1.11.0 版本中，录制结束后不会自动添加任何内容，直到你在编辑器中选择自动缩放，或在命令行中传入 `--auto-zoom`。
+- **每次录制结束后都会运行。** 每段新录制的内容在编辑器中打开时就会带上缩放。如需关闭，请在编辑器的**录制**模式中关闭**录制后自动缩放**。也可以随时手动运行：在编辑器中选择**自动缩放**，或在命令行中传入 `--auto-zoom`。
 - **没有符合条件的内容时会告知你。** 编辑器会提示未找到可自动缩放的时刻。
 - **不需要点击数据。** 没有点击数据的录制内容，例如用户未加入 `input` 组时录制的 Linux 录制内容，同样可以获得自动缩放。
 - **较长的停顿由你自行处理。** 指针停留超过 2.6 秒的情况，例如你在讲解幻灯片时，不会被自动处理。可以用 `Z` 手动添加缩放。
@@ -74,7 +74,7 @@ OpenScreen 是一款面向 Windows、macOS 和 Linux 的免费录屏软件，采
 
 ## 通过命令行 {#from-the-command-line}
 
-[CLI](/docs/cli/) 的 `export` 命令接受 `--auto-zoom` 参数。渲染之前，它会对录制内容的光标数据运行同一套停顿检测逻辑，并添加不会与项目中已有缩放重叠的新缩放。这些缩放每个时长为一秒或录制内容的 5%，取两者中较长者。没有 OpenScreen 光标数据的视频将无法生成任何自动缩放。
+[CLI](/docs/cli/) 的 `export` 命令接受 `--auto-zoom` 参数。渲染之前，它会对录制内容的光标数据运行同一套停顿检测逻辑，并添加不会与项目中已有缩放重叠的新缩放。这些缩放每个时长为两秒，与编辑器中相同。没有 OpenScreen 光标数据的视频将无法生成任何自动缩放。
 
 ## 其他具备自动缩放功能的工具 {#other-tools-that-zoom-automatically}
 
@@ -96,7 +96,7 @@ OpenScreen 是一款面向 Windows、macOS 和 Linux 的免费录屏软件，采
 1. 从[下载页面](/download/)下载 OpenScreen。在 Windows 上，推荐通过 Microsoft Store 安装。
 2. 按照[安装说明](/docs/installation/)操作。在 macOS 上，首次录制前请先授予屏幕录制和辅助功能权限。
 3. 参照[快速上手](/docs/quick-start/)完成第一次录制，并将光标模式保持为可编辑光标。
-4. 在编辑器中选择**自动增强 → 自动缩放**，然后按照[编辑与时间轴](/docs/editing-timeline/)中的说明调整这些缩放。
+4. 录制内容在编辑器中打开时，自动缩放已经放置好。按照[编辑与时间轴](/docs/editing-timeline/)中的说明调整这些缩放。
 
 在制作完整的演示视频？[产品演示视频指南](/docs/guides/product-demo-video/)介绍了如何为这些缩放安排录制节奏，[字幕页面](/features/captions/)则介绍了本机转录功能。OpenScreen 支持 [Windows](/screen-recorder-windows/)、[macOS](/screen-recorder-mac/) 和 [Linux](/screen-recorder-linux/)。或返回 [OpenScreen 首页](/)。
 
