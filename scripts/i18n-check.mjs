@@ -225,8 +225,14 @@ for (const file of sourceFiles) {
 	const bindings = [
 		...source.matchAll(/\b(?:const|let|var)\s+(\w+)\s*=\s*useScopedT\(\s*"(\w+)"\s*\)/g),
 	].map((m) => ({ name: m[1], ns: m[2], at: m.index }));
-	for (const match of source.matchAll(/\b(t[A-Z]?\w*)\(\s*"([\w.-]+)"/g)) {
+	// A callee is a translator when the file binds it to useScopedT, or when it is named like
+	// one handed in as a prop or parameter: `t`, or `t` plus a capital (`tCommon`). Any other
+	// name starting with a t, like `tierOutputDims("source")`, is not a translation call.
+	const bound = new Set(bindings.map((b) => b.name));
+	const isTranslator = (callee) => bound.has(callee) || /^t(?:[A-Z]\w*)?$/.test(callee);
+	for (const match of source.matchAll(/\b([A-Za-z_]\w*)\(\s*"([\w.-]+)"/g)) {
 		const [, callee, key] = match;
+		if (!isTranslator(callee)) continue;
 		checkedKeyCount++;
 		const own = bindings.filter((b) => b.name === callee);
 		const nearest = own.filter((b) => b.at < match.index).at(-1);
