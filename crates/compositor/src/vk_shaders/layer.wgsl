@@ -30,7 +30,7 @@ struct Layer {
     mb: vec4<f32>,        // mode 8 : [gx, gy, z_focus, k], profondeur du plan et flou (texels source) par px d'ecart, k = 0 coupe ; mode 0 : .x taps, .y force du flou, .w = 1 si coins hauts carres (sous un cadre) ; mode 5 : mb.x = aspect w/h de la sortie (fond anime) ; mode 12 : mb.y = spread de la pénombre en px ; mode 9 : mb.y = demi-épaisseur du trait en px ; mode 10 : mb.z = 1 si masque incliné, mb.w = 1 si son warp est projectif ; mode 13 : mb.x = 1 si warp projectif ; mode 14 : couleur du filet (alpha droit) ; modes 15 et 17 : .xy = demi-taille du plan dans son repere (px pour le 15, unites pour le 17), .zw = translation du plan (repere camera, px) ; mode 18 : .z = 1 si le plan est incline, .w = 1 si son warp est projectif
     trail_a: vec4<f32>,   // mode 8 : coins TL, TR du plan a la frame precedente (px locaux, comme fx) ; mode 18 incline : en fractions de sortie
     trail_b: vec4<f32>,   // mode 8 : coins BR, BL du plan a la frame precedente (comme src_prev) ; mode 18 incline : en fractions de sortie
-    trail_mb: vec4<f32>,  // mode 8 : x = taps, y = force du flou de mouvement (ceux du mode 0) ; 0 ailleurs
+    trail_mb: vec4<f32>,  // mode 8 : x = taps, y = force du flou de mouvement (ceux du mode 0) ; mode 18 incline : le `mb` du mode 8 (profondeur de champ), et `color.xy` sa lampe ; 0 ailleurs
 }
 
 @group(0) @binding(0) var<uniform> layer: Layer;
@@ -39,9 +39,11 @@ struct Layer {
 @group(0) @binding(3) var samp:  sampler;
 // Masque de segmentation du sujet webcam, R8. Une vue 1x1 est liee quand aucun masque
 // n'existe : la branche n'est de toute facon prise que si layer.fx.z > 0.5.
-// Mode 8 : ce binding porte a la place la pyramide RGBA de profondeur de champ (jamais le
-// binding 1, qui porte la luma).
+// Mode 18 : ce binding porte a la place le rendu isole de l'ecran cadre.
 @group(0) @binding(4) var texMask: texture_2d<f32>;
+// Pyramide RGBA de profondeur de champ (`tilted_sample`), lue par le mode 8 et par le repli du
+// mode 18, qui garde le binding 4 pour son rendu isole : d'ou un binding a elle. Vue 1x1 ailleurs.
+@group(0) @binding(6) var texDof: texture_2d<f32>;
 
 // Plafond de la profondeur de champ du mode 8, en niveau de la pyramide demi-resolution.
 // Meme valeur que `DOF_MAX_LOD` du HLSL.
@@ -108,9 +110,11 @@ fn sample_yuv_level(uv: vec2<f32>) -> vec3<f32> {
 // sur la trajectoire (`f`) et le relit la ou il est dessine maintenant (`q`). A plat, sa boite va
 // de `dst_prev` (frame precedente) a `fx` (courante) ; incline (`mb.z` = 1), les coins du plan
 // vont de `trail_a`/`trail_b` a `fx`/`src_prev`, et le warp du plan (`mb.w`, celui du mode 8) fait
-// l'aller et le retour. Hors de la sortie rien n'a ete rendu : dans l'ouverture arrondie de l'ecran
-// (`quad_px`, `radius_px`, 2 px en retrait) on relit le metrage (`src` = la coupe), ailleurs le
-// tap est ecarte.
+// l'aller et le retour ; un pixel que le plan prolonge n'atteint pas (aller sans solution) n'a pas
+// de tap. Hors de la sortie rien n'a ete rendu : dans l'ouverture arrondie de l'ecran (`quad_px`,
+// `radius_px`, 2 px en retrait) on relit le metrage (`src` = la coupe) comme le mode 8 l'a dessine,
+// avec sa profondeur de champ (`trail_mb` = son `mb`, pyramide en binding 6) et sa lampe
+// (`color.xy`), nulles a plat ; ailleurs le tap est ecarte.
 fn screen_trail(pout: vec2<f32>) -> vec4<f32> {
     let taps = i32(layer.mb.x);
     var acc = vec4<f32>(0.0);
@@ -123,7 +127,9 @@ fn screen_trail(pout: vec2<f32>) -> vec4<f32> {
         if layer.mb.z > 0.5 {
             let ta = mix(layer.fx, layer.trail_a, a);
             let tb = mix(layer.src_prev, layer.trail_b, a);
-            f = quad_inverse(pout, ta.xy, ta.zw, tb.xy, tb.zw, layer.mb.w).xy;
+            let r = quad_inverse(pout, ta.xy, ta.zw, tb.xy, tb.zw, layer.mb.w);
+            if r.z < -0.5 { continue; }
+            f = r.xy;
             q = quad_forward(f, layer.fx.xy, layer.fx.zw, layer.src_prev.xy, layer.src_prev.zw, layer.mb.w);
         } else {
             let r = mix(layer.fx, layer.dst_prev, a);
@@ -139,7 +145,11 @@ fn screen_trail(pout: vec2<f32>) -> vec4<f32> {
         } else {
             let hs = layer.quad_px * 0.5;
             if sd_round_rect(f * layer.quad_px - hs, hs, layer.radius_px) < -2.0 {
-                acc = acc + vec4<f32>(sample_yuv_level(mix(layer.src.xy, layer.src.zw, f)), 1.0);
+                let z = (f.x - 0.5) * layer.trail_mb.x + (f.y - 0.5) * layer.trail_mb.y;
+                let rgb = tilted_sample(mix(layer.src.xy, layer.src.zw, f),
+                                        layer.trail_mb.w * abs(z - layer.trail_mb.z));
+                let shade = 1.0 + layer.color.x * (f.x - 0.5) + layer.color.y * (f.y - 0.5);
+                acc = acc + vec4<f32>(clamp(rgb * shade, vec3<f32>(0.0), vec3<f32>(1.0)), 1.0);
                 n = n + 1.0;
             }
         }
@@ -285,6 +295,8 @@ fn quad_st_for_root(t: f32, e: vec2<f32>, f: vec2<f32>, g: vec2<f32>, h: vec2<f3
 }
 
 // (s, t, ok) du point `P` dans le quad c00->c10->c11->c01 : le warp bilineaire INVERSE.
+// `ok` = -1 quand `P` n'a AUCUN antecedent (au-dela du pli du warp) : (s, t) n'y veut rien dire,
+// et ce n'est pas l'origine du plan (cf. HLSL, qui fait foi).
 fn quad_inverse_bilinear(P: vec2<f32>, c00: vec2<f32>, c10: vec2<f32>, c11: vec2<f32>, c01: vec2<f32>) -> vec3<f32> {
     let e = c10 - c00;
     let f = c01 - c00;
@@ -296,15 +308,15 @@ fn quad_inverse_bilinear(P: vec2<f32>, c00: vec2<f32>, c10: vec2<f32>, c11: vec2
     // Quad quasi affine (rotation Y pure, p.ex.) : le terme quadratique s'evanouit
     // et resoudre la quadratique diviserait par ~0.
     if abs(k2) < 1e-5 * abs(k1) {
-        var t = 0.0;
-        if abs(k1) >= 1e-6 {
-            t = -k0 / k1;
+        // k1 nul aussi : l'equation ne fixe plus `t`, aucun point a rendre.
+        if abs(k1) < 1e-6 {
+            return vec3<f32>(0.0, 0.0, -1.0);
         }
-        return quad_st_for_root(t, e, f, g, h);
+        return quad_st_for_root(-k0 / k1, e, f, g, h);
     }
     let disc = k1 * k1 - 4.0 * k2 * k0;
     if disc < 0.0 {
-        return vec3<f32>(0.0, 0.0, 0.0);
+        return vec3<f32>(0.0, 0.0, -1.0);
     }
     // Forme stable de la quadratique : additionner deux termes de meme signe evite
     // l'annulation catastrophique que `(-k1 +- sqrt(disc)) / (2 k2)` produit quand
@@ -357,6 +369,7 @@ fn quad_inverse_projective(P: vec2<f32>, c00: vec2<f32>, c10: vec2<f32>, c11: ve
 
 // Warp inverse d'un calque pose sur le plan : projectif sous la camera reelle ou un appareil
 // (`projective` = 1), bilineaire sous un angle fixe, inchange.
+// `ok` : 1 dans le quad, 0 dehors, -1 sans antecedent (`quad_inverse_bilinear`).
 fn quad_inverse(P: vec2<f32>, c00: vec2<f32>, c10: vec2<f32>, c11: vec2<f32>, c01: vec2<f32>, projective: f32) -> vec3<f32> {
     if projective > 0.5 {
         return quad_inverse_projective(P, c00, c10, c11, c01);
@@ -383,14 +396,15 @@ fn quad_forward(st: vec2<f32>, c00: vec2<f32>, c10: vec2<f32>, c11: vec2<f32>, c
 }
 
 // Un echantillon de l'ecran incline (mode 8) : la video nette, fondue vers la pyramide de
-// profondeur de champ (binding 4, a la place du masque webcam) au-dela d'un demi-texel de cercle
-// de confusion `coc`. Sous ce seuil, l'echantillon net d'avant, a l'octet. Miroir de
-// `tilted_sample` (HLSL). LOD explicite : pas de derivees dans cette branche.
+// profondeur de champ (binding 6) au-dela d'un demi-texel de cercle de confusion `coc`. Sous ce
+// seuil, l'echantillon net d'avant, a l'octet. Miroir de `tilted_sample` (HLSL). LOD explicite
+// partout : les plans video n'ont qu'un niveau, donc c'est le meme echantillon, et le repli du
+// mode 18 l'appelle hors du flot uniforme.
 fn tilted_sample(uv: vec2<f32>, coc: f32) -> vec3<f32> {
-    var rgb = sample_yuv(uv);
+    var rgb = sample_yuv_level(uv);
     if coc > 0.5 {
         let lod = clamp(log2(coc) - 1.0, 0.0, DOF_MAX_LOD);
-        let far_rgb = textureSampleLevel(texMask, samp, uv, lod).rgb;
+        let far_rgb = textureSampleLevel(texDof, samp, uv, lod).rgb;
         rgb = mix(rgb, far_rgb, clamp((coc - 0.5) / 1.5, 0.0, 1.0));
     }
     return rgb;
@@ -2100,9 +2114,9 @@ fn fs_main(i: VsOut) -> @location(0) vec4<f32> {
         let tilt_a = (1.0 - smoothstep(0.0, 1.5, d))
             * slot_alpha(i.local, layer.quad_px, layer.color.w);
         // Profondeur de champ (cf. HLSL) : net sous un demi-texel de flou, l'echantillon
-        // d'avant a l'octet ; au-dela, fondu vers la pyramide demi-resolution liee en binding 4
-        // (a la place du masque webcam, que ce mode ne lit pas), au niveau `log2(coc) - 1`,
-        // plafonne. LOD explicite : pas de derivees dans cette branche (`tilted_sample`).
+        // d'avant a l'octet ; au-dela, fondu vers la pyramide demi-resolution liee en binding 6,
+        // au niveau `log2(coc) - 1`, plafonne. LOD explicite : pas de derivees dans cette branche
+        // (`tilted_sample`).
         let rs = clamp(vec2<f32>(r.x, r.y), vec2<f32>(0.0), vec2<f32>(1.0));
         let z = (rs.x - 0.5) * layer.mb.x + (rs.y - 0.5) * layer.mb.y;
         let coc = layer.mb.w * abs(z - layer.mb.z);
@@ -2117,7 +2131,8 @@ fn fs_main(i: VsOut) -> @location(0) vec4<f32> {
                 i.local, layer.trail_a.xy, layer.trail_a.zw, layer.trail_b.xy, layer.trail_b.zw, layer.dst_prev.w,
             );
             let duv = (r.xy - rp.xy) * (layer.src.zw - layer.src.xy) * clamp(layer.trail_mb.y, 0.0, 1.0);
-            if dot(duv, duv) >= 1e-9 {
+            // Sans antecedent sur le plan d'avant, pas de point d'avant : l'echantillon reste net.
+            if rp.z > -0.5 && dot(duv, duv) >= 1e-9 {
                 var acc = vec3<f32>(0.0);
                 let step = 1.0 / f32(trail_taps - 1);
                 for (var k: i32 = 0; k < 16; k = k + 1) {

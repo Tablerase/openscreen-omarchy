@@ -74,9 +74,10 @@ struct WebcamMask {
     height: u32,
 }
 
-/// Pyramide de la profondeur de champ (mode 8) : la vidéo en RGBA8 à demi-résolution de la
-/// texture DÉCODEUR, avec sa chaîne de mips. Dimensionnée sur la texture décodeur et remplie en
-/// UV plein (0..1) : ses UV sont ceux de t0/t1, et le calcul d'UV du mode 8 ne change pas.
+/// Pyramide de la profondeur de champ (modes 8 et 18, en t5) : la vidéo en RGBA8 à
+/// demi-résolution de la texture DÉCODEUR, avec sa chaîne de mips. Dimensionnée sur la texture
+/// décodeur et remplie en UV plein (0..1) : ses UV sont ceux de t0/t1, et le calcul d'UV du
+/// mode 8 ne change pas.
 struct DofPyramid {
     rtv: ID3D11RenderTargetView,
     srv: ID3D11ShaderResourceView,
@@ -978,9 +979,9 @@ impl Compositor {
         let pyr = self.dof_pyramid.borrow();
         let pyr = pyr.as_ref().expect("pyramide allouée ci-dessus");
         self.bind_compose_state();
-        // Délie t2 : la pyramide y est peut-être encore liée depuis le mode 8 précédent, et une
-        // ressource liée en lecture ET en écriture est retirée d'office par le runtime.
-        self.ctx.PSSetShaderResources(2, Some(&[None]));
+        // Délie t5 : la pyramide y est peut-être encore liée depuis le mode 8 ou 18 précédent, et
+        // une ressource liée en lecture ET en écriture est retirée d'office par le runtime.
+        self.ctx.PSSetShaderResources(5, Some(&[None]));
         self.ctx.OMSetRenderTargets(Some(&[Some(pyr.rtv.clone())]), None);
         self.ctx.ClearRenderTargetView(&pyr.rtv, &[0.0, 0.0, 0.0, 0.0]);
         self.ctx.RSSetViewports(Some(&[D3D11_VIEWPORT {
@@ -2073,10 +2074,9 @@ impl Compositor {
             // rendus dans le repère DU PLAN : sans eux le plan a des arêtes de couteau qui
             // tranchent le contenu en pleine phrase, et l'œil lit une découpe là où il devrait
             // lire une inclinaison.
-            // t2 EXPLICITE : `draw_video` ne lie que t0/t1, et t2 garde sinon ce que le draw
-            // précédent y a laissé (un wallpaper, un sprite). `None` quand l'effet est coupé :
-            // `k = 0`, le shader n'y lit rien.
-            self.ctx.PSSetShaderResources(2, Some(&[dof_srv.clone()]));
+            // La pyramide de profondeur de champ en t5, que `draw_video` ne lie pas. `None` quand
+            // l'effet est coupé : `k = 0`, le shader n'y lit rien.
+            self.ctx.PSSetShaderResources(5, Some(&[dof_srv.clone()]));
             self.draw_video(
                 &crate::frame_geometry::tilted_screen_cb(
                     &quad,
@@ -2094,7 +2094,7 @@ impl Compositor {
                 &sy,
                 &suv,
             );
-            self.ctx.PSSetShaderResources(2, Some(&[None]));
+            self.ctx.PSSetShaderResources(5, Some(&[None]));
         } else {
             // Sous le masque d'un layout en bloc, rogné au slot (`FrameGeometry::mask_flat_screen`).
             let (dst, src, quad_px, radius_px) = g.mask_flat_screen(
@@ -2129,9 +2129,13 @@ impl Compositor {
         }
         if trail {
             self.ctx.OMSetRenderTargets(Some(&[Some(self.rtv.clone())]), None);
+            // t2 = l'écran cadré isolé ; t5 = la pyramide, avec laquelle le repli relit le
+            // métrage hors de la sortie comme le mode 8 l'a dessiné.
             self.ctx.PSSetShaderResources(2, Some(&[Some(self.trail_srv.clone())]));
-            self.draw_video(&g.screen_trail_cb(render_px), &sy, &suv);
+            self.ctx.PSSetShaderResources(5, Some(&[dof_srv.clone()]));
+            self.draw_video(&g.screen_trail_cb(render_px, dof), &sy, &suv);
             self.ctx.PSSetShaderResources(2, Some(&[None]));
+            self.ctx.PSSetShaderResources(5, Some(&[None]));
         }
 
         // --- curseur custom : suit le mapping src/dst (zoom+layout), click bounce,

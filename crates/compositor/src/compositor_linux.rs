@@ -245,7 +245,7 @@ struct WebcamMask {
 }
 
 /// Pyramide de profondeur de champ (cf. `Compositor::dof_pyramid`). `_tex` garde la
-/// texture en vie ; `view` porte tous les niveaux (binding 4 du mode 8), `mips` un
+/// texture en vie ; `view` porte tous les niveaux (binding 6 des modes 8 et 18), `mips` un
 /// niveau chacune (cible du remplissage puis de `generate_mips`).
 struct DofPyramid {
     _tex: wgpu::Texture,
@@ -471,6 +471,9 @@ impl Compositor {
                     // plans, et renumeroter aurait touche tous les bind groups
                     // pour un gain nul.
                     tex_entry(5),
+                    // Pyramide de profondeur de champ (modes 8 et 18), `dummy` ailleurs : le
+                    // mode 18 lit a la fois le metrage, son rendu isole (binding 4) et elle.
+                    tex_entry(6),
                 ],
             });
         let pipeline_layout = gpu.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -1275,18 +1278,18 @@ impl Compositor {
         planes: Option<(&wgpu::TextureView, &wgpu::TextureView, &wgpu::TextureView)>,
         dummy: &wgpu::TextureView,
     ) -> (wgpu::Buffer, wgpu::BindGroup) {
-        self.make_bind_b4(cb, planes, dummy, None)
+        self.make_bind_b4(cb, planes, dummy, None, None)
     }
 
-    /// `make_bind`, binding 4 impose. Seul le mode 8 s'en sert, pour y lier la pyramide
-    /// de profondeur de champ a la place du masque webcam qu'il ne lit pas -- jamais le
-    /// binding 1, qui porte la luma.
+    /// `make_bind`, binding 4 impose (le rendu isole du mode 18, a la place du masque webcam
+    /// qu'il ne lit pas), et la pyramide de profondeur de champ en binding 6 (modes 8 et 18).
     fn make_bind_b4(
         &self,
         cb: &LayerCB,
         planes: Option<(&wgpu::TextureView, &wgpu::TextureView, &wgpu::TextureView)>,
         dummy: &wgpu::TextureView,
         b4: Option<&wgpu::TextureView>,
+        dof: Option<&wgpu::TextureView>,
     ) -> (wgpu::Buffer, wgpu::BindGroup) {
         let uniform = self.gpu.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("layer-uniform"),
@@ -1330,6 +1333,10 @@ impl Compositor {
                 wgpu::BindGroupEntry {
                     binding: 5,
                     resource: wgpu::BindingResource::TextureView(v),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 6,
+                    resource: wgpu::BindingResource::TextureView(dof.unwrap_or(dummy)),
                 },
             ],
         });
@@ -2206,12 +2213,13 @@ impl Compositor {
         // Bind group construit AVANT le pass (doit vivre pendant tout le pass) ;
         // `_screen_uniform` garde le buffer uniforme en vie (reference par le bind).
         let dummy = self.dummy_view();
-        // Binding 4 EXPLICITE sur le mode 8 : la pyramide si l'effet tourne, sinon le
-        // repli habituel (`k = 0`, le shader n'y lit rien).
+        // Binding 6 du mode 8 : la pyramide si l'effet tourne, sinon `dummy` (`k = 0`, le
+        // shader n'y lit rien).
         let (_screen_uniform, screen_bind) = self.make_bind_b4(
             &screen_layer,
             Some((&sy, &su, &sv)),
             &dummy,
+            None,
             dof_pyramid.map(|p| &p.view),
         );
         // Remplissage de la pyramide : UN draw du mode 0 en UV plein vers son niveau 0
@@ -2272,13 +2280,14 @@ impl Compositor {
         // Flou de mouvement de l'ecran CADRE (`FrameGeometry::screen_trail`) : l'ombre, le cadre,
         // le metrage et l'appareil ci-dessus passent dans un rendu isole (`trail_view`), que le
         // mode 18 recompose sur le fond, droit ou incline ; binding 4 = ce rendu, les plans = le
-        // metrage.
+        // metrage, binding 6 = la pyramide, pour le relire hors de la sortie comme le mode 8.
         let trail = g.screen_trail([rw, rh]).then(|| {
             self.make_bind_b4(
-                &g.screen_trail_cb([rw, rh]),
+                &g.screen_trail_cb([rw, rh], dof),
                 Some((&sy, &su, &sv)),
                 &dummy,
                 Some(&self.trail_view),
+                dof_pyramid.map(|p| &p.view),
             )
         });
 
@@ -4996,6 +5005,120 @@ mod tests {
             eprintln!("{label} : barre de titre -{:.1} % de pixels francs a t={}", best.0 * 100.0, best.1);
             let best = best.0;
             assert!(best > 0.05, "{label} : la barre de titre reste nette pendant le zoom (au mieux {best:.3})");
+        }
+    }
+
+    /// Un seul ecran dans `rect` (fractions de la sortie `out`), zoome x`scale` sous `iso` de 2 a
+    /// 6 s, fond uni sans ombre ni padding. Meme scene que `tests/screen_trail_render.rs` (D3D11).
+    fn trail_scene_json(rect: [f32; 4], out: (u32, u32), scale: f32, blur: f32, dof: bool) -> String {
+        let [x, y, w, h] = rect;
+        let (ow, oh) = out;
+        format!(
+            r##"{{"clips":[{{"screenPath":"/s.mp4","webcamPath":"","sourceStartSec":0,"sourceEndSec":10,"webcamOffsetSec":0,"hasAudio":false}}],
+                "layout":{{"preset":"no-webcam","webcamSize":1,"webcamShape":"rounded","webcamMirror":false,"webcamPosition":null,"webcamReactiveZoom":false,
+                           "screenRect":{{"x":{x},"y":{y},"width":{w},"height":{h}}}}},
+                "effects":{{"padding":0,"blur":false,"shadow":0,"roundnessFrac":0.02,"motionBlur":{blur},"depthOfField":{dof}}},
+                "background":{{"kind":"color","color":"#6070a0"}},
+                "zoomRegions":[{{"clipIndex":0,"startSec":2,"endSec":6,"scale":{scale},"focusX":0.5,"focusY":0.5,"focusMode":"manual","rotation":"iso"}}],
+                "annotations":[],
+                "cursor":{{"show":false,"size":1,"smoothing":0,"motionBlur":0,"clickBounce":0,"clipToBounds":false,"theme":"default"}},
+                "cropByClip":[null],
+                "output":{{"width":{ow},"height":{oh},"fps":30}}}}"##
+        )
+    }
+
+    fn compose_trail(comp: &Compositor, screen: &FakeFrame, json: &str, t: f32) -> Vec<u8> {
+        let scene = Scene::from_json(json).expect("scene json");
+        comp.set_live_params(live_params_from_scene(&scene));
+        comp.set_has_webcam(false);
+        comp.set_scene(Some(scene));
+        let mut cfg = Cfg::c8();
+        cfg.bg_blur = 0.0;
+        cfg.zoom = false;
+        cfg.layout_anim = false;
+        cfg.cursor = false;
+        cfg.mblur_n = 1;
+        cfg.shadow = false;
+        unsafe {
+            comp.set_timeline_time(Some(t));
+            comp.compose_frame(screen.as_ptr(), screen.as_ptr(), 0.0, &cfg).expect("compose_frame");
+            comp.readback_direct().expect("readback_direct").2
+        }
+    }
+
+    /// Un tap du mode 18 dont le warp inverse n'a PAS de solution (au-dela du pli du warp
+    /// bilineaire d'`iso`) est ecarte : il valait l'origine du plan, renvoyee sur le coin
+    /// haut-gauche de l'ecran courant, et le fond loin de l'ecran prenait la couleur de ce coin
+    /// (un repere masque par l'arrondi y reparaissait). Petit ecran centre (15 %), zoom x1,6 :
+    /// loin de l'ecran, le rendu floute reste le fond, au bit pres. Pendant D3D11 :
+    /// `tests/screen_trail_render.rs`.
+    #[test]
+    fn unsolvable_trail_taps_leave_the_background_alone() {
+        let Some(gpu) = gpu() else { return };
+        let comp = Compositor::new_sized(&gpu, 1280, 720).expect("Compositor::new_sized");
+        // Metrage rouge, repere vert dans son coin haut-gauche.
+        let (w, h) = (640u32, 360u32);
+        let marker = |col: u32, row: u32| col < 48 && row < 48;
+        let y: Vec<u8> = (0..w * h).map(|i| if marker(i % w, i / w) { 173 } else { 63 }).collect();
+        let uv: Vec<u8> = (0..w * (h / 2))
+            .map(|i| {
+                let [u, v] = if marker(i % w & !1, i / w * 2) { [42, 26] } else { [102, 240] };
+                if i % 2 == 0 { u } else { v }
+            })
+            .collect();
+        let screen = FakeFrame::from_planes(&gpu, w, h, &y, &uv);
+        let json = |blur| trail_scene_json([0.425, 0.425, 0.15, 0.15], (1280, 720), 1.6, blur, false);
+        let far = |x: u32, y: u32| !(320..960).contains(&x) || !(180..540).contains(&y);
+        let mut leaks = 0;
+        for t in [1.5, 1.7, 1.9, 6.1] {
+            let sharp = compose_trail(&comp, &screen, &json(0.0), t);
+            let blurred = compose_trail(&comp, &screen, &json(1.0), t);
+            let n = (0..1280 * 720u32)
+                .filter(|&i| far(i % 1280, i / 1280))
+                .filter(|&i| sharp[i as usize * 4..][..3] != blurred[i as usize * 4..][..3])
+                .count();
+            eprintln!("t={t} : {n} px du fond changent avec le flou");
+            leaks += n;
+        }
+        assert_eq!(leaks, 0, "le flou de mouvement a peint loin de l'ecran");
+    }
+
+    /// Hors de la sortie, le mode 18 relit le metrage comme le mode 8 l'a dessine, profondeur de
+    /// champ comprise : le meme ecran physique, zoome x2 sous `iso`, rendu sur la sortie et au
+    /// centre d'une sortie deux fois plus grande (ou rien ne sort du cadre), coincide aux bords de
+    /// la sortie. Le repli lisait le metrage NET. Pendant D3D11 : `tests/screen_trail_render.rs`.
+    #[test]
+    fn off_canvas_trail_taps_keep_the_depth_of_field() {
+        let Some(gpu) = gpu() else { return };
+        let (w, h) = (640u32, 360u32);
+        // Rayures noires et blanches de 2 px : la profondeur de champ les grise.
+        let screen = FakeFrame::new(&gpu, w, h, |col, _| if col / 2 % 2 == 0 { Y_BLACK } else { Y_WHITE });
+        let (ow, oh) = (1280u32, 720u32);
+        let normal = Compositor::new_sized(&gpu, ow, oh).expect("Compositor::new_sized");
+        let padded = Compositor::new_sized(&gpu, 2 * ow, 2 * oh).expect("Compositor::new_sized");
+        let json = |k: f32, dof| {
+            let r = [0.5 - 0.4 / k, 0.5 - 0.4 / k, 0.8 / k, 0.8 / k];
+            trail_scene_json(r, ((ow as f32 * k) as u32, (oh as f32 * k) as u32), 2.0, 1.0, dof)
+        };
+        let edges: Vec<(u32, u32)> =
+            (oh / 4..oh * 3 / 4).flat_map(|y| (0..24).chain(ow - 24..ow).map(move |x| (x, y))).collect();
+        let at = |rgba: &[u8], w: u32, (x, y): (u32, u32)| rgba[((y * w + x) * 4) as usize];
+        for t in [1.5, 1.7] {
+            let a = compose_trail(&normal, &screen, &json(1.0, true), t);
+            let b = compose_trail(&padded, &screen, &json(2.0, true), t);
+            let net = compose_trail(&normal, &screen, &json(1.0, false), t);
+            let crop = |(x, y): (u32, u32)| (x + ow / 2, y + oh / 2);
+            let diffs: Vec<u8> = edges.iter().map(|&p| at(&a, ow, p).abs_diff(at(&b, 2 * ow, crop(p)))).collect();
+            let mean = diffs.iter().map(|&d| d as f32).sum::<f32>() / diffs.len() as f32;
+            let max = diffs.iter().copied().max().unwrap_or(0);
+            let dof = edges.iter().map(|&p| at(&a, ow, p).abs_diff(at(&net, ow, p))).max().unwrap_or(0);
+            // La pyramide est bien liee : elle grise les rayures sans les assombrir.
+            let level = |rgba: &[u8]| edges.iter().map(|&p| at(rgba, ow, p) as f32).sum::<f32>() / edges.len() as f32;
+            let (lit, flat) = (level(&a), level(&net));
+            eprintln!("t={t} : bord de la sortie, ecart moyen {mean:.2}, max {max} (profondeur de champ : {dof}, niveau {lit:.1} / {flat:.1})");
+            assert!(dof > 60, "t={t} : la profondeur de champ n'agit pas au bord, le test ne prouve rien");
+            assert!((lit - flat).abs() < 4.0, "t={t} : la profondeur de champ assombrit le bord ({lit:.1} / {flat:.1})");
+            assert!(mean < 1.0 && max <= 16, "t={t} : le bord perd la profondeur de champ ({mean:.2}, {max})");
         }
     }
 

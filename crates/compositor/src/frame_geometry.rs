@@ -2099,14 +2099,18 @@ impl FrameGeometry {
     /// mode 8. `mb.w` = le warp du plan (`TiltedQuad::warp_flag`, bilinéaire sous un angle fixe,
     /// projectif sous la caméra réelle ou un appareil) : le shader passe par lui dans les deux
     /// sens, comme le mode 8 qui a dessiné le métrage.
-    pub fn screen_trail_cb(&self, render_px: [f32; 2]) -> LayerCB {
+    ///
+    /// Le métrage relu hors de la sortie l'est comme le mode 8 l'a dessiné : incliné, `trail_mb`
+    /// porte SA profondeur de champ (son `mb` ; `dof` = `depth_of_field_on`, vrai quand la
+    /// pyramide est liée) et `color.xy` sa lampe. Nuls à plat : le repli relit le métrage net.
+    pub fn screen_trail_cb(&self, render_px: [f32; 2], dof: bool) -> LayerCB {
+        let s_px = [self.s_dst[2] * render_px[0], self.s_dst[3] * render_px[1]];
         let flat = LayerCB {
             dst: [0.0, 0.0, 1.0, 1.0],
             src: self.cut,
-            quad_px: [self.s_dst[2] * render_px[0], self.s_dst[3] * render_px[1]],
+            quad_px: s_px,
             radius_px: self.s_radius,
             mode: 18.0,
-            color: [1.0, 1.0, 1.0, 1.0],
             fx: self.s_dst,
             dst_prev: self.s_dst_prev,
             mb: [self.mb_taps, self.mb_amount, 0.0, 0.0],
@@ -2120,14 +2124,19 @@ impl FrameGeometry {
         let out = |(x, y): (f32, f32)| [(c[0] + x) / render_px[0], (c[1] + y) / render_px[1]];
         let [tl, tr, br, bl] = quad.corners.map(out);
         let [ptl, ptr, pbr, pbl] = trail.corners.map(out);
+        // Le calque que le mode 8 dessine pour ce plan : sa profondeur de champ et sa lampe ne
+        // dépendent ni du rayon, ni du chrome, ni d'un masque.
+        let plane = tilted_screen_cb(&quad, s_px, c, self.cut, self.focus_plane, 0.0, 0.0, dof, render_px, None, None);
         LayerCB {
-            quad_px: flat.quad_px.map(|v| v * quad.scale),
+            quad_px: s_px.map(|v| v * quad.scale),
             radius_px: self.s_radius * quad.scale,
+            color: [plane.color[0], plane.color[1], 0.0, 0.0],
             fx: [tl[0], tl[1], tr[0], tr[1]],
             src_prev: [br[0], br[1], bl[0], bl[1]],
             trail_a: [ptl[0], ptl[1], ptr[0], ptr[1]],
             trail_b: [pbr[0], pbr[1], pbl[0], pbl[1]],
             mb: [self.mb_taps, self.mb_amount, 1.0, quad.warp_flag()],
+            trail_mb: plane.mb,
             ..flat
         }
     }
@@ -4667,9 +4676,11 @@ mod tests {
             g.s_dst_prev[2] *= 0.9;
             assert!(g.screen_trail(RENDER), "{frame}: boîte qui bouge");
             assert_eq!(g.screen_pixel_taps(RENDER), 1.0, "{frame}: flou compté deux fois");
-            let cb = g.screen_trail_cb(RENDER);
+            let cb = g.screen_trail_cb(RENDER, true);
             assert_eq!((cb.fx, cb.dst_prev, cb.src), (g.s_dst, g.s_dst_prev, g.cut));
             assert_eq!(cb.mb, [16.0, 1.0, 0.0, 0.0], "{frame}: la boîte, pas le plan");
+            // À plat, ni profondeur de champ ni lampe : le repli relit le métrage net.
+            assert_eq!((cb.trail_mb, cb.color), ([0.0; 4], [0.0; 4]), "{frame}: repli net");
             g.mb_amount = 0.0;
             assert!(!g.screen_trail(RENDER), "{frame}: flou coupé");
             g.mb_amount = 1.0;
@@ -4710,7 +4721,7 @@ mod tests {
                 assert!(g.screen_trail(RENDER), "{case}: le plan bouge, le cadre doit suivre");
                 assert_eq!(g.tilt_pixel_trail(RENDER), None, "{case}: flou compté deux fois");
 
-                let cb = g.screen_trail_cb(RENDER);
+                let cb = g.screen_trail_cb(RENDER, true);
                 // Le warp du plan, celui du mode 8 : bilinéaire sous un angle fixe nu, projectif
                 // sous la caméra réelle ou un appareil.
                 let warp = if rotation == r#""iso""# && frame.is_empty() { 0.0 } else { 1.0 };
@@ -4725,6 +4736,12 @@ mod tests {
                 let s_px = [g.s_dst[2] * RENDER[0], g.s_dst[3] * RENDER[1]];
                 assert_eq!(cb.quad_px, s_px.map(|v| v * quad.scale));
                 assert_eq!(cb.radius_px, g.s_radius * quad.scale);
+                // Et il relit le métrage comme le mode 8 l'a dessiné : même profondeur de champ
+                // (son `mb`), même lampe (son `color.xy`).
+                let mode8 = tilted_screen_cb(&quad, s_px, c, g.cut, g.focus_plane, g.s_radius, 0.0, true, RENDER, None, None);
+                assert!(mode8.mb[3] > 0.0, "{case}: la profondeur de champ doit tourner");
+                assert_eq!(cb.trail_mb, mode8.mb, "{case}: profondeur de champ du repli");
+                assert_eq!(cb.color, [mode8.color[0], mode8.color[1], 0.0, 0.0], "{case}: lampe du repli");
 
                 // Sous un masque de bloc, la case ne bouge pas : retour au flou par pixel.
                 let mut masked = g;
