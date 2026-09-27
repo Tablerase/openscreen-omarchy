@@ -5460,7 +5460,15 @@ mod tests {
             let touch = compose_model(&comp, &blue, &on, &clicked);
             let touch_b = compose_model(&comp, &orange, &on, &clicked);
             let hover = compose_model(&comp, &blue, &on, &still);
-            let tilted = compose_model(&comp, &blue, &json(r#""iso""#, Some(true), "default", true), &still);
+            let iso = json(r#""iso""#, Some(true), "default", true);
+            let tilted = compose_model(&comp, &blue, &iso, &still);
+            // Le modèle incliné posé en `x` sur la ligne du focus : le préset iso (`left`) amène le
+            // bord droit du plan vers la caméra.
+            let across = |x: f32| {
+                let track = crate::cursor::CursorTrack::new(vec![(0.0, x, 0.5), (9.0, x, 0.5)], vec![], vec![(0.0, key.to_string())]);
+                compose_model(&comp, &blue, &iso, &track)
+            };
+            let (near, far) = (across(0.8), across(0.2));
             let sprite = compose_model(&comp, &blue, &flat, &still);
             let sprite_b = compose_model(&comp, &orange, &flat, &still);
             let absent = compose_model(&comp, &blue, &json("null", None, "default", true), &still);
@@ -5488,9 +5496,10 @@ mod tests {
                 .count() as f32;
             let body = |rgba: &[u8]| (0..1280 * 720).filter(|&i| model_neutral(&rgba[i * 4..i * 4 + 3]) && differs(rgba, i)).count() as f32;
             let (flat_body, tilted_body) = (body(&hover), body(&tilted));
+            let (near_body, far_body) = (body(&near), body(&far));
             println!(
                 "{key} : IoU {overlap:.3}, a 2 px pres {near3d:.3} / {near2d:.3}, sprite {area} px, palette 3D {pal3d:?} / sprite {pal2d:?}, \
-                 ombre {shadow} px, corps a plat {flat_body} / incline {tilted_body}"
+                 ombre {shadow} px, corps a plat {flat_body} / incline {tilted_body}, proche {near_body} / lointain {far_body}"
             );
             let (min_iou, min_near, palette_tol) = if centred { (0.75, 0.98, 0.07) } else { (0.6, 0.9, 0.2) };
             if overlap <= min_iou || near3d < min_near || near2d < min_near {
@@ -5504,9 +5513,14 @@ mod tests {
             if shadow <= 0.3 * area {
                 failures.push(format!("{key}: pas d'ombre en l'air ({shadow} px)"));
             }
-            // Le préset iso réduit le plan (unité 51,5 contre 62,6 px) et incline le modèle.
-            if !(tilted_body < 0.9 * flat_body && tilted_body > 0.3 * flat_body) {
-                failures.push(format!("{key}: le modele ne suit pas le plan ({tilted_body} / {flat_body})"));
+            // Au focus du zoom, l'angle fixe garde au modèle sa taille à plat (`plan_cursor`) ;
+            // ailleurs, le plan l'emporte avec lui : sa perspective le grossit du côté proche et le
+            // réduit du côté lointain. Mesuré : ×1,5 de l'un à l'autre ; un modèle resté de face sur
+            // le même plan n'y gagne que ×1,0 à 1,1.
+            if !((0.85..1.15).contains(&(tilted_body / flat_body)) && near_body > 1.25 * far_body) {
+                failures.push(format!(
+                    "{key}: le modele ne suit pas le plan ({tilted_body} / {flat_body}, proche {near_body} / lointain {far_body})"
+                ));
             }
         }
         assert!(failures.is_empty(), "{failures:#?}");
