@@ -54,7 +54,7 @@
 		18px + 100vw - env(titlebar-area-width, 100vw) - env(titlebar-area-x, 0px)
 	);
 	background: transparent;
-	border-bottom: 1px solid var(--border-soft);
+	border-bottom: 1px solid var(--shell-rule-soft);
 	min-width: 0;
 	-webkit-app-region: drag;
 	app-region: drag;
@@ -1324,7 +1324,7 @@
 	/* Room above AND below the 34px play button: at 40px it sat on the bottom rule. */
 	height: 48px;
 	flex-shrink: 0;
-	border-bottom: 1px solid var(--border-soft);
+	border-bottom: 1px solid var(--shell-rule-soft);
 }
 .tlTools {
 	/* Both side groups take an equal share of the row, so the transport between

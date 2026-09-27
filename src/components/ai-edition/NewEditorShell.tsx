@@ -1674,7 +1674,7 @@ export function NewEditorShell() {
 						gridRow: 3,
 						minHeight: 0,
 						background: "var(--surface)",
-						borderTop: "1px solid var(--border)",
+						borderTop: "1px solid var(--shell-rule)",
 					}}
 				>
 					{mode !== "media" ? (

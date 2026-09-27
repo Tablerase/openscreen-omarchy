@@ -12,7 +12,7 @@
  * depending on import order. */
 :root:root {
 	/* canvas */
-	--bg: #f8fafc;
+	--bg: #eaeef3;
 	--bg-grad: radial-gradient(ellipse 1200px 800px at 50% -200px, #ffffff 0%, #f1f5f9 80%);
 	--surface: #ffffff;
 	--surface-1: #f1f5f9;
@@ -26,6 +26,10 @@
 	--border-soft: #e6eaef;
 	--border-hi: #cbd5e1;
 	--border-dark: #0f172a;
+	/* the shell's rules (under the top bar, above and inside the timeline): on light the plain
+	   borders vanish against white, so they are darker than --border / --border-soft. */
+	--shell-rule: #cbd5e1;
+	--shell-rule-soft: #d3dbe4;
 
 	/* foreground */
 	--fg: #0f172a;
@@ -190,6 +194,8 @@
 	--border-soft: #1c2029;
 	--border-hi: #3a4150;
 	--border-dark: #0a0d12;
+	--shell-rule: #252a35;
+	--shell-rule-soft: #1c2029;
 
 	--fg: #e6e9ef;
 	--fg-2: #f3f5f8;
