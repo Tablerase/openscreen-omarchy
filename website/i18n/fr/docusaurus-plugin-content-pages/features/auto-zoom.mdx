@@ -10,7 +10,7 @@ keywords:
 
 # Un enregistreur d'écran gratuit avec zoom auto
 
-OpenScreen est un enregistreur d'écran gratuit, sous licence MIT, avec zoom auto pour Windows, macOS et Linux. Après une prise, **Amélioration auto → Zooms automatiques** lit le mouvement de curseur qu'OpenScreen a enregistré et ajoute un zoom partout où le pointeur s'est arrêté, sans appel réseau ni modèle d'IA. Screen Studio, Cap et Camtasia zooment aussi automatiquement  OpenScreen le fait gratuitement, sur les trois systèmes.
+OpenScreen est un enregistreur d'écran gratuit, sous licence MIT, avec zoom auto pour Windows, macOS et Linux. Après chaque prise, il lit le mouvement de curseur qu'il a enregistré et ajoute un zoom partout où le pointeur s'est arrêté, sans appel réseau ni modèle d'IA. Screen Studio, Cap et Camtasia zooment aussi automatiquement  OpenScreen le fait gratuitement, sur les trois systèmes.
 
 Cette page est publiée par le projet OpenScreen. Les informations sur Screen Studio, Cap et Camtasia proviennent de screen.studio, cap.so et techsmith.com et ont été vérifiées en septembre 2026. Les sources sont listées à la fin.
 
@@ -46,7 +46,7 @@ Quelques détails comptent en pratique :
 - **Chaque clip a ses propres zooms.** Sur une timeline multiclip, chaque clip est associé à sa propre plage de l'enregistrement, même quand deux clips proviennent de la même prise.
 - **Une seule annulation retire tout le lot.** L'ensemble du traitement est une seule modification.
 - **Les résultats sont des zooms ordinaires.** Cliquez sur l'un pour changer sa profondeur, sa caméra 3D ou son focus, faites glisser ses bords pour déplacer son début et sa fin, ou supprimez-le.
-- **Il s'exécute sur demande.** Dans la version 1.11.0, rien n'est ajouté après une prise tant que vous ne choisissez pas Zooms automatiques dans l'éditeur, ou ne passez pas `--auto-zoom` en ligne de commande.
+- **Il s'exécute après chaque prise.** Chaque nouvel enregistrement reçoit ses zooms à son ouverture dans l'éditeur. Pour l'éviter, désactivez **Zoom automatique après l'enregistrement** dans le mode **Enregistrement** de l'éditeur. Pour le lancer à la demande, choisissez **Zooms automatiques** dans l'éditeur, ou passez `--auto-zoom` en ligne de commande.
 - **Il vous prévient quand rien ne convient.** L'éditeur signale qu'aucun moment de zoom auto n'a été trouvé.
 - **Il n'a besoin d'aucune donnée de clic.** Une prise enregistrée sans clics, comme une prise Linux quand votre utilisateur n'est pas dans le groupe `input`, obtient quand même des zooms automatiques.
 - **Les longues pauses, c'est à vous de les cadrer.** Un pointeur immobilisé plus de 2,6 secondes, par exemple pendant que vous commentez une diapositive, est laissé tel quel. Ajoutez un zoom à la main avec `Z`.
@@ -74,7 +74,7 @@ Le rebond au clic a besoin de clics enregistrés. Sous macOS, cela nécessite l'
 
 ## Depuis la ligne de commande {#from-the-command-line}
 
-La commande `export` de la [CLI](/docs/cli/) accepte `--auto-zoom`. Avant le rendu, elle exécute le même détecteur de pauses sur les données de curseur de l'enregistrement et ajoute des zooms qui ne chevauchent jamais ceux du projet. Chacun de ces zooms dure une seconde ou 5 % de l'enregistrement, selon la valeur la plus longue. Une vidéo sans données de curseur OpenScreen ne lui donne rien à exploiter.
+La commande `export` de la [CLI](/docs/cli/) accepte `--auto-zoom`. Avant le rendu, elle exécute le même détecteur de pauses sur les données de curseur de l'enregistrement et ajoute des zooms qui ne chevauchent jamais ceux du projet. Chacun de ces zooms dure deux secondes, comme dans l'éditeur. Une vidéo sans données de curseur OpenScreen ne lui donne rien à exploiter.
 
 ## D'autres outils qui zooment automatiquement {#other-tools-that-zoom-automatically}
 
@@ -96,7 +96,7 @@ Comme OpenScreen, Cap et Camtasia ont besoin de données capturées par leur pro
 1. Téléchargez OpenScreen depuis la [page de téléchargement](/download/). Sous Windows, le Microsoft Store est la voie recommandée.
 2. Suivez l'[Installation](/docs/installation/). Sous macOS, accordez les autorisations Enregistrement de l'écran et Accessibilité avant la première prise.
 3. Enregistrez une première prise avec le [démarrage rapide](/docs/quick-start/), et laissez le mode du curseur sur Curseur éditable.
-4. Dans l'éditeur, choisissez **Amélioration auto → Zooms automatiques**, puis ajustez les zooms comme décrit dans [Montage et timeline](/docs/editing-timeline/).
+4. La prise s'ouvre dans l'éditeur avec ses zooms automatiques déjà placés. Ajustez-les comme décrit dans [Montage et timeline](/docs/editing-timeline/).
 
 Vous construisez une démo complète  Le [guide de la vidéo de démo produit](/docs/guides/product-demo-video/) explique comment rythmer une prise pour ces zooms, et la page [sous-titres](/features/captions/) couvre la transcription locale. OpenScreen tourne sous [Windows](/screen-recorder-windows/), [macOS](/screen-recorder-mac/) et [Linux](/screen-recorder-linux/). Ou retournez à la [page d'accueil d'OpenScreen](/).
 

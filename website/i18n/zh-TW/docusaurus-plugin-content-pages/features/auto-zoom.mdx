@@ -10,7 +10,7 @@ keywords:
 
 # 免費、內建自動縮放的螢幕錄影軟體
 
-OpenScreen 是一款免費、MIT 授權、支援 Windows、macOS 與 Linux 的螢幕錄影軟體，內建自動縮放。錄完之後，**自動加強 → 自動縮放**會讀取 OpenScreen 錄下的游標移動，在指標停頓的地方加上縮放，不需要連線，也不需要 AI 模型。Screen Studio、Cap 與 Camtasia 也都有自動縮放；OpenScreen 在三個平台上都免費提供這項功能。
+OpenScreen 是一款免費、MIT 授權、支援 Windows、macOS 與 Linux 的螢幕錄影軟體，內建自動縮放。每次錄完之後，OpenScreen 會讀取它錄下的游標移動，在指標停頓的地方加上縮放，不需要連線，也不需要 AI 模型。Screen Studio、Cap 與 Camtasia 也都有自動縮放；OpenScreen 在三個平台上都免費提供這項功能。
 
 本頁由 OpenScreen 專案發布。Screen Studio、Cap 與 Camtasia 的資訊來自 screen.studio、cap.so 與 techsmith.com，於 2026 年 9 月確認。資料來源列於文末。
 
@@ -46,7 +46,7 @@ OpenScreen 是一款免費、MIT 授權、支援 Windows、macOS 與 Linux 的�
 - **每個片段都有自己的縮放。** 在多片段時間軸上，即使兩個片段來自同一次錄影，每個片段也會對應到錄影中屬於自己的那一段。
 - **一次復原就能移除整批。** 整個處理是單一次編輯。
 - **結果就是一般的縮放。** 點一下可以更改倍率、3D 鏡頭或對焦，拖曳邊緣可以調整起訖時間，也可以直接刪除。
-- **只在你要求時執行。** 在 1.11.0 版中，錄完之後不會自動加上任何東西，除非你在編輯器中選擇「自動縮放」，或在命令列上加入 `--auto-zoom`。
+- **每次錄完都會執行。** 每段新錄下的影片在編輯器中開啟時，就會加上縮放。若要關閉，請在編輯器的**錄製**模式中關閉**錄製後自動縮放**。也可以隨時手動執行：在編輯器中選擇**自動縮放**，或在命令列上加入 `--auto-zoom`。
 - **找不到時會告訴你。** 編輯器會回報找不到可自動縮放的時刻。
 - **不需要點擊資料。** 即使錄影時沒有點擊資料，例如 Linux 上使用者不在 `input` 群組中錄下的內容，仍然可以套用自動縮放。
 - **長時間停頓交給你自行決定。** 指標停留超過 2.6 秒的情況，例如你正對著投影片講話時，會被略過不處理。可以按 `Z` 手動加上縮放。
@@ -74,7 +74,7 @@ OpenScreen 是一款免費、MIT 授權、支援 Windows、macOS 與 Linux 的�
 
 ## 從命令列使用 {#from-the-command-line}
 
-[CLI](/docs/cli/) 的 `export` 指令接受 `--auto-zoom` 參數。在算繪之前，它會對錄影的游標資料執行同一套停頓偵測，並加入不會與專案既有縮放重疊的縮放。每個這樣加入的縮放長度為一秒，或錄影長度的 5%，取兩者中較長者。沒有 OpenScreen 游標資料的影片，則沒有任何資料可供它運作。
+[CLI](/docs/cli/) 的 `export` 指令接受 `--auto-zoom` 參數。在算繪之前，它會對錄影的游標資料執行同一套停頓偵測，並加入不會與專案既有縮放重疊的縮放。每個這樣加入的縮放長度為兩秒，與編輯器中相同。沒有 OpenScreen 游標資料的影片，則沒有任何資料可供它運作。
 
 ## 其他也有自動縮放的工具 {#other-tools-that-zoom-automatically}
 
@@ -96,7 +96,7 @@ OpenScreen 是一款免費、MIT 授權、支援 Windows、macOS 與 Linux 的�
 1. 從[下載頁面](/download/)下載 OpenScreen。在 Windows 上，建議使用 Microsoft Store。
 2. 依照[安裝](/docs/installation/)步驟進行。在 macOS 上，請在第一次錄影前授予「螢幕錄製」與「輔助使用」權限。
 3. 依照[快速入門](/docs/quick-start/)錄下第一段影片，並將游標模式保持在「可編輯游標」。
-4. 在編輯器中選擇**自動加強 → 自動縮放**，再依照[剪輯與時間軸](/docs/editing-timeline/)所述調整縮放。
+4. 錄下的影片在編輯器中開啟時，自動縮放已經放好。再依照[剪輯與時間軸](/docs/editing-timeline/)所述調整縮放。
 
 正在製作完整示範影片嗎？[產品示範影片指南](/docs/guides/product-demo-video/)說明如何為這類縮放安排節奏，而[字幕頁面](/features/captions/)則說明裝置端轉錄的做法。OpenScreen 可在 [Windows](/screen-recorder-windows/)、[macOS](/screen-recorder-mac/) 與 [Linux](/screen-recorder-linux/) 上使用。或回到 [OpenScreen 首頁](/)。
 

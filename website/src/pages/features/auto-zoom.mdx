@@ -10,7 +10,7 @@ keywords:
 
 # A free screen recorder with auto zoom
 
-OpenScreen is a free, MIT-licensed screen recorder with auto zoom for Windows, macOS and Linux. After a take, **Auto-enhance → Automatic zooms** reads the cursor movement OpenScreen recorded and adds a zoom wherever the pointer paused, with no network call and no AI model. Screen Studio, Cap and Camtasia also zoom automatically; OpenScreen does it for free, on all three systems.
+OpenScreen is a free, MIT-licensed screen recorder with auto zoom for Windows, macOS and Linux. After each take, it reads the cursor movement it recorded and adds a zoom wherever the pointer paused, with no network call and no AI model. Screen Studio, Cap and Camtasia also zoom automatically; OpenScreen does it for free, on all three systems.
 
 This page is published by the OpenScreen project. The Screen Studio, Cap and Camtasia details come from screen.studio, cap.so and techsmith.com and were checked in September 2026. The sources are listed at the end.
 
@@ -46,7 +46,7 @@ A few details matter in practice:
 - **Every clip gets its own zooms.** On a multi-clip timeline, each clip is matched to its own stretch of the recording, even when two clips come from the same take.
 - **One undo removes the batch.** The whole pass is a single edit.
 - **The results are ordinary zooms.** Click one to change its depth, 3D camera or focus, drag its edges to move its start and end, or delete it.
-- **It runs when you ask.** In version 1.11.0, nothing is added after a take until you choose Automatic zooms in the editor, or pass `--auto-zoom` on the command line.
+- **It runs after every take.** Each new recording gets its zooms as it opens in the editor. To stop it, turn off **Auto-zoom after recording** in the editor's **Record** mode. To run it on demand, choose **Automatic zooms** in the editor, or pass `--auto-zoom` on the command line.
 - **It tells you when nothing qualifies.** The editor reports that no auto-zoom moments were found.
 - **It needs no click data.** A take recorded without clicks, such as a Linux take when your user is not in the `input` group, still gets automatic zooms.
 - **Long pauses are yours to frame.** A pointer parked for more than 2.6 seconds, for example while you talk over a slide, is left alone. Add a zoom by hand with `Z`.
@@ -74,7 +74,7 @@ Click bounce needs recorded clicks. On macOS that takes the Accessibility permis
 
 ## From the command line
 
-The `export` command of the [CLI](/docs/cli/) accepts `--auto-zoom`. Before rendering, it runs the same pause detector over the recording's cursor data and adds zooms that never overlap the project's own. Each of those zooms lasts one second or 5% of the recording, whichever is longer. A video with no OpenScreen cursor data gives it nothing to work from.
+The `export` command of the [CLI](/docs/cli/) accepts `--auto-zoom`. Before rendering, it runs the same pause detector over the recording's cursor data and adds zooms that never overlap the project's own. Each of those zooms lasts two seconds, as in the editor. A video with no OpenScreen cursor data gives it nothing to work from.
 
 ## Other tools that zoom automatically
 
@@ -96,7 +96,7 @@ Like OpenScreen, Cap and Camtasia need data their own recorder captured. Screen 
 1. Download OpenScreen from the [download page](/download/). On Windows, the Microsoft Store is the recommended route.
 2. Follow [Installation](/docs/installation/). On macOS, grant the Screen Recording and Accessibility permissions before the first take.
 3. Record a first take with the [quick start](/docs/quick-start/), and leave the cursor mode on Editable overlay.
-4. In the editor, choose **Auto-enhance → Automatic zooms**, then adjust the zooms as described in [Editing & timeline](/docs/editing-timeline/).
+4. The take opens in the editor with automatic zooms already placed. Adjust them as described in [Editing & timeline](/docs/editing-timeline/).
 
 Building a full demo? The [product demo video guide](/docs/guides/product-demo-video/) shows how to pace a take for these zooms, and the [captions page](/features/captions/) covers on-device transcription. OpenScreen runs on [Windows](/screen-recorder-windows/), [macOS](/screen-recorder-mac/) and [Linux](/screen-recorder-linux/). Or go back to the [OpenScreen home page](/).
 

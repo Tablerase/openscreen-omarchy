@@ -61,7 +61,7 @@ El panel **Composición** da estilo al cuadro. Su sección de fondo ofrece 18 fo
 
 ## 4. Agrega zooms automáticos {#4-add-automatic-zooms}
 
-En la barra de herramientas de la línea de tiempo, abre **Mejora automática** y elige **Zooms automáticos**. OpenScreen lee el movimiento grabado del cursor y coloca regiones de zoom en esas pausas, sin red y sin modelo. Si no coloca nada, te lo indica. Las causas habituales son una grabación sin datos del cursor, la ausencia de pausas en ese rango o zooms existentes que ya cubren esos momentos.
+OpenScreen los agrega cuando la toma se abre en el editor: lee el movimiento grabado del cursor y coloca regiones de zoom en esas pausas, sin red y sin modelo. Si la toma se abrió sin ellos, abre **Mejora automática** en la barra de herramientas de la línea de tiempo y elige **Zooms automáticos**. Si no coloca nada, te lo indica. Las causas habituales son una grabación sin datos del cursor, la ausencia de pausas en ese rango o zooms existentes que ya cubren esos momentos.
 
 Luego revísalos. Haz clic en un zoom para definir su nivel (de 1.25× a 5×), su modo de enfoque (Auto sigue al cursor, Manual mantiene un punto fijo) y una cámara 3D opcional. Presiona `Z` para agregar un zoom a mano, y `Ctrl/Cmd+D` para eliminar uno que no quieras.
 
