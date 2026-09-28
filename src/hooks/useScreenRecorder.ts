@@ -226,6 +226,7 @@ export async function finalizeWebcamAsset(
 
 export function useScreenRecorder(): UseScreenRecorderReturn {
 	const t = useScopedT("editor");
+	const tLaunch = useScopedT("launch");
 	/**
 	 * `t` through a ref, for the callbacks that must not be rebuilt when it
 	 * changes identity.
@@ -1653,7 +1654,15 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 					!cursorAccessibilityWarningShown.current
 				) {
 					cursorAccessibilityWarningShown.current = true;
-					toast.warning(t("recording.cursorAccessibilityUnavailable"));
+					toast.warning(t("recording.cursorAccessibilityUnavailable"), {
+						duration: 10_000,
+						action: {
+							label: tLaunch("permissions.actions.openSettings"),
+							onClick: () => {
+								void window.electronAPI?.permissions.openSettings("accessibility");
+							},
+						},
+					});
 				}
 			}
 		} catch (error) {

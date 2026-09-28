@@ -19,9 +19,11 @@ const SOURCE = { id: "screen:0:0", name: "Screen 1", display_id: "1", thumbnail:
 
 let api: Record<string, ReturnType<typeof vi.fn>>;
 let emitSystemAudioUnavailable: (() => void) | undefined;
+let openAccessibilitySettings: ReturnType<typeof vi.fn>;
 
 function stubElectronAPI(systemAudioEnabled = false) {
 	emitSystemAudioUnavailable = undefined;
+	openAccessibilitySettings = vi.fn(async () => undefined);
 	api = {
 		getRecordingPrefs: vi.fn(async () => ({
 			micEnabled: true,
@@ -52,6 +54,9 @@ function stubElectronAPI(systemAudioEnabled = false) {
 		hideCountdownOverlay: vi.fn(async () => true),
 	};
 	window.electronAPI = api as unknown as ElectronAPI;
+	Object.defineProperty(window.electronAPI, "permissions", {
+		value: { openSettings: openAccessibilitySettings },
+	});
 }
 
 async function settle(ms = 0) {
@@ -187,7 +192,21 @@ describe("useScreenRecorder native macOS start warnings", () => {
 		expect(api.requestNativeMacCursorAccess).toHaveBeenCalledOnce();
 		expect(api.startNativeMacRecording).toHaveBeenCalledOnce();
 		expect(view.result.current.recording).toBe(true);
-		expect(toast.warning).toHaveBeenCalledWith("recording.cursorAccessibilityUnavailable");
+		expect(toast.warning).toHaveBeenCalledWith(
+			"recording.cursorAccessibilityUnavailable",
+			expect.objectContaining({
+				action: expect.objectContaining({ label: "permissions.actions.openSettings" }),
+			}),
+		);
+		const warningOptions = vi.mocked(toast.warning).mock.calls.at(-1)?.[1] as
+			| { action?: { onClick?: () => void } }
+			| undefined;
+
+		await act(async () => {
+			warningOptions?.action?.onClick?.();
+		});
+
+		expect(openAccessibilitySettings).toHaveBeenCalledWith("accessibility");
 	});
 
 	it("shows the Accessibility warning once across repeated recording attempts", async () => {
