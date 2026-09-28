@@ -243,6 +243,11 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 	useEffect(() => {
 		tRef.current = t;
 	}, [t]);
+	useEffect(() => {
+		return window.electronAPI?.onNativeMacSystemAudioUnavailable?.(() => {
+			toast.warning(tRef.current("recording.systemAudioUnavailable"));
+		});
+	}, []);
 	const [recording, setRecording] = useState(false);
 	const [paused, setPaused] = useState(false);
 	const [saving, setSaving] = useState(false);
@@ -341,6 +346,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 	const discardRecordingId = useRef<number | null>(null);
 	const restarting = useRef(false);
 	const countdownRunId = useRef(0);
+	const cursorAccessibilityWarningShown = useRef(false);
 	const [countdownActive, setCountdownActive] = useState(false);
 	const webcamReady = useRef(false);
 	const webcamAcquireId = useRef(0);
@@ -1637,25 +1643,17 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 		try {
 			const platform = window.electronAPI.getPlatform();
 			if (platform === "darwin" && cursorCaptureMode === "editable-overlay") {
-				// Stop before the countdown ONLY when the user genuinely denied
-				// Accessibility — the main process is showing them a dialog that
-				// deep-links to the settings pane, so pressing record again after
-				// granting it will work.
-				//
-				// When the helper simply could not run (missing from the build, killed
-				// by the loader, crashed, hung) there is nothing for the user to grant,
-				// and blocking here is what left macOS 12 unable to record at all
-				// (#515). Recording degrades on its own: the session falls back to
-				// position-only cursor telemetry and the editor draws the cursor from
-				// its bundled sprites, so only the pointer/text shape hints are lost.
+				// Accessibility only improves cursor shape hints. Keep recording when
+				// the grant is pending or the helper is unavailable; the cursor session
+				// falls back to position-only telemetry when needed.
 				const access = await window.electronAPI.requestNativeMacCursorAccess();
-				if (!access.granted && access.status === "not-determined") {
-					return;
-				}
-				if (!access.granted) {
-					console.warn(
-						`Editable cursor unavailable (${access.status}); recording with position-only cursor telemetry.`,
-					);
+				if (
+					!access.granted &&
+					access.status === "not-determined" &&
+					!cursorAccessibilityWarningShown.current
+				) {
+					cursorAccessibilityWarningShown.current = true;
+					toast.warning(t("recording.cursorAccessibilityUnavailable"));
 				}
 			}
 		} catch (error) {
