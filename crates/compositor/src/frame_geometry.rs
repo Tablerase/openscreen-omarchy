@@ -7843,6 +7843,8 @@ mod tests {
                     hotspot_x: hx,
                     hotspot_y: hy,
                     sculpt: None,
+                    model_sdf_path: None,
+                    model_color_path: None,
                 },
             );
         }
@@ -8075,6 +8077,8 @@ mod tests {
             hotspot_x: 0.1947,
             hotspot_y: 0.0656,
             sculpt: Some("studio-ink/arrow".into()),
+            model_sdf_path: None,
+            model_color_path: None,
         };
         themed.cursor.cursor_sprites.insert("arrow".into(), themed_arrow.clone());
         assert_eq!(

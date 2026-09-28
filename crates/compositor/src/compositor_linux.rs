@@ -47,7 +47,7 @@ use crate::frame_geometry::{
     tilted_screen_cb, CursorPlacement, CursorPlanInput, FrameGeometryInput, ShadowCaster,
     SpriteShape,
 };
-use crate::scene::{Scene, SceneBackground, WallpaperMotion};
+use crate::scene::{Scene, SceneBackground, SceneCursorSprite, WallpaperMotion};
 
 const LAYER_WGSL: &str = include_str!("vk_shaders/layer.wgsl");
 const BLUR_WGSL: &str = include_str!("vk_shaders/blur.wgsl");

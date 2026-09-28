@@ -605,9 +605,14 @@ def export_model_volume(scene, root, state, output_dir):
 		"thick": thick,
 		"maxHeight": max_height,
 	}
+	metadata_items = list(metadata.items())
 	with open(os.path.join(output_dir, stem + ".json"), "w", encoding="utf-8", newline="\n") as file:
-		json.dump(metadata, file, indent=2)
-		file.write("\n")
+		file.write("{\n")
+		for index, (key, value) in enumerate(metadata_items):
+			encoded = json.dumps(value, separators=(", ", ": "))
+			comma = "," if index + 1 < len(metadata_items) else ""
+			file.write(f'\t{json.dumps(key)}: {encoded}{comma}\n')
+		file.write("}\n")
 	return metadata
 
 
