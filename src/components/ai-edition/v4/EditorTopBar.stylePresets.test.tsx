@@ -244,6 +244,20 @@ describe("Presets menu in the editor top bar", () => {
 		expect(checked.map((row) => row.textContent)).toEqual(["Warm"]);
 	});
 
+	it("keeps a twin checked while the matching row is being renamed", async () => {
+		state.presets.list = vi.fn<Fn>(async () => [WARM, { ...WARM, id: "Twin", name: "Twin" }]);
+		state.settings = { ...DEFAULT_EDITOR_SETTINGS, padding: 42, wallpaper: "#aa5500" };
+		renderPane();
+		await openMenu();
+		openRowActions("Warm");
+		fireEvent.click(screen.getByRole("menuitem", { name: "Rename" }));
+		// Warm's row is a name form now, so the mark sits on the twin that still matches.
+		const checked = within(screen.getByRole("menu", { name: "Style presets" }))
+			.getAllByRole("menuitemradio")
+			.filter((row) => row.getAttribute("aria-checked") === "true");
+		expect(checked.map((row) => row.textContent)).toEqual(["Twin"]);
+	});
+
 	it("opens a row's actions from “⋯” without applying the preset", async () => {
 		renderPane();
 		await openMenu();
