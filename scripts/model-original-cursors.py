@@ -820,6 +820,9 @@ def import_mesh_and_bake(mesh_path, theme, state):
 	mesh_path = os.path.abspath(mesh_path)
 	if not os.path.isfile(mesh_path):
 		raise RuntimeError(f"Mesh file does not exist: {mesh_path}")
+	themes = ["studio-ink", "prism-glow", "pop-coral", "pixel-candy", "star-sprout"]
+	theme_index = themes.index(theme)
+	title = theme.replace("-", " ").title()
 	scene = next((s for s in bpy.data.scenes if any(
 		o.get("theme") == theme and o.get("cursor_state") == state and "hotspot_local" in o
 		for o in s.objects
@@ -831,6 +834,16 @@ def import_mesh_and_bake(mesh_path, theme, state):
 		o for o in scene.objects
 		if o.get("theme") == theme and o.get("cursor_state") == state and "hotspot_local" in o
 	)
+	overview_collection = bpy.data.collections.get(f"{theme_index + 1:02d} {title} | Arrow + Hand")
+	if overview_collection is not None:
+		replaced_names = {
+			obj.name
+			for obj in scene.objects
+			if obj.get("theme") == theme and obj.get("cursor_state") == state
+		}
+		for copy in list(overview_collection.objects):
+			if copy.name.startswith(f"{title} | ") and copy.name[len(title) + 3:] in replaced_names:
+				bpy.data.objects.remove(copy, do_unlink=True)
 	for obj in list(scene.objects):
 		if obj != root and (
 			obj.get("model_root") == root.name
@@ -863,10 +876,34 @@ def import_mesh_and_bake(mesh_path, theme, state):
 		obj["cursor_state"] = state
 	output_dir = os.path.join(CURSOR_DIR, theme)
 	metadata = export_model_volume(scene, root, state, output_dir)
+	root["polygon_budget"] = evaluated_triangles(imported)
+	if overview_collection is not None:
+		columns = 3
+		rows = math.ceil(len(themes) / columns)
+		column = theme_index % columns
+		row = theme_index // columns
+		offset = Vector((
+			(column - (columns - 1) / 2) * 6.2,
+			0.0,
+			((rows - 1) / 2 - row) * 4.2,
+		))
+		for source in scene.objects:
+			if source.get("theme") != theme or source.get("cursor_state") != state:
+				continue
+			copy = source.copy()
+			copy.name = f"{title} | {source.name}"
+			copy.location += offset
+			for key in ("theme", "cursor_state", "hotspot_local", "polygon_budget", "model_root"):
+				if key in copy:
+					del copy[key]
+			overview_collection.objects.link(copy)
+	scene.render.filepath = os.path.join(output_dir, "source.png")
+	bpy.ops.render.render(write_still=True)
 	bpy.ops.wm.save_as_mainfile(filepath=BLEND_PATH)
 	print(
 		f"[cursor-model] imported {os.path.basename(mesh_path)} as {theme}/{state}; "
-		f"baked {metadata['width']}x{metadata['height']}x{metadata['depth']} SDF"
+		f"baked {metadata['width']}x{metadata['height']}x{metadata['depth']} SDF and rendered "
+		f"{os.path.basename(scene.render.filepath)} ({root['polygon_budget']} triangles)"
 	)
 
 

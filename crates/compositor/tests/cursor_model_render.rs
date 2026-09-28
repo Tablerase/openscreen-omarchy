@@ -165,7 +165,7 @@ fn cursors_dir() -> String {
 /// (`CURSOR_THEMES`, `src/lib/cursor/cursorThemes.ts`, sur 32).
 const SCULPTED: [(&str, [f32; 2], [f32; 2]); 5] = [
     ("studio-ink", [6.2304, 2.0992], [12.848, 2.0704]),
-    ("prism-glow", [6.3456, 2.0672], [11.968, 2.0352]),
+    ("prism-glow", [6.3456, 2.0672], [14.6432, 8.336]),
     ("pop-coral", [10.4768, 2.1792], [12.3456, 2.0]),
     ("pixel-candy", [7.3664, 2.0], [13.376, 1.9264]),
     ("star-sprout", [4.7232, 2.1152], [13.1712, 2.0384]),
