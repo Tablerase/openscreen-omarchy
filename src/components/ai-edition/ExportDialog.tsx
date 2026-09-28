@@ -44,6 +44,7 @@ import type { CompositorClipInput } from "@/native/contracts";
 import { buildSceneDescription, resolveVisibleClips } from "@/native/sceneDescription";
 import { ModalShell } from "./Modals";
 import styles from "./NewEditorShell.module.css";
+import { Toggle } from "./RightPanes";
 
 type Phase = "idle" | "configuring" | "rendering" | "writing" | "done" | "error";
 
@@ -669,12 +670,11 @@ export function ExportDialog({ open, onClose, document }: ExportDialogProps) {
 						</div>
 						<div className={styles.paneRow} style={{ margin: 0 }}>
 							<span className={styles.label}>{t("exportDialog.loopGif")}</span>
-							<button
-								type="button"
-								className={`${styles.toggle} ${gifLoop ? styles.isOn : ""}`}
-								aria-pressed={gifLoop}
+							<Toggle
+								checked={gifLoop}
+								ariaLabel={t("exportDialog.loopGif")}
 								disabled={isBusy}
-								onClick={() => setGifLoop((v) => !v)}
+								onChange={setGifLoop}
 							/>
 						</div>
 						<div

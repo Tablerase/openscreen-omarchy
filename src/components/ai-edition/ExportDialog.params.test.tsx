@@ -171,6 +171,17 @@ describe("ExportDialog format settings", () => {
 		expect(social?.bitrate).toBe((web?.bitrate ?? 0) / 2);
 	});
 
+	it("gives the GIF loop toggle an accessible name", () => {
+		// The switch renders no text of its own; without a name a screen reader only
+		// announces "pressed" and never says which setting it is.
+		renderDialog();
+		fireEvent.click(screen.getByRole("button", { name: "GIF" }));
+		expect(screen.getByRole("button", { name: "Loop GIF" })).toHaveAttribute(
+			"aria-pressed",
+			"true",
+		);
+	});
+
 	it("a GIF is 15 fps and README-sized at the small preset", async () => {
 		renderDialog();
 		fireEvent.click(screen.getByRole("button", { name: "GIF" }));
