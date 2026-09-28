@@ -17,7 +17,7 @@ const INNER_SIZE = 112;
 const themes = [
 	{
 		id: "studio-ink",
-		hotspots: { arrow: [186, 64], pointer: [418, 56] },
+		hotspots: { arrow: [186, 64], pointer: [1305, 56] },
 	},
 	{
 		id: "prism-glow",
@@ -25,15 +25,15 @@ const themes = [
 	},
 	{
 		id: "pop-coral",
-		hotspots: { arrow: [290, 60], pointer: [367, 56] },
+		hotspots: { arrow: [290, 60], pointer: [1254, 56] },
 	},
 	{
 		id: "pixel-candy",
-		hotspots: { arrow: [219, 62], pointer: [389, 57] },
+		hotspots: { arrow: [219, 62], pointer: [1276, 57] },
 	},
 	{
 		id: "star-sprout",
-		hotspots: { arrow: [140, 70], pointer: [379, 56] },
+		hotspots: { arrow: [140, 70], pointer: [1266, 56] },
 	},
 ];
 
