@@ -963,7 +963,51 @@ fn sd_sprite2(p: vec2<f32>) -> f32 {
     return select(d, sqrt(out2 + e * e), out2 > 0.0);
 }
 
+fn volume_atlas_uv(xy: vec2<f32>, slice: i32, atlas_size: vec2<u32>) -> vec2<f32> {
+    let tiles_x = max(layer.trail_b.x, 1.0);
+    let tile_w = f32(atlas_size.x) / tiles_x;
+    let tile_h = f32(atlas_size.y) / max(layer.trail_b.y, 1.0);
+    let slice_f = f32(slice);
+    let tile_x = slice_f - floor(slice_f / tiles_x) * tiles_x;
+    let tile_y = floor(slice_f / tiles_x);
+    let pixel = vec2<f32>(tile_x * tile_w + 0.5 + xy.x * (tile_w - 1.0),
+                          tile_y * tile_h + 0.5 + xy.y * (tile_h - 1.0));
+    return pixel / vec2<f32>(atlas_size);
+}
+
+fn volume_local_point(p: vec3<f32>) -> vec3<f32> {
+    return vec3<f32>(p.xy, p.z / max(layer.color.b, 1e-3));
+}
+
+fn volume_distance(p: vec3<f32>) -> f32 {
+    let atlas_size = textureDimensions(texU);
+    let point = volume_local_point(p);
+    let lo = vec3<f32>(layer.color.rg, -layer.trail_a.y);
+    let extent = vec3<f32>(sprite_size(), layer.trail_a.y + layer.trail_a.z);
+    let uv = clamp((point - lo) / max(extent, vec3<f32>(1e-6)), vec3<f32>(0.0), vec3<f32>(1.0));
+    let z = uv.z * (layer.trail_b.z - 1.0);
+    let z0 = i32(floor(z));
+    let z1 = min(z0 + 1, i32(layer.trail_b.z) - 1);
+    let d0 = textureSampleLevel(texU, samp, volume_atlas_uv(uv.xy, z0, atlas_size), 0.0).r;
+    let d1 = textureSampleLevel(texU, samp, volume_atlas_uv(uv.xy, z1, atlas_size), 0.0).r;
+    return mix(d0, d1, fract(z)) * min(layer.color.b, 1.0);
+}
+
+fn model_normal_step() -> f32 {
+    if sculpt_id() <= 10 {
+        return 0.002;
+    }
+    let atlas_size = textureDimensions(texU);
+    let tile = vec2<f32>(f32(atlas_size.x) / max(layer.trail_b.x, 1.0),
+                         f32(atlas_size.y) / max(layer.trail_b.y, 1.0));
+    let size = sprite_size();
+    return 0.75 * max(size.x / tile.x, size.y / tile.y);
+}
+
 fn model_eval(p: vec3<f32>, occ: bool) -> vec2<f32> {
+    if sculpt_id() > 10 {
+        return vec2<f32>(volume_distance(p), 0.0);
+    }
     if sculpt_id() > 0 {
         return sculpt_eval(p, occ);
     }
@@ -1017,6 +1061,20 @@ fn model_albedo(p: vec2<f32>) -> vec3<f32> {
                       sd_sprite2(p + vec2<f32>(0.0, e)) - sd_sprite2(p - vec2<f32>(0.0, e)));
     let q = p - g / max(length(g), 1e-6) * max(sd_sprite2(p) + MODEL_RIM_INSET * texel, 0.0);
     return textureSampleLevel(texY, samp, (q - layer.color.rg) / sprite_size(), 0.0).rgb;
+}
+
+fn model_volume_color(p: vec3<f32>) -> vec3<f32> {
+    let atlas_size = textureDimensions(texY);
+    let point = volume_local_point(p);
+    let lo = vec3<f32>(layer.color.rg, -layer.trail_a.y);
+    let extent = vec3<f32>(sprite_size(), layer.trail_a.y + layer.trail_a.z);
+    let uv = clamp((point - lo) / max(extent, vec3<f32>(1e-6)), vec3<f32>(0.0), vec3<f32>(1.0));
+    let z = uv.z * (layer.trail_b.z - 1.0);
+    let z0 = i32(floor(z));
+    let z1 = min(z0 + 1, i32(layer.trail_b.z) - 1);
+    let c0 = textureSampleLevel(texY, samp, volume_atlas_uv(uv.xy, z0, atlas_size), 0.0).rgb;
+    let c1 = textureSampleLevel(texY, samp, volume_atlas_uv(uv.xy, z1, atlas_size), 0.0).rgb;
+    return mix(c0, c1, fract(z));
 }
 
 struct SculptMat {
@@ -1147,7 +1205,9 @@ fn model_shade(q: vec3<f32>, n: vec3<f32>, rd: vec3<f32>, L: vec3<f32>, fall: f3
     }
     var m: SculptMat;
     var gloss = 1.0;
-    if id > 0 {
+    if id > 10 {
+        m = SculptMat(pow(model_volume_color(q), vec3<f32>(2.2)), 0.36, 0.28, 0.12, 0.24);
+    } else if id > 0 {
         let p = sculpt_point(q) - vec3<f32>(n.x, -n.y, n.z) * 0.01;
         m = sculpt_material(mat, p, (id - 1) / 2, (id - 1) % 2);
     } else {
@@ -1250,7 +1310,7 @@ fn cursor_model(local: vec2<f32>) -> vec4<f32> {
         if stage == STAGE_MARCH {
             pos = ro + rd * t;
         } else if stage == STAGE_NORMAL {
-            pos = q + 0.002 * model_tetra(k);
+            pos = q + model_normal_step() * model_tetra(k);
         } else if stage == STAGE_AO {
             pos = q + (0.01 + 0.0175 * f32(k)) * SCULPT_SCALE * n;
         } else if stage == STAGE_SELF {

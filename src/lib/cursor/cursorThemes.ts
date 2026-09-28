@@ -15,9 +15,12 @@ export interface CursorThemeAsset {
 	height: number;
 	hotspotX: number;
 	hotspotY: number;
-	/** The compositor models this state in 3D (`crates/compositor/src/sculpt.rs`) instead of
-	 *  extruding the flat asset, which stays the 2D art. */
+	/** The compositor has a dedicated 3D model for this state; the PNG remains the 2D art. */
 	sculpted?: boolean;
+	/** SDF volume baked from the editable Blender mesh for the compositor's 3D cursor mode. */
+	modelSdfPath?: string;
+	/** Material-color volume baked from the same Blender mesh. */
+	modelColorPath?: string;
 }
 
 export interface CursorTheme {
@@ -51,8 +54,7 @@ export interface CursorSprite {
 	/** Hotspot as a fraction of the image width / height. */
 	hotspotX: number;
 	hotspotY: number;
-	/** The compositor's sculpted model for this state in 3D, `"<theme>/<state>"`
-	 *  (`crates/compositor/src/sculpt.rs`). Without it, 3D extrudes the sprite. */
+	/** Identifies a dedicated 3D model as `"<theme>/<state>"`; unmodeled states extrude the PNG. */
 	sculpt?: string;
 }
 
@@ -135,8 +137,8 @@ export function readCursorAsArrow(
  *
  * To add one: drop arrow.png/pointer.png into public/cursors/<id>/ and add an entry here
  * with hotspots normalized to the 32-logical reference (divide a 128px-pack hotspot by 4).
- * Mark an asset `sculpted` when the compositor has a 3D model for it (`sculpt.rs`); other states
- * are extruded from their sprite in 3D. An id that leaves this list reads back as the default art
+ * Mark an asset `sculpted` when the compositor has a 3D model for it; other states are extruded
+ * from their sprite in 3D. An id that leaves this list reads back as the default art
  * through `normalizeCursorThemeId`, so a project saved with it still opens.
  */
 export const CURSOR_THEMES: readonly CursorTheme[] = [
@@ -148,17 +150,21 @@ export const CURSOR_THEMES: readonly CursorTheme[] = [
 				assetPath: "cursors/studio-ink/arrow.png",
 				width: 32,
 				height: 32,
-				hotspotX: 6.2304,
-				hotspotY: 2.0992,
+				hotspotX: 6.6752,
+				hotspotY: 2.4448,
 				sculpted: true,
+				modelSdfPath: "cursors/studio-ink/arrow-sdf.png",
+				modelColorPath: "cursors/studio-ink/arrow-color.png",
 			},
 			pointer: {
 				assetPath: "cursors/studio-ink/pointer.png",
 				width: 32,
 				height: 32,
-				hotspotX: 12.848,
-				hotspotY: 2.0704,
+				hotspotX: 13.936,
+				hotspotY: 2.4768,
 				sculpted: true,
+				modelSdfPath: "cursors/studio-ink/pointer-sdf.png",
+				modelColorPath: "cursors/studio-ink/pointer-color.png",
 			},
 		},
 	},
@@ -170,17 +176,21 @@ export const CURSOR_THEMES: readonly CursorTheme[] = [
 				assetPath: "cursors/prism-glow/arrow.png",
 				width: 32,
 				height: 32,
-				hotspotX: 6.3456,
-				hotspotY: 2.0672,
+				hotspotX: 6.7264,
+				hotspotY: 2.4416,
 				sculpted: true,
+				modelSdfPath: "cursors/prism-glow/arrow-sdf.png",
+				modelColorPath: "cursors/prism-glow/arrow-color.png",
 			},
 			pointer: {
 				assetPath: "cursors/prism-glow/pointer.png",
 				width: 32,
 				height: 32,
-				hotspotX: 11.968,
-				hotspotY: 2.0352,
+				hotspotX: 13.8432,
+				hotspotY: 2.5536,
 				sculpted: true,
+				modelSdfPath: "cursors/prism-glow/pointer-sdf.png",
+				modelColorPath: "cursors/prism-glow/pointer-color.png",
 			},
 		},
 	},
@@ -192,17 +202,21 @@ export const CURSOR_THEMES: readonly CursorTheme[] = [
 				assetPath: "cursors/pop-coral/arrow.png",
 				width: 32,
 				height: 32,
-				hotspotX: 10.4768,
-				hotspotY: 2.1792,
+				hotspotX: 6.7264,
+				hotspotY: 2.4416,
 				sculpted: true,
+				modelSdfPath: "cursors/pop-coral/arrow-sdf.png",
+				modelColorPath: "cursors/pop-coral/arrow-color.png",
 			},
 			pointer: {
 				assetPath: "cursors/pop-coral/pointer.png",
 				width: 32,
 				height: 32,
-				hotspotX: 12.3456,
-				hotspotY: 2,
+				hotspotX: 13.8528,
+				hotspotY: 2.6144,
 				sculpted: true,
+				modelSdfPath: "cursors/pop-coral/pointer-sdf.png",
+				modelColorPath: "cursors/pop-coral/pointer-color.png",
 			},
 		},
 	},
@@ -214,17 +228,21 @@ export const CURSOR_THEMES: readonly CursorTheme[] = [
 				assetPath: "cursors/pixel-candy/arrow.png",
 				width: 32,
 				height: 32,
-				hotspotX: 7.3664,
-				hotspotY: 2,
+				hotspotX: 6.6656,
+				hotspotY: 3.7152,
 				sculpted: true,
+				modelSdfPath: "cursors/pixel-candy/arrow-sdf.png",
+				modelColorPath: "cursors/pixel-candy/arrow-color.png",
 			},
 			pointer: {
 				assetPath: "cursors/pixel-candy/pointer.png",
 				width: 32,
 				height: 32,
-				hotspotX: 13.376,
-				hotspotY: 1.9264,
+				hotspotX: 13.5712,
+				hotspotY: 3.3312,
 				sculpted: true,
+				modelSdfPath: "cursors/pixel-candy/pointer-sdf.png",
+				modelColorPath: "cursors/pixel-candy/pointer-color.png",
 			},
 		},
 	},
@@ -236,17 +254,21 @@ export const CURSOR_THEMES: readonly CursorTheme[] = [
 				assetPath: "cursors/star-sprout/arrow.png",
 				width: 32,
 				height: 32,
-				hotspotX: 4.7232,
-				hotspotY: 2.1152,
+				hotspotX: 6.4768,
+				hotspotY: 2.4992,
 				sculpted: true,
+				modelSdfPath: "cursors/star-sprout/arrow-sdf.png",
+				modelColorPath: "cursors/star-sprout/arrow-color.png",
 			},
 			pointer: {
 				assetPath: "cursors/star-sprout/pointer.png",
 				width: 32,
 				height: 32,
-				hotspotX: 13.1712,
-				hotspotY: 2.0384,
+				hotspotX: 13.9328,
+				hotspotY: 2.4704,
 				sculpted: true,
+				modelSdfPath: "cursors/star-sprout/pointer-sdf.png",
+				modelColorPath: "cursors/star-sprout/pointer-color.png",
 			},
 		},
 	},

@@ -55,10 +55,10 @@ pub struct LayerCB {
     pub src_prev: [f32; 4],
     pub dst_prev: [f32; 4],
     pub mb: [f32; 4], // mb[0] = nombre de taps de motion blur
-    /// Mode 8 : le plan à la frame PRÉCÉDENTE, coins TL, TR (`trail_a`) puis BR, BL (`trail_b`)
-    /// en px locaux comme `fx`/`src_prev`, et `trail_mb` = `[taps, force, 0, 0]` de son flou de
-    /// mouvement, ceux du mode 0 (`mb.xy`). `trail_mb` nul ailleurs : aucun tap, rien n'est lu.
-    /// Mode 18 incliné : les mêmes coins d'avant, en fractions de la sortie (`screen_trail_cb`).
+    /// Mode 15 : `trail_a` = `[id, épaisseur, hauteur max, 0]`, `trail_b` = atlas volume
+    /// `[colonnes, lignes, tranches, plage SDF]`. Mode 8 : coins TL/TR (`trail_a`) puis BR/BL
+    /// (`trail_b`) du plan précédent ; `trail_mb` = `[taps, force, 0, 0]` de son flou de mouvement.
+    /// Mode 18 incliné : les coins d'avant en fractions de la sortie (`screen_trail_cb`).
     pub trail_a: [f32; 4],
     pub trail_b: [f32; 4],
     pub trail_mb: [f32; 4],
@@ -3837,6 +3837,9 @@ pub struct SpriteShape {
     pub thick: f32,
     /// Le curseur sculpté que dessine le shader (`sculpt`), 0 pour le sprite extrudé.
     pub sculpt: u32,
+    /// `[colonnes, lignes, tranches, plage signée]` d'un atlas de volume Blender, zéro pour les
+    /// curseurs dont la forme reste définie par le sprite ou par les anciens prototypes shader.
+    pub volume: [f32; 4],
 }
 
 impl SpriteShape {
@@ -3991,6 +3994,9 @@ pub fn cursor_pose(
 /// (`sculpt::sculpted_shape`), sinon le sprite extrudé (`sdf_shape`, du champ de son PNG) au
 /// hotspot de la scène. Commun aux trois backends.
 pub fn model_shape(sprite: &crate::scene::SceneCursorSprite, sdf_shape: SpriteShape) -> SpriteShape {
+    if sdf_shape.volume[0] > 0.0 {
+        return sdf_shape;
+    }
     sprite
         .sculpt
         .as_deref()
@@ -4154,9 +4160,9 @@ impl ModelView {
     }
 }
 
-/// `LayerCB` du curseur modélisé (mode 15) posé en `placement`, pour les trois backends : le
-/// sprite `shape` extrudé. `None` quand il n'y a rien à dessiner (placement droit, caméra
-/// dégénérée). Voir l'en-tête de cette section pour l'emploi des emplacements.
+/// `LayerCB` du curseur modélisé (mode 15) posé en `placement`, pour les trois backends. Le SDF
+/// décrit le maillage importé ou la silhouette du sprite extrudé. `None` quand le placement droit
+/// ou la caméra dégénérée ne permet pas de le dessiner.
 pub fn cursor_model_cb(
     placement: CursorPlacement,
     size_px: f32,
@@ -4190,6 +4196,8 @@ pub fn cursor_model_cb(
         mb: [view.half[0], view.half[1], view.offset[0], view.offset[1]],
         radius_px: shape.size[0] / shape.size[1],
         trail_a: [shape.sculpt as f32, shape.thick, shape.max_height, 0.0],
+        // Mode 15: imported SDF atlas layout, depth, and signed-distance decode range.
+        trail_b: shape.volume,
         ..Default::default()
     })
 }

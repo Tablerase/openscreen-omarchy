@@ -1255,15 +1255,24 @@ impl Compositor {
     }
 
     /// Champ de distance du sprite `path` (t4 du mode 15) et sa forme, calculés au premier appel.
-    unsafe fn cursor_sdf(&self, path: &str) -> Result<(ID3D11ShaderResourceView, SpriteShape)> {
+    unsafe fn cursor_sdf(
+        &self,
+        sprite: &SceneCursorSprite,
+    ) -> Result<(ID3D11ShaderResourceView, SpriteShape)> {
+        let path = sprite.model_sdf_path.as_deref().unwrap_or(&sprite.path);
         if let Some(hit) = self.sdf_cache.borrow().get(path) {
             return Ok(hit.clone());
         }
-        let sdf = crate::cursor_sdf::CursorSdf::load(path)?;
-        let texels = sdf.f16_bytes();
+        let (width, height, texels, shape) = if sprite.model_sdf_path.is_some() {
+            let sdf = crate::cursor_sdf::CursorVolumeSdf::load(path)?;
+            (sdf.width, sdf.height, sdf.f16_bytes(), sdf.shape)
+        } else {
+            let sdf = crate::cursor_sdf::CursorSdf::load(path)?;
+            (sdf.width, sdf.height, sdf.f16_bytes(), sdf.shape)
+        };
         let td = D3D11_TEXTURE2D_DESC {
-            Width: sdf.width,
-            Height: sdf.height,
+            Width: width,
+            Height: height,
             MipLevels: 1,
             ArraySize: 1,
             Format: DXGI_FORMAT_R16_FLOAT,
@@ -1275,14 +1284,14 @@ impl Compositor {
         };
         let init = D3D11_SUBRESOURCE_DATA {
             pSysMem: texels.as_ptr() as *const c_void,
-            SysMemPitch: sdf.width * 2,
+            SysMemPitch: width * 2,
             SysMemSlicePitch: 0,
         };
         let mut tex: Option<ID3D11Texture2D> = None;
         self.dev.CreateTexture2D(&td, Some(&init), Some(&mut tex))?;
         let mut srv: Option<ID3D11ShaderResourceView> = None;
         self.dev.CreateShaderResourceView(&tex.unwrap(), None, Some(&mut srv))?;
-        let entry = (srv.unwrap(), sdf.shape);
+        let entry = (srv.unwrap(), shape);
         self.sdf_cache.borrow_mut().insert(path.to_string(), entry.clone());
         Ok(entry)
     }
@@ -1696,21 +1705,27 @@ impl Compositor {
         // Sans champ de distance, repli sur le sprite plat plutôt que sur le curseur math.
         // Parité Linux.
         if let Some(pose) = model {
-            match self.cursor_sdf(path) {
-                Ok((sdf, shape)) => {
+            let model_srv = match sprite.model_color_path.as_deref() {
+                Some(color_path) => self.cached_image(color_path).ok().map(|(srv, _, _)| srv),
+                None => Some(srv.clone()),
+            };
+            if let Some(model_srv) = model_srv {
+                match self.cursor_sdf(sprite) {
+                    Ok((sdf, shape)) => {
                     let shape = crate::frame_geometry::model_shape(sprite, shape);
                     if let Some(cb) = crate::frame_geometry::cursor_model_cb(
                         placement, size_px, pose, shape, a, clip,
                     ) {
                         self.upload_cb(&cb);
-                        self.ctx.PSSetShaderResources(2, Some(&[Some(srv)]));
+                        self.ctx.PSSetShaderResources(2, Some(&[Some(model_srv)]));
                         self.ctx.PSSetShaderResources(4, Some(&[Some(sdf)]));
                         self.ctx.Draw(4, 0);
                         self.ctx.PSSetShaderResources(4, Some(&[None]));
                     }
                     return Ok(());
                 }
-                Err(e) => eprintln!("[curseur] champ de \"{path}\" : {e:#}"),
+                    Err(e) => eprintln!("[curseur] champ de \"{path}\" : {e:#}"),
+                }
             }
         }
         let ar = iw as f32 / ih as f32;

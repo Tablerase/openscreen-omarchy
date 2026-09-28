@@ -5,9 +5,11 @@ import { fileURLToPath } from "node:url";
 import { app } from "electron";
 import {
 	type CursorKind,
+	getCursorTheme,
 	readCursorAsArrow,
 	resolveCursorSprites,
 } from "../../../src/lib/cursor/cursorThemes";
+import type { NativeCursorType } from "../../../src/native/contracts";
 import type { GifExportJob } from "../../ipc/gifExportJobs";
 import type {
 	ClipInput,
@@ -107,19 +109,48 @@ function resolveCursorSpritePaths(
 	themeId: string,
 	asArrow: readonly CursorKind[],
 	model3d = false,
-): Record<string, { path: string; hotspotX: number; hotspotY: number; sculpt?: string }> {
+): Record<
+	string,
+	{
+		path: string;
+		hotspotX: number;
+		hotspotY: number;
+		sculpt?: string;
+		modelSdfPath?: string;
+		modelColorPath?: string;
+	}
+> {
 	const resolved: Record<
 		string,
-		{ path: string; hotspotX: number; hotspotY: number; sculpt?: string }
+		{
+			path: string;
+			hotspotX: number;
+			hotspotY: number;
+			sculpt?: string;
+			modelSdfPath?: string;
+			modelColorPath?: string;
+		}
 	> = {};
 	for (const [type, sprite] of Object.entries(resolveCursorSprites(themeId, asArrow, model3d))) {
 		const absolute = resolveSceneAssetPath(sprite.assetPath);
 		if (absolute) {
+			const [sculptThemeId, sculptState] = sprite.sculpt?.split("/", 2) ?? [];
+			const modelAsset =
+				sculptThemeId && sculptState
+					? getCursorTheme(sculptThemeId)?.assets[sculptState as NativeCursorType]
+					: undefined;
+			const modelSdfPath = modelAsset?.modelSdfPath
+				? resolveSceneAssetPath(modelAsset.modelSdfPath)
+				: null;
+			const modelColorPath = modelAsset?.modelColorPath
+				? resolveSceneAssetPath(modelAsset.modelColorPath)
+				: null;
 			resolved[type] = {
 				path: absolute,
 				hotspotX: sprite.hotspotX,
 				hotspotY: sprite.hotspotY,
 				...(sprite.sculpt ? { sculpt: sprite.sculpt } : {}),
+				...(modelSdfPath && modelColorPath ? { modelSdfPath, modelColorPath } : {}),
 			};
 		}
 	}
@@ -141,7 +172,14 @@ export function resolveSceneAssetPaths(sceneJson: string): string {
 				model3d?: boolean;
 				cursorSprites?: Record<
 					string,
-					{ path: string; hotspotX: number; hotspotY: number; sculpt?: string }
+					{
+						path: string;
+						hotspotX: number;
+						hotspotY: number;
+						sculpt?: string;
+						modelSdfPath?: string;
+						modelColorPath?: string;
+					}
 				>;
 			};
 			webcamEffect?: {

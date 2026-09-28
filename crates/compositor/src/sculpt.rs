@@ -69,6 +69,7 @@ pub fn sculpted_shape(name: &str) -> Option<SpriteShape> {
         max_height: (z_high - zref) * s,
         thick: (zref - Z_LOW) * s,
         sculpt: 1 + 2 * theme as u32 + u32::from(!arrow),
+        volume: [0.0; 4],
     })
 }
 

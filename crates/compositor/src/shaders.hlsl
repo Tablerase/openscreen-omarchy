@@ -1040,11 +1040,62 @@ float sd_sprite2(float2 p)
     return out2 > 0.0 ? sqrt(out2 + e * e) : d;
 }
 
+// Un volume Blender est empaquete en tranches carrées dans la texture 2D déjà liée en t4.
+// L'interpolation entre deux tranches se fait ici, sans filtrer à travers les bords des tuiles.
+float2 volume_atlas_uv(float2 xy, int slice, uint atlas_w, uint atlas_h)
+{
+    float tiles_x = max(trail_b.x, 1.0);
+    float tile_w = (float)atlas_w / tiles_x;
+    float tile_h = (float)atlas_h / max(trail_b.y, 1.0);
+    float tile_x = fmod((float)slice, tiles_x);
+    float tile_y = floor((float)slice / tiles_x);
+    float2 pixel = float2(tile_x * tile_w + 0.5 + xy.x * (tile_w - 1.0),
+                          tile_y * tile_h + 0.5 + xy.y * (tile_h - 1.0));
+    return pixel / float2(atlas_w, atlas_h);
+}
+
+float3 volume_local_point(float3 p)
+{
+    return float3(p.xy, p.z / max(color.b, 1e-3));
+}
+
+float volume_distance(float3 p)
+{
+    uint atlas_w, atlas_h;
+    texSdf.GetDimensions(atlas_w, atlas_h);
+    float3 model_p = volume_local_point(p);
+    float3 lo = float3(color.rg, -trail_a.y);
+    float3 extent = float3(sprite_size(), trail_a.y + trail_a.z);
+    float3 uv = saturate((model_p - lo) / max(extent, 1e-6));
+    float z = uv.z * (trail_b.z - 1.0);
+    int z0 = (int)floor(z);
+    int z1 = min(z0 + 1, (int)trail_b.z - 1);
+    float d0 = texSdf.SampleLevel(samp, volume_atlas_uv(uv.xy, z0, atlas_w, atlas_h), 0.0);
+    float d1 = texSdf.SampleLevel(samp, volume_atlas_uv(uv.xy, z1, atlas_w, atlas_h), 0.0);
+    return lerp(d0, d1, frac(z)) * min(color.b, 1.0);
+}
+
+float model_normal_step()
+{
+    if (sculpt_id() <= 10)
+    {
+        return 0.002;
+    }
+    uint atlas_w, atlas_h;
+    texSdf.GetDimensions(atlas_w, atlas_h);
+    float2 tile = float2(atlas_w / max(trail_b.x, 1.0), atlas_h / max(trail_b.y, 1.0));
+    return 0.75 * max(sprite_size().x / tile.x, sprite_size().y / tile.y);
+}
+
 // Le modèle en `p` : distance signée et id de matière (0 pour un sprite). Sculpté, sa forme
 // (`sculpt_eval`, dont `occ`) ; sinon le contour rentré du chanfrein, épaisseur rentrée du
 // chanfrein, puis regonflé : les arêtes du dessus et du dessous sont arrondies de MODEL_BEVEL.
 float2 model_eval(float3 p, bool occ)
 {
+    if (sculpt_id() > 10)
+    {
+        return float2(volume_distance(p), 0.0);
+    }
     if (sculpt_id() > 0)
     {
         return sculpt_eval(p, occ);
@@ -1116,6 +1167,22 @@ float3 model_albedo(float2 p)
                       sd_sprite2(p + float2(0.0, e)) - sd_sprite2(p - float2(0.0, e)));
     float2 q = p - g / max(length(g), 1e-6) * max(sd_sprite2(p) + MODEL_RIM_INSET * texel, 0.0);
     return texImg.SampleLevel(samp, (q - color.rg) / sprite_size(), 0.0).rgb;
+}
+
+float3 model_volume_color(float3 p)
+{
+    uint atlas_w, atlas_h;
+    texImg.GetDimensions(atlas_w, atlas_h);
+    float3 model_p = volume_local_point(p);
+    float3 lo = float3(color.rg, -trail_a.y);
+    float3 extent = float3(sprite_size(), trail_a.y + trail_a.z);
+    float3 uv = saturate((model_p - lo) / max(extent, 1e-6));
+    float z = uv.z * (trail_b.z - 1.0);
+    int z0 = (int)floor(z);
+    int z1 = min(z0 + 1, (int)trail_b.z - 1);
+    float3 c0 = texImg.SampleLevel(samp, volume_atlas_uv(uv.xy, z0, atlas_w, atlas_h), 0.0).rgb;
+    float3 c1 = texImg.SampleLevel(samp, volume_atlas_uv(uv.xy, z1, atlas_w, atlas_h), 0.0).rgb;
+    return lerp(c0, c1, frac(z));
 }
 
 struct SculptMat
@@ -1268,7 +1335,11 @@ float3 model_shade(float3 q, float3 n, float3 rd, float3 L, float fall, float sh
     // Sur un sprite, reflets et brillance sur les arrondis seulement : le dessus plat d'un sprite
     // sombre virerait au gris sous la lampe.
     float gloss = 1.0;
-    if (id > 0)
+    if (id > 10)
+    {
+        m = s_mat(pow(model_volume_color(q), 2.2), 0.36, 0.28, 0.12, 0.24);
+    }
+    else if (id > 0)
     {
         // La matière d'un voxel se lit juste sous la surface : son flanc lit sa propre cellule.
         float3 p = sculpt_point(q) - float3(n.x, -n.y, n.z) * 0.01;
@@ -1400,7 +1471,7 @@ float4 cursor_model(float2 local)
         }
         else if (stage == STAGE_NORMAL)
         {
-            pos = q + 0.002 * model_tetra(k);
+            pos = q + model_normal_step() * model_tetra(k);
         }
         else if (stage == STAGE_AO)
         {

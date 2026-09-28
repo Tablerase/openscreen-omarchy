@@ -1,8 +1,8 @@
-// Prepare transparent cursor PNGs from the original raster artwork in design/cursors.
+// Prepare transparent cursor PNGs from the Blender renders in design/cursors.
 // Run with `node scripts/generate-original-cursor-themes.mjs`.
 // Each source PNG contains the arrow on the left and the hand on the right.
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
@@ -13,39 +13,28 @@ const PUBLIC_DIR = path.join(ROOT, "public", "cursors");
 const SIZE = 128;
 const INNER_SIZE = 112;
 
-// Fingertip and arrow tip coordinates in the 1774 × 887 source PNGs.
-const themes = [
-	{
-		id: "studio-ink",
-		hotspots: { arrow: [158, 48], pointer: [1258, 50] },
-	},
-	{
-		id: "prism-glow",
-		hotspots: { arrow: [208, 42], pointer: [1220, 50] },
-	},
-	{
-		id: "pop-coral",
-		hotspots: { arrow: [265, 58], pointer: [1245, 65] },
-	},
-	{
-		id: "pixel-candy",
-		hotspots: { arrow: [273, 76], pointer: [1218, 78] },
-	},
-	{
-		id: "star-sprout",
-		hotspots: { arrow: [210, 65], pointer: [1218, 65] },
-	},
-];
+// Each Blender scene writes arrow-tip and fingertip positions in source-image pixels.
+const themeIds = ["studio-ink", "prism-glow", "pop-coral", "pixel-candy", "star-sprout"];
+const themeNames = ["Studio Ink", "Prism Glow", "Pop Coral", "Pixel Candy", "Star Sprout"];
 
 const browser = await chromium.launch();
 try {
 	const page = await browser.newPage();
 	await page.goto("about:blank");
-	for (const theme of themes) {
+	const previewSprites = [];
+	for (const id of themeIds) {
+		const theme = {
+			id,
+			hotspots: JSON.parse(await readFile(path.join(SOURCE_DIR, id, "hotspots.json"), "utf8")),
+		};
 		const output = path.join(PUBLIC_DIR, theme.id);
 		await mkdir(output, { recursive: true });
 		const source = await readFile(path.join(SOURCE_DIR, theme.id, "source.png"));
+		const sprites = {};
 		for (const type of ["arrow", "pointer"]) {
+			for (const filename of [`${type}-sdf.png`, `${type}-sdf.json`, `${type}-color.png`]) {
+				await copyFile(path.join(SOURCE_DIR, theme.id, filename), path.join(output, filename));
+			}
 			const result = await page.evaluate(
 				async ({ png, type, size, innerSize, hotspot }) => {
 					const image = new Image();
@@ -116,11 +105,60 @@ try {
 			);
 			const filename = `${type}.png`;
 			await writeFile(path.join(output, filename), Buffer.from(result.png, "base64"));
+			sprites[type] = result.png;
 			console.log(
 				`${theme.id}/${filename}: hotspot ${result.hotspotX.toFixed(4)}, ${result.hotspotY.toFixed(4)}`,
 			);
 		}
+		previewSprites.push({ id, name: themeNames[themeIds.indexOf(id)], sprites });
 	}
+	const sheets = await page.evaluate(async (themes) => {
+		const imageFromBase64 = async (base64) => {
+			const image = new Image();
+			image.src = `data:image/png;base64,${base64}`;
+			await image.decode();
+			return image;
+		};
+		const contact = document.createElement("canvas");
+		contact.width = 328;
+		contact.height = 820;
+		const contactContext = contact.getContext("2d");
+		contactContext.fillStyle = "#ebeff6";
+		contactContext.fillRect(0, 0, contact.width, contact.height);
+		contactContext.font = "12px Arial, sans-serif";
+		contactContext.fillStyle = "#2a2f39";
+		for (let row = 0; row < themes.length; row++) {
+			const theme = themes[row];
+			const y = row * 164;
+			contactContext.fillText(theme.name, 10, y + 18);
+			for (const [column, type] of ["arrow", "pointer"].entries()) {
+				const image = await imageFromBase64(theme.sprites[type]);
+				contactContext.drawImage(image, 18 + column * 164, y + 28, 128, 128);
+			}
+		}
+
+		const dark = document.createElement("canvas");
+		dark.width = 112;
+		dark.height = 280;
+		const darkContext = dark.getContext("2d");
+		darkContext.fillStyle = "#141822";
+		darkContext.fillRect(0, 0, dark.width, dark.height);
+		for (let row = 0; row < themes.length; row++) {
+			for (const [column, type] of ["arrow", "pointer"].entries()) {
+				const image = await imageFromBase64(themes[row].sprites[type]);
+				darkContext.drawImage(image, 12 + column * 56, row * 56 + 12, 32, 32);
+			}
+		}
+		return { contact: contact.toDataURL("image/png"), dark: dark.toDataURL("image/png") };
+	}, previewSprites);
+	await writeFile(
+		path.join(SOURCE_DIR, "contact-sheet.png"),
+		Buffer.from(sheets.contact.split(",")[1], "base64"),
+	);
+	await writeFile(
+		path.join(SOURCE_DIR, "dark-32px.png"),
+		Buffer.from(sheets.dark.split(",")[1], "base64"),
+	);
 } finally {
 	await browser.close();
 }

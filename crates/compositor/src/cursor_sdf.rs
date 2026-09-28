@@ -19,6 +19,7 @@
 //! les trois backends (D3D11, Metal, wgpu), contrairement au R32F.
 
 use anyhow::{anyhow, Result};
+use serde::Deserialize;
 
 use crate::frame_geometry::SpriteShape;
 
@@ -115,6 +116,7 @@ impl CursorSdf {
                 max_height: 0.0,
                 thick: crate::frame_geometry::MODEL_THICK,
                 sculpt: 0,
+                volume: [0.0; 4],
             },
         }
     }
@@ -140,6 +142,98 @@ impl CursorSdf {
         let top = at(x0, y0) * (1.0 - tx) + at(x0 + 1, y0) * tx;
         let bottom = at(x0, y0 + 1) * (1.0 - tx) + at(x0 + 1, y0 + 1) * tx;
         top * (1.0 - ty) + bottom * ty
+    }
+}
+
+/// Volume distance field exported from an editable Blender cursor mesh. Slices are packed into a
+/// 2D atlas so all three render backends can keep using their existing filterable R16F binding.
+pub struct CursorVolumeSdf {
+    pub width: u32,
+    pub height: u32,
+    pub texels: Vec<f32>,
+    pub shape: SpriteShape,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CursorVolumeMetadata {
+    width: u32,
+    height: u32,
+    depth: u32,
+    tiles_x: u32,
+    tiles_y: u32,
+    distance_range: f32,
+    size: [f32; 2],
+    hotspot: [f32; 2],
+    top: f32,
+    thick: f32,
+    max_height: f32,
+}
+
+impl CursorVolumeSdf {
+    /// Loads the grayscale SDF atlas and its sibling JSON dimensions / cursor bounds.
+    pub fn load(path: &str) -> Result<CursorVolumeSdf> {
+        let path_buf = std::path::Path::new(path);
+        let metadata_path = path_buf.with_extension("json");
+        let metadata: CursorVolumeMetadata = serde_json::from_slice(
+            &std::fs::read(&metadata_path)
+                .map_err(|e| anyhow!("metadata du volume {} : {e}", metadata_path.display()))?,
+        )
+        .map_err(|e| anyhow!("metadata du volume {} : {e}", metadata_path.display()))?;
+        if metadata.width == 0
+            || metadata.height == 0
+            || metadata.depth == 0
+            || metadata.tiles_x == 0
+            || metadata.tiles_y == 0
+            || metadata.depth > metadata.tiles_x * metadata.tiles_y
+            || !metadata.distance_range.is_finite()
+            || metadata.distance_range <= 0.0
+            || metadata.size.iter().any(|v| !v.is_finite() || *v <= 0.0)
+            || metadata.hotspot.iter().any(|v| !v.is_finite())
+            || !metadata.thick.is_finite()
+            || !metadata.max_height.is_finite()
+        {
+            return Err(anyhow!("dimensions ou bornes invalides dans {}", metadata_path.display()));
+        }
+        let atlas = image::open(path)
+            .map_err(|e| anyhow!("atlas SDF {path} : {e}"))?
+            .to_luma8();
+        let atlas_width = metadata.width * metadata.tiles_x;
+        let atlas_height = metadata.height * metadata.tiles_y;
+        if atlas.dimensions() != (atlas_width, atlas_height) {
+            return Err(anyhow!(
+                "dimensions de l'atlas SDF {path} : {:?}, attendues {atlas_width}x{atlas_height}",
+                atlas.dimensions()
+            ));
+        }
+        let mut texels = Vec::with_capacity((atlas_width * atlas_height) as usize);
+        for pixel in atlas.as_raw() {
+            texels.push(((*pixel as f32 / 255.0) * 2.0 - 1.0) * metadata.distance_range);
+        }
+        Ok(CursorVolumeSdf {
+            width: atlas_width,
+            height: atlas_height,
+            texels,
+            shape: SpriteShape {
+                size: metadata.size,
+                hotspot: metadata.hotspot,
+                top: metadata.top,
+                max_height: metadata.max_height,
+                thick: metadata.thick,
+                sculpt: 11,
+                volume: [
+                    metadata.tiles_x as f32,
+                    metadata.tiles_y as f32,
+                    metadata.depth as f32,
+                    metadata.distance_range,
+                ],
+            },
+        })
+    }
+
+    /// R16F byte representation consumed by D3D11, Metal and wgpu.
+    pub fn f16_bytes(&self) -> Vec<u8> {
+        self.texels.iter().flat_map(|&d| f16_bits(d).to_le_bytes()).collect()
     }
 }
 

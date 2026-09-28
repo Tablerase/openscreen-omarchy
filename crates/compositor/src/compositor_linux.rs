@@ -1388,13 +1388,22 @@ impl Compositor {
 
     /// Champ de distance du sprite `path` (binding 2 du mode 15) et sa forme, calcules au
     /// premier appel. Parite `compositor_windows::cursor_sdf`.
-    fn cursor_sdf(&self, path: &str) -> Result<(wgpu::Texture, SpriteShape)> {
+    fn cursor_sdf(
+        &self,
+        sprite: &SceneCursorSprite,
+    ) -> Result<(wgpu::Texture, SpriteShape)> {
+        let path = sprite.model_sdf_path.as_deref().unwrap_or(&sprite.path);
         if let Some(hit) = self.sdf_cache.borrow().get(path) {
             return Ok(hit.clone());
         }
-        let sdf = crate::cursor_sdf::CursorSdf::load(path)?;
-        let texels = sdf.f16_bytes();
-        let size = wgpu::Extent3d { width: sdf.width, height: sdf.height, depth_or_array_layers: 1 };
+        let (width, height, texels, shape) = if sprite.model_sdf_path.is_some() {
+            let sdf = crate::cursor_sdf::CursorVolumeSdf::load(path)?;
+            (sdf.width, sdf.height, sdf.f16_bytes(), sdf.shape)
+        } else {
+            let sdf = crate::cursor_sdf::CursorSdf::load(path)?;
+            (sdf.width, sdf.height, sdf.f16_bytes(), sdf.shape)
+        };
+        let size = wgpu::Extent3d { width, height, depth_or_array_layers: 1 };
         let tex = self.gpu.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("cursor-sdf"),
             size,
@@ -1415,12 +1424,12 @@ impl Compositor {
             &texels,
             wgpu::TexelCopyBufferLayout {
                 offset: 0,
-                bytes_per_row: Some(sdf.width * 2),
-                rows_per_image: Some(sdf.height),
+                bytes_per_row: Some(width * 2),
+                rows_per_image: Some(height),
             },
             size,
         );
-        let entry = (tex, sdf.shape);
+        let entry = (tex, shape);
         self.sdf_cache.borrow_mut().insert(path.to_string(), entry.clone());
         Ok(entry)
     }
@@ -2908,9 +2917,15 @@ impl Compositor {
             // Curseur modelise (mode 15) : ce meme sprite extrude, `plan_cursor` en a tire la
             // pose. Sprite au binding 1 (texY), champ au binding 2 (texU). Parite Windows/macOS.
             if let Some(pose) = plan.model {
-                match self.cursor_sdf(&sprite.path) {
-                    Ok((sdf, shape)) => {
+                let model_image = match sprite.model_color_path.as_deref() {
+                    Some(color_path) => self.cached_image(color_path).ok(),
+                    None => Some((tex.clone(), iw, ih)),
+                };
+                if let Some((model_tex, _, _)) = model_image {
+                    match self.cursor_sdf(sprite) {
+                        Ok((sdf, shape)) => {
                         let shape = crate::frame_geometry::model_shape(sprite, shape);
+                        let model_view = model_tex.create_view(&wgpu::TextureViewDescriptor::default());
                         let sdf_view = sdf.create_view(&wgpu::TextureViewDescriptor::default());
                         for placement in placements {
                             let Some(cb) = cursor_model_cb(
@@ -2924,18 +2939,19 @@ impl Compositor {
                                 continue;
                             };
                             let (buf, bind) =
-                                self.make_bind(&cb, Some((&view, &sdf_view, &view)), &dummy);
+                                self.make_bind(&cb, Some((&model_view, &sdf_view, &model_view)), &dummy);
                             bufs.push(buf);
                             binds.push(bind);
                         }
                         return (!binds.is_empty()).then_some(CursorDraw {
                             _bufs: bufs,
-                            _tex: vec![(tex, view), (sdf, sdf_view)],
+                            _tex: vec![(model_tex, model_view), (sdf, sdf_view)],
                             binds,
                             impacts,
                         });
                     }
-                    Err(e) => eprintln!("[curseur] champ de \"{}\" : {e:#}", sprite.path),
+                        Err(e) => eprintln!("[curseur] champ de \"{}\" : {e:#}", sprite.path),
+                    }
                 }
             }
 

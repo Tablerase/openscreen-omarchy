@@ -987,8 +987,60 @@ static float sd_sprite2(float2 p, constant Layer &layer, texture2d<float, access
     return out2 > 0.0 ? sqrt(out2 + e * e) : d;
 }
 
+static float2 volume_atlas_uv(float2 xy, int slice, uint atlas_w, uint atlas_h,
+                              constant Layer &layer)
+{
+    float tiles_x = max(layer.trail_b.x, 1.0);
+    float tile_w = float(atlas_w) / tiles_x;
+    float tile_h = float(atlas_h) / max(layer.trail_b.y, 1.0);
+    float tile_x = fmod(float(slice), tiles_x);
+    float tile_y = floor(float(slice) / tiles_x);
+    float2 pixel = float2(tile_x * tile_w + 0.5 + xy.x * (tile_w - 1.0),
+                          tile_y * tile_h + 0.5 + xy.y * (tile_h - 1.0));
+    return pixel / float2(float(atlas_w), float(atlas_h));
+}
+
+static float3 volume_local_point(float3 p, constant Layer &layer)
+{
+    return float3(p.xy, p.z / max(layer.color.b, 1e-3));
+}
+
+static float volume_distance(float3 p, constant Layer &layer,
+                             texture2d<float, access::sample> texSdf)
+{
+    uint atlas_w = texSdf.get_width();
+    uint atlas_h = texSdf.get_height();
+    float3 point = volume_local_point(p, layer);
+    float3 lo = float3(layer.color.rg, -layer.trail_a.y);
+    float3 extent = float3(sprite_size(layer), layer.trail_a.y + layer.trail_a.z);
+    float3 uv = clamp((point - lo) / max(extent, float3(1e-6)), 0.0, 1.0);
+    float z = uv.z * (layer.trail_b.z - 1.0);
+    int z0 = int(floor(z));
+    int z1 = min(z0 + 1, int(layer.trail_b.z) - 1);
+    float d0 = texSdf.sample(samp, volume_atlas_uv(uv.xy, z0, atlas_w, atlas_h, layer), level(0.0)).r;
+    float d1 = texSdf.sample(samp, volume_atlas_uv(uv.xy, z1, atlas_w, atlas_h, layer), level(0.0)).r;
+    return mix(d0, d1, fract(z)) * min(layer.color.b, 1.0);
+}
+
+static float model_normal_step(constant Layer &layer,
+                               texture2d<float, access::sample> texSdf)
+{
+    if (sculpt_id(layer) <= 10)
+    {
+        return 0.002;
+    }
+    float2 tile = float2(float(texSdf.get_width()) / max(layer.trail_b.x, 1.0),
+                         float(texSdf.get_height()) / max(layer.trail_b.y, 1.0));
+    float2 size = sprite_size(layer);
+    return 0.75 * max(size.x / tile.x, size.y / tile.y);
+}
+
 static float2 model_eval(float3 p, bool occ, constant Layer &layer, texture2d<float, access::sample> texSdf)
 {
+    if (sculpt_id(layer) > 10)
+    {
+        return float2(volume_distance(p, layer, texSdf), 0.0);
+    }
     if (sculpt_id(layer) > 0)
     {
         return sculpt_eval(p, occ, layer);
@@ -1052,6 +1104,23 @@ static float3 model_albedo(float2 p, constant Layer &layer, texture2d<float, acc
     float2 q = p - g / max(length(g), 1e-6) *
                        max(sd_sprite2(p, layer, texSdf) + MODEL_RIM_INSET * texel, 0.0);
     return texImg.sample(samp, (q - layer.color.rg) / sprite_size(layer), level(0.0)).rgb;
+}
+
+static float3 model_volume_color(float3 p, constant Layer &layer,
+                                 texture2d<float, access::sample> texImg)
+{
+    uint atlas_w = texImg.get_width();
+    uint atlas_h = texImg.get_height();
+    float3 point = volume_local_point(p, layer);
+    float3 lo = float3(layer.color.rg, -layer.trail_a.y);
+    float3 extent = float3(sprite_size(layer), layer.trail_a.y + layer.trail_a.z);
+    float3 uv = clamp((point - lo) / max(extent, float3(1e-6)), 0.0, 1.0);
+    float z = uv.z * (layer.trail_b.z - 1.0);
+    int z0 = int(floor(z));
+    int z1 = min(z0 + 1, int(layer.trail_b.z) - 1);
+    float3 c0 = texImg.sample(samp, volume_atlas_uv(uv.xy, z0, atlas_w, atlas_h, layer), level(0.0)).rgb;
+    float3 c1 = texImg.sample(samp, volume_atlas_uv(uv.xy, z1, atlas_w, atlas_h, layer), level(0.0)).rgb;
+    return mix(c0, c1, fract(z));
 }
 
 struct SculptMat
@@ -1184,7 +1253,11 @@ static float3 model_shade(float3 q, float3 n, float3 rd, float3 L, float fall, f
     }
     SculptMat m;
     float gloss = 1.0;
-    if (id > 0)
+    if (id > 10)
+    {
+        m = s_mat(pow(model_volume_color(q, layer, texImg), float3(2.2)), 0.36, 0.28, 0.12, 0.24);
+    }
+    else if (id > 0)
     {
         float3 p = sculpt_point(q, layer) - float3(n.x, -n.y, n.z) * 0.01;
         m = sculpt_material(mat, p, (id - 1) / 2, (id - 1) % 2);
@@ -1300,7 +1373,7 @@ static float4 cursor_model(float2 local, constant Layer &layer,
         }
         else if (stage == STAGE_NORMAL)
         {
-            pos = q + 0.002 * model_tetra(k);
+            pos = q + model_normal_step(layer, texSdf) * model_tetra(k);
         }
         else if (stage == STAGE_AO)
         {

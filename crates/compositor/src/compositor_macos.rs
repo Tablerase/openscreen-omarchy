@@ -998,30 +998,39 @@ impl Compositor {
     /// Champ de distance du sprite `path` (texture(4) du mode 15) et sa forme, calculés au
     /// premier appel. Parité `compositor_windows::cursor_sdf`. R16Float : filtrable sur tous
     /// les GPU Apple, contrairement au R32Float.
-    fn cursor_sdf(&self, path: &str) -> Result<(metal::Texture, crate::frame_geometry::SpriteShape)> {
+    fn cursor_sdf(
+        &self,
+        sprite: &crate::scene::SceneCursorSprite,
+    ) -> Result<(metal::Texture, crate::frame_geometry::SpriteShape)> {
+        let path = sprite.model_sdf_path.as_deref().unwrap_or(&sprite.path);
         if let Some(hit) = self.sdf_cache.borrow().get(path) {
             return Ok(hit.clone());
         }
-        let sdf = crate::cursor_sdf::CursorSdf::load(path)?;
-        let texels = sdf.f16_bytes();
+        let (width, height, texels, shape) = if sprite.model_sdf_path.is_some() {
+            let sdf = crate::cursor_sdf::CursorVolumeSdf::load(path)?;
+            (sdf.width, sdf.height, sdf.f16_bytes(), sdf.shape)
+        } else {
+            let sdf = crate::cursor_sdf::CursorSdf::load(path)?;
+            (sdf.width, sdf.height, sdf.f16_bytes(), sdf.shape)
+        };
         let tex = make_texture(
             &self.gpu.device,
             metal::MTLPixelFormat::R16Float,
-            sdf.width,
-            sdf.height,
+            width,
+            height,
             metal::MTLStorageMode::Shared,
             metal::MTLTextureUsage::ShaderRead,
         );
         tex.replace_region(
             metal::MTLRegion {
                 origin: metal::MTLOrigin { x: 0, y: 0, z: 0 },
-                size: metal::MTLSize { width: sdf.width as u64, height: sdf.height as u64, depth: 1 },
+                size: metal::MTLSize { width: width as u64, height: height as u64, depth: 1 },
             },
             0,
             texels.as_ptr() as *const std::ffi::c_void,
-            (sdf.width * 2) as u64,
+            (width * 2) as u64,
         );
-        let entry = (tex, sdf.shape);
+        let entry = (tex, shape);
         self.sdf_cache.borrow_mut().insert(path.to_string(), entry.clone());
         Ok(entry)
     }
@@ -2081,19 +2090,25 @@ impl Compositor {
         let (tex, iw, ih) = self.cached_image(sprite.path.as_str())?;
         // Sans champ de distance, repli sur le sprite plat plutôt qu'aucun curseur. Parité Linux.
         if let Some(pose) = model {
-            match self.cursor_sdf(sprite.path.as_str()) {
-                Ok((sdf, shape)) => {
+            let model_tex = match sprite.model_color_path.as_deref() {
+                Some(color_path) => self.cached_image(color_path).ok().map(|(tex, _, _)| tex),
+                None => Some(tex.clone()),
+            };
+            if let Some(model_tex) = model_tex {
+                match self.cursor_sdf(sprite) {
+                    Ok((sdf, shape)) => {
                     let shape = crate::frame_geometry::model_shape(sprite, shape);
                     if let Some(cb) = crate::frame_geometry::cursor_model_cb(
                         placement, size_px, pose, shape, a, clip,
                     ) {
-                        enc.set_fragment_texture(2, Some(&tex));
+                        enc.set_fragment_texture(2, Some(&model_tex));
                         enc.set_fragment_texture(4, Some(&sdf));
                         self.draw_solid(enc, &cb);
                     }
                     return Ok(());
                 }
-                Err(e) => eprintln!("[curseur] champ de \"{}\" : {e:#}", sprite.path),
+                    Err(e) => eprintln!("[curseur] champ de \"{}\" : {e:#}", sprite.path),
+                }
             }
         }
         let (rw, rh) = (self.render_w as f32, self.render_h as f32);

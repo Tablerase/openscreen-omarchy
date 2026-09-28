@@ -591,10 +591,16 @@ pub struct SceneCursorSprite {
     /// que le curseur était agrandi — le bug que ce champ corrige.
     pub hotspot_x: f32,
     pub hotspot_y: f32,
-    /// Le curseur sculpté de cet état en 3D, `"<thème>/<état>"` (`sculpt::sculpted_shape`) : les
-    /// shaders le modèlent au lieu d'extruder le sprite, qui reste l'art en 2D.
+    /// Identifiant `"<thème>/<état>"` du modèle 3D dédié. Les anciens noms sans atlas retombent
+    /// sur les prototypes des shaders ; `path` reste l'image 2D.
     #[serde(default)]
     pub sculpt: Option<String>,
+    /// Atlas SDF produit depuis le maillage Blender pour le modèle 3D (PNG gris + sidecar JSON).
+    #[serde(default)]
+    pub model_sdf_path: Option<String>,
+    /// Atlas des couleurs de matériaux cuits depuis le maillage Blender.
+    #[serde(default)]
+    pub model_color_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
