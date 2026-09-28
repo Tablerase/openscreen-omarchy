@@ -233,6 +233,17 @@ describe("Presets menu in the editor top bar", () => {
 		);
 	});
 
+	it("checks exactly one row when two saved presets share a look", async () => {
+		state.presets.list = vi.fn<Fn>(async () => [WARM, { ...WARM, id: "Twin", name: "Twin" }]);
+		state.settings = { ...DEFAULT_EDITOR_SETTINGS, padding: 42, wallpaper: "#aa5500" };
+		renderPane();
+		const menu = await openMenu();
+		const checked = within(menu)
+			.getAllByRole("menuitemradio")
+			.filter((row) => row.getAttribute("aria-checked") === "true");
+		expect(checked.map((row) => row.textContent)).toEqual(["Warm"]);
+	});
+
 	it("opens a row's actions from “⋯” without applying the preset", async () => {
 		renderPane();
 		await openMenu();
