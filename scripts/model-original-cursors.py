@@ -3,8 +3,9 @@
 From the repository root:
     blender --background --python scripts/model-original-cursors.py
 
-The editable .blend has a scene per theme. Each scene contains a 3D arrow and hand,
-and renders a transparent 1774 x 887 source.png plus projected hotspot coordinates.
+The editable .blend opens on an overview of every theme and keeps one editable
+scene per theme. Each theme scene contains a 3D arrow and hand, and renders a
+transparent 1774 x 887 source.png plus projected hotspot coordinates.
 """
 
 import argparse
@@ -140,22 +141,40 @@ def extruded_polygon(name, points, depth, materials, bevel=0.0, facet_ids=None, 
 		faces.append(tuple(reversed(range(count, count * 2))))
 		material_ids.append(min(1, len(materials) - 1))
 	else:
-		center = (sum(x for x, _ in points) / count, front_y, sum(z for _, z in points) / count)
+		center_x = sum(x for x, _ in points) / count
+		center_z = sum(z for _, z in points) / count
+		for index, (x, z) in enumerate(points):
+			depth_factor = 0.07 + ((index * 7) % 5) * 0.055
+			vertices[index] = (x, front_y - depth * depth_factor, z)
+		inner_start = len(vertices)
+		for index, (x, z) in enumerate(points):
+			depth_factor = 0.27 + ((index * 11) % 7) * 0.065
+			vertices.append((
+				center_x + (x - center_x) * 0.68,
+				front_y - depth * depth_factor,
+				center_z + (z - center_z) * 0.68,
+			))
 		center_index = len(vertices)
-		vertices.append(center)
+		vertices.append((center_x, front_y - depth * 0.54, center_z))
 		back_center_index = len(vertices)
-		vertices.append((center[0], back_y, center[2]))
+		vertices.append((center_x, back_y, center_z))
 		for index in range(count):
 			next_index = (index + 1) % count
-			faces.append((center_index, index, next_index))
-			material_ids.append(facet_ids[index % len(facet_ids)])
+			inner = inner_start + index
+			inner_next = inner_start + next_index
+			faces.append((index, next_index, inner_next))
+			material_ids.append(facet_ids[(index * 3) % len(facet_ids)])
+			faces.append((index, inner_next, inner))
+			material_ids.append(facet_ids[(index * 3 + 1) % len(facet_ids)])
+			faces.append((center_index, inner, inner_next))
+			material_ids.append(facet_ids[(index * 3 + 2) % len(facet_ids)])
 			faces.append((back_center_index, count + next_index, count + index))
 			material_ids.append(min(1, len(materials) - 1))
 	for index in range(count):
 		next_index = (index + 1) % count
 		faces.append((index, next_index, count + next_index, count + index))
 		material_ids.append(min(1, len(materials) - 1))
-	return finish_mesh(name, vertices, faces, materials, material_ids, bevel, 2)
+	return finish_mesh(name, vertices, faces, materials, material_ids, bevel, 4)
 
 
 def curve_line(name, points, mat, depth=0.018, y=-0.13, location_x=0.0):
@@ -173,6 +192,14 @@ def curve_line(name, points, mat, depth=0.018, y=-0.13, location_x=0.0):
 	bpy.context.scene.collection.objects.link(obj)
 	obj.location.x = location_x
 	obj.data.materials.append(mat)
+	for selected in bpy.context.selected_objects:
+		selected.select_set(False)
+	obj.select_set(True)
+	bpy.context.view_layer.objects.active = obj
+	bpy.ops.object.convert(target="MESH")
+	obj = bpy.context.object
+	for polygon in obj.data.polygons:
+		polygon.use_smooth = True
 	return obj
 
 
@@ -199,6 +226,98 @@ def sphere(name, location, scale, mat):
 	obj.data.materials.append(mat)
 	for face in obj.data.polygons:
 		face.use_smooth = True
+	return obj
+
+
+def curved_outline(name, points, center_x, mat, thickness, edge_round, resolution=1):
+	"""Turn a rounded 2D contour into an editable, beveled mesh."""
+	curve = bpy.data.curves.new(name + " Sculpted Outline", "CURVE")
+	curve.dimensions = "2D"
+	curve.resolution_u = resolution
+	curve.fill_mode = "BOTH"
+	curve.extrude = thickness / 2
+	curve.bevel_depth = edge_round
+	curve.bevel_resolution = 3
+	spline = curve.splines.new("BEZIER")
+	spline.bezier_points.add(len(points) - 1)
+	for bezier_point, (x, z) in zip(spline.bezier_points, ccw(points)):
+		bezier_point.co = (x, z, 0.0)
+		bezier_point.handle_left_type = "AUTO"
+		bezier_point.handle_right_type = "AUTO"
+	spline.use_cyclic_u = True
+	obj = bpy.data.objects.new(name, curve)
+	bpy.context.scene.collection.objects.link(obj)
+	obj.rotation_euler[0] = math.pi / 2
+	obj.location.x = center_x
+	curve.materials.append(mat)
+	for selected in bpy.context.selected_objects:
+		selected.select_set(False)
+	obj.select_set(True)
+	bpy.context.view_layer.objects.active = obj
+	bpy.ops.object.convert(target="MESH")
+	obj = bpy.context.object
+	for polygon in obj.data.polygons:
+		polygon.use_smooth = True
+	return obj
+
+
+def curved_hand(name, center_x, mat, thickness=0.20, edge_round=0.055):
+	"""Extrude a smooth, rounded pointer silhouette into a low-poly 3D hand."""
+	return curved_outline(name, HAND, center_x, mat, thickness, edge_round)
+
+
+def sculpted_hand(name, center_x, materials, faceted=False):
+	"""Create a rounded palm and separate blended fingers, with an optional crystal finish."""
+	volume = bpy.data.metaballs.new(name + " blended volume")
+	volume.resolution = 0.065 if faceted else 0.05
+	volume.render_resolution = 0.04
+	volume.threshold = 0.48
+	obj = bpy.data.objects.new(name, volume)
+	bpy.context.scene.collection.objects.link(obj)
+	obj.location.x = center_x
+
+	def ellipsoid(location, scale, rotation=0.0):
+		element = volume.elements.new()
+		element.type = "ELLIPSOID"
+		element.co = location
+		element.radius = 1.0
+		element.size_x, element.size_y, element.size_z = scale
+		element.rotation = (math.cos(rotation / 2), 0.0, math.sin(rotation / 2), 0.0)
+
+	# The lower palm tapers into a cuff; the raised index is longest and the other
+	# three fingers step down in length, matching the pointer silhouette in the concept.
+	ellipsoid((0.18, 0.0, 0.06), (0.76, 0.24, 0.58))
+	ellipsoid((0.15, 0.0, -0.23), (0.48, 0.20, 0.30))
+	ellipsoid((-0.13, 0.0, 0.72), (0.23, 0.20, 0.85))
+	ellipsoid((0.26, 0.0, 0.55), (0.21, 0.19, 0.72))
+	ellipsoid((0.58, 0.0, 0.40), (0.19, 0.18, 0.61))
+	ellipsoid((0.82, 0.0, 0.23), (0.17, 0.17, 0.49))
+	ellipsoid((-0.40, 0.0, 0.18), (0.37, 0.18, 0.28), rotation=math.radians(35))
+
+	for selected in bpy.context.selected_objects:
+		selected.select_set(False)
+	obj.select_set(True)
+	bpy.context.view_layer.objects.active = obj
+	bpy.ops.object.convert(target="MESH")
+	obj = bpy.context.object
+	for mat in materials:
+		obj.data.materials.append(mat)
+
+	target_faces = 90 if faceted else 600
+	if len(obj.data.polygons) > target_faces:
+		decimate = obj.modifiers.new("Cursor polygon budget", "DECIMATE")
+		decimate.ratio = target_faces / len(obj.data.polygons)
+		bpy.ops.object.modifier_apply(modifier=decimate.name)
+
+	if faceted:
+		triangulate = obj.modifiers.new("Crystal triangular facets", "TRIANGULATE")
+		bpy.ops.object.modifier_apply(modifier=triangulate.name)
+		for polygon in obj.data.polygons:
+			polygon.use_smooth = False
+			polygon.material_index = (polygon.index * 37 + int((polygon.center.x + 1.4) * 19)) % len(materials)
+	else:
+		for polygon in obj.data.polygons:
+			polygon.use_smooth = True
 	return obj
 
 
@@ -253,7 +372,11 @@ def voxel_volume(name, points, front_materials, side_material, cell_count=14, ba
 			vertex(x0, front_y, z0), vertex(x1, front_y, z0),
 			vertex(x1, front_y, z1), vertex(x0, front_y, z1),
 		))
-		mat_ids.append((column * 3 + row) % len(front_materials))
+		base_colors = 3 if len(front_materials) > 3 else len(front_materials)
+		if len(front_materials) > 3 and column < 2 and row < rows * 0.62:
+			mat_ids.append(len(front_materials) - 1)
+		else:
+			mat_ids.append((column * 7 + row * 11) % base_colors)
 		faces.append((
 			vertex(x0, back_y, z0), vertex(x0, back_y, z1),
 			vertex(x1, back_y, z1), vertex(x1, back_y, z0),
@@ -303,16 +426,18 @@ def make_palette(theme):
 		}
 	if theme == "pixel-candy":
 		return {
-			"front": [
-				material("Pixel Candy | strawberry", (0.98, 0.19, 0.48), 0.25, 0.05, 0.3),
-				material("Pixel Candy | sugar pink", (1.0, 0.35, 0.63), 0.25, 0.03, 0.32),
-				material("Pixel Candy | rose", (0.86, 0.11, 0.40), 0.27, 0.05, 0.25),
-			],
+		"front": [
+			material("Pixel Candy | strawberry", (0.98, 0.19, 0.48), 0.25, 0.05, 0.3),
+			material("Pixel Candy | sugar pink", (1.0, 0.35, 0.63), 0.25, 0.03, 0.32),
+			material("Pixel Candy | rose", (0.86, 0.11, 0.40), 0.27, 0.05, 0.25),
+			material("Pixel Candy | mint accents", (0.13, 0.88, 0.58), 0.25, 0.02, 0.3),
+		],
 			"side": material("Pixel Candy | grape voxel sides", (0.25, 0.055, 0.52), 0.24, 0.08, 0.34),
 		}
 	return {
 		"body": material("Star Sprout | mint ceramic", (0.18, 0.80, 0.56), 0.24, 0.0, 0.4),
 		"side": material("Star Sprout | deep mint edge", (0.055, 0.40, 0.31), 0.26, 0.0, 0.32),
+		"hand": material("Star Sprout | warm ivory", (1.0, 0.91, 0.76), 0.31, 0.0, 0.25),
 		"accent": material("Star Sprout | marigold star", (1.0, 0.56, 0.035), 0.24, 0.0, 0.35),
 		"accent_side": material("Star Sprout | golden edge", (0.72, 0.29, 0.015), 0.26, 0.0, 0.26),
 		"leaf": material("Star Sprout | fresh leaf", (0.08, 0.62, 0.35), 0.25, 0.0, 0.3),
@@ -323,11 +448,11 @@ def make_palette(theme):
 
 def make_arrow(theme, center_x, mats):
 	if theme == "studio-ink":
-		obj = extruded_polygon("Studio Ink Arrow", ARROW, 0.19, [mats["body"], mats["side"]], bevel=0.035, dome=0.025)
+		obj = extruded_polygon("Studio Ink Arrow", ARROW, 0.24, [mats["body"], mats["side"]], bevel=0.065, dome=0.04)
 		cx = sum(x for x, _ in ARROW) / len(ARROW)
 		cz = sum(z for _, z in ARROW) / len(ARROW)
 		inset = [(cx + (x - cx) * 0.78, cz + (z - cz) * 0.78) for x, z in ARROW]
-		pipe = curve_line("Ivory inset piping", inset, mats["accent"], depth=0.024, y=-0.125, location_x=center_x)
+		pipe = curve_line("Ivory inset piping", inset, mats["accent"], depth=0.026, y=-0.16, location_x=center_x)
 	elif theme == "prism-glow":
 		palette = mats["facets"]
 		obj = extruded_polygon("Prism Arrow Crystal", ARROW, 0.25, palette, bevel=0.01, facet_ids=[0, 1, 4, 2, 3, 0, 5])
@@ -336,7 +461,7 @@ def make_arrow(theme, center_x, mats):
 	elif theme == "pixel-candy":
 		obj = voxel_volume("Pixel Candy Arrow Voxels", ARROW, mats["front"], mats["side"])
 	else:
-		obj = extruded_polygon("Star Sprout Ceramic Arrow", ARROW, 0.22, [mats["body"], mats["side"]], bevel=0.06, dome=0.045)
+		obj = extruded_polygon("Star Sprout Ceramic Arrow", ARROW, 0.24, [mats["body"], mats["side"]], bevel=0.085, dome=0.06)
 		charm = extruded_polygon("Raised star charm", star_points(0.43, -0.30, 0.23, 0.105), 0.075, [mats["accent"], mats["accent_side"]], bevel=0.02)
 		charm.location = (center_x, -0.17, 0)
 		sphere("Star eye left", (center_x + 0.385, -0.225, -0.295), (0.025, 0.018, 0.032), mats["eye"])
@@ -354,18 +479,16 @@ def make_arrow(theme, center_x, mats):
 
 def make_hand(theme, center_x, mats):
 	if theme == "studio-ink":
-		obj = extruded_polygon("Studio Ink Gloved Hand", HAND, 0.18, [mats["accent"], mats["side"]], bevel=0.038, dome=0.10)
+		obj = curved_hand("Studio Ink Gloved Hand", center_x, mats["accent"], thickness=0.24, edge_round=0.075)
 		rounded_box("Studio Ink wrist cuff", (center_x, -0.15, -0.30), (0.77, 0.24, 0.23), mats["cuff"], bevel=0.085)
 	elif theme == "prism-glow":
-		palette = mats["facets"]
-		facets = [3, 1, 0, 4, 2, 5, 1, 0, 3, 4, 2, 5, 1, 3, 0, 4, 2, 5, 1, 0, 3, 4, 2, 5, 1, 0, 4, 2, 3, 5, 1, 0]
-		obj = extruded_polygon("Prism Hand Crystal", HAND, 0.24, palette, bevel=0.008, facet_ids=facets)
+		obj = sculpted_hand("Prism Hand Crystal", center_x, mats["facets"], faceted=True)
 	elif theme == "pop-coral":
-		obj = extruded_polygon("Pop Coral Rubber Hand", HAND, 0.25, [mats["hand"], mats["side"]], bevel=0.105, dome=0.12)
+		obj = curved_hand("Pop Coral Rubber Hand", center_x, mats["hand"], thickness=0.25, edge_round=0.11)
 	elif theme == "pixel-candy":
 		obj = voxel_volume("Pixel Candy Hand Voxels", HAND, mats["front"], mats["side"])
 	else:
-		obj = extruded_polygon("Star Sprout Ivory Hand", HAND, 0.19, [mats["accent"], mats["side"]], bevel=0.05, dome=0.09)
+		obj = curved_hand("Star Sprout Ivory Hand", center_x, mats["hand"], thickness=0.22, edge_round=0.085)
 		rounded_box("Star Sprout mint cuff", (center_x, -0.15, -0.30), (0.80, 0.24, 0.23), mats["cuff"], bevel=0.08)
 		charm = extruded_polygon("Star Sprout cuff charm", star_points(0.32, -0.29, 0.19, 0.085), 0.065, [mats["accent"], mats["accent_side"]], bevel=0.016)
 		charm.location = (center_x, -0.30, 0)
@@ -378,7 +501,7 @@ def make_hand(theme, center_x, mats):
 	obj.location.x = center_x
 	obj["cursor_state"] = "pointer"
 	obj["theme"] = theme
-	obj["hotspot_local"] = [0.02, 1.50]
+	obj["hotspot_local"] = [-0.13, 1.18] if theme == "prism-glow" else [0.02, 1.50]
 	return obj
 
 
@@ -425,6 +548,60 @@ def add_camera_and_lights(scene):
 	except TypeError:
 		pass
 	return camera
+
+
+def make_overview_scene(results):
+	"""Put every theme's arrow and hand in a single, easy-to-browse Blender scene."""
+	themes = [result[0] for result in results]
+	columns = 3
+	rows = math.ceil(len(themes) / columns)
+	column_spacing = 6.2
+	row_spacing = 4.2
+	scene = bpy.data.scenes.new("00 Overview - all cursor models")
+	scene["description"] = (
+		"Browse all cursor themes here. Edit a theme in its numbered scene; "
+		"the overview copies are for inspection only."
+	)
+
+	for index, (theme, source_scene, _camera, _arrow_tip, _hand_tip, _arrow, _hand) in enumerate(results):
+		column = index % columns
+		row = index // columns
+		x_offset = (column - (columns - 1) / 2) * column_spacing
+		z_offset = ((rows - 1) / 2 - row) * row_spacing
+		title = theme.replace("-", " ").title()
+		collection = bpy.data.collections.new(f"{index + 1:02d} {title} | Arrow + Hand")
+		scene.collection.children.link(collection)
+		for source in source_scene.objects:
+			if source.get("theme") != theme or source.get("cursor_state") not in {"arrow", "pointer"}:
+				continue
+			copy = source.copy()
+			copy.name = f"{title} | {source.name}"
+			copy.location += Vector((x_offset, 0.0, z_offset))
+			for key in ("theme", "cursor_state", "hotspot_local", "polygon_budget", "model_root"):
+				if key in copy:
+					del copy[key]
+			collection.objects.link(copy)
+
+	camera = add_camera_and_lights(scene)
+	camera.location = (0.0, -32.0, 0.0)
+	camera.rotation_euler = (math.pi / 2, 0.0, 0.0)
+	camera.data.ortho_scale = 20.0
+	camera.data.clip_end = 100.0
+	scene.render.resolution_x, scene.render.resolution_y = 1600, 900
+	for obj in scene.objects:
+		if obj.type == "LIGHT" and obj.data.type == "AREA":
+			obj.data.energy *= 2.5
+			obj.data.size = 8.0
+
+	for screen in bpy.data.screens:
+		for area in screen.areas:
+			if area.type != "VIEW_3D":
+				continue
+			space = area.spaces.active
+			space.region_3d.view_perspective = "CAMERA"
+			space.shading.type = "SOLID"
+			space.shading.color_type = "MATERIAL"
+	return scene
 
 
 def projected_pixel(scene, camera, center_x, point, y=-0.12):
@@ -735,16 +912,13 @@ def build():
 			scene,
 			camera,
 			projected_pixel(scene, camera, arrow_x, ARROW[0]),
-			projected_pixel(scene, camera, hand_x, (0.02, 1.50)),
+			projected_pixel(scene, camera, hand_x, hand["hotspot_local"]),
 			arrow,
 			hand,
 		))
 
-	bpy.context.window.scene = results[0][1]
-	for screen in bpy.data.screens:
-		for area in screen.areas:
-			if area.type == "VIEW_3D":
-				area.spaces.active.region_3d.view_perspective = "CAMERA"
+	overview = make_overview_scene(results)
+	bpy.context.window.scene = overview
 	os.makedirs(CURSOR_DIR, exist_ok=True)
 	bpy.context.preferences.filepaths.save_version = 0
 	bpy.ops.wm.save_as_mainfile(filepath=BLEND_PATH)
@@ -763,7 +937,7 @@ def build():
 			f"[cursor-model] {theme}: arrow={arrow['polygon_budget']} tris, "
 			f"pointer={hand['polygon_budget']} tris; hotspots={arrow_tip}, {fingertip}"
 		)
-	bpy.context.window.scene = results[0][1]
+	bpy.context.window.scene = overview
 	print(f"[cursor-model] saved editable scene: {BLEND_PATH}")
 
 

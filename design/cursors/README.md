@@ -5,6 +5,10 @@ editable Blender meshes in `original-cursor-models.blend`; the rendered PNGs in
 each theme directory are the high-resolution masters. There is no SVG conversion
 step.
 
+The Blender file opens on an overview scene with every arrow and hand visible.
+Use the numbered theme scenes in the scene selector to edit a model; the overview
+contains inspection copies and is not the scene used for mesh imports or baking.
+
 | Theme | Intent |
 | --- | --- |
 | Studio Ink | Quiet, high-contrast choice for product demos |
