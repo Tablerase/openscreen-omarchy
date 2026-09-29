@@ -728,16 +728,59 @@ fn s_cuff(p: vec3<f32>, zc: f32) -> f32 {
     return s_extrude(e, q.y, 0.07, 0.06);
 }
 
-fn s_sprout(p: vec3<f32>, c: vec3<f32>) -> vec2<f32> {
-    let q = p - c;
-    let st2 = s_star5(q.xy, 0.125, 0.52) - 0.022;
-    var r = vec2<f32>(s_extrude(st2, q.z, 0.038, 0.034), 3.0);
-    let e = vec3<f32>(abs(q.x) - 0.032, q.y + 0.005, q.z - 0.036);
-    r = s_opu(r, vec2<f32>(length(e) - 0.0135, 5.0));
-    let l1 = vec3<f32>(s_rot(q.xy - vec2<f32>(-0.04, 0.15), -0.6), q.z);
-    let l2 = vec3<f32>(s_rot(q.xy - vec2<f32>(0.045, 0.155), 0.7), q.z);
-    let leaves = min(s_ellipsoid(l1, vec3<f32>(0.03, 0.058, 0.02)), s_ellipsoid(l2, vec3<f32>(0.03, 0.058, 0.02)));
-    return s_opu(r, vec2<f32>(leaves, 4.0));
+// Star Sprout : silhouette du dessin, coque marine et inserts bombés en émail.
+fn s_sprout_hand2(xy: vec2<f32>) -> f32 {
+    let p = vec3<f32>(xy, 0.0);
+    let palm = s_round_box(p - vec3<f32>(0.185, -0.675, 0.0), vec3<f32>(0.295, 0.17, 0.2), 0.10);
+    let index = s_capsule(p, vec3<f32>(0.0, -0.105, 0.0), vec3<f32>(0.0, -0.59, 0.0), 0.105);
+    let f1 = s_capsule(p, vec3<f32>(0.17, -0.31, 0.0), vec3<f32>(0.17, -0.64, 0.0), 0.086);
+    let f2 = s_capsule(p, vec3<f32>(0.31, -0.355, 0.0), vec3<f32>(0.31, -0.66, 0.0), 0.080);
+    let f3 = s_capsule(p, vec3<f32>(0.435, -0.405, 0.0), vec3<f32>(0.435, -0.68, 0.0), 0.075);
+    let thumb = s_capsule(p, vec3<f32>(-0.165, -0.43, 0.0), vec3<f32>(0.02, -0.72, 0.0), 0.10);
+    let fingers = min(index, min(f1, min(f2, f3)));
+    return s_smin(s_smin(palm, fingers, 0.045), thumb, 0.055);
+}
+
+// Feuille en amande : deux disques qui se croisent, pointes comprises.
+fn s_sprout_leaf2(p: vec2<f32>) -> f32 {
+    return max(length(p - vec2<f32>(0.070, 0.0)), length(p + vec2<f32>(0.070, 0.0))) - 0.105;
+}
+
+fn s_sprout(p: vec3<f32>, c: vec3<f32>, angle: f32) -> vec2<f32> {
+    var q = p - c;
+    q = vec3<f32>(s_rot(q.xy, angle), q.z);
+    let st2 = s_star5(q.xy, 0.135, 0.52) - 0.039;
+    var r = vec2<f32>(s_extrude(st2, q.z + 0.015, 0.055, 0.025), 5.0);
+    r = s_opu(r, vec2<f32>(s_extrude(st2 + 0.018, q.z - 0.012, 0.070, 0.040), 3.0));
+    let e = vec3<f32>(abs(q.x) - 0.029, q.y + 0.005, q.z - 0.081);
+    r = s_opu(r, vec2<f32>(s_ellipsoid(e, vec3<f32>(0.011, 0.019, 0.009)), 5.0));
+    let l1 = s_rot(q.xy - vec2<f32>(-0.059, 0.174), -0.65);
+    let l2 = s_rot(q.xy - vec2<f32>(0.059, 0.174), 0.65);
+    let leaves = min(s_sprout_leaf2(l1), s_sprout_leaf2(l2));
+    r = s_opu(r, vec2<f32>(s_extrude(leaves, q.z + 0.018, 0.044, 0.022), 5.0));
+    return s_opu(r, vec2<f32>(s_extrude(leaves + 0.014, q.z - 0.005, 0.050, 0.027), 4.0));
+}
+
+fn s_sprout_cursor(p: vec3<f32>, shape: i32) -> vec2<f32> {
+    var body: vec2<f32>;
+    var star: vec3<f32>;
+    var angle = 0.0;
+    if shape == 0 {
+        let d2 = s_arrow2(p.xy) - SCULPT_AR_ROUND;
+        body = vec2<f32>(s_extrude(d2, p.z - 0.13, 0.08, 0.030), 5.0);
+        body = s_opu(body, vec2<f32>(s_extrude(d2 + 0.055, p.z - 0.16, 0.095, 0.045), 1.0));
+        star = vec3<f32>(0.655, -0.835, 0.245);
+        angle = -0.24;
+    } else {
+        let d2 = s_sprout_hand2(p.xy);
+        body = vec2<f32>(s_extrude(d2, p.z - 0.13, 0.08, 0.035), 5.0);
+        body = s_opu(body, vec2<f32>(s_extrude(d2 + 0.037, p.z - 0.163, 0.095, 0.055), 1.0));
+        let cuff2 = s_round_box(vec3<f32>(p.xy - vec2<f32>(0.185, -0.925), 0.0), vec3<f32>(0.29, 0.13, 0.2), 0.07);
+        body = s_opu(body, vec2<f32>(s_extrude(cuff2, p.z - 0.13, 0.08, 0.04), 5.0));
+        body = s_opu(body, vec2<f32>(s_extrude(cuff2 + 0.034, p.z - 0.166, 0.088, 0.045), 2.0));
+        star = vec3<f32>(0.185, -0.905, 0.285);
+    }
+    return s_opu(body, s_sprout(p, star, angle));
 }
 
 // Pixel Candy : une ligne par entier, bit c = colonne c (cf. HLSL et `sculpt.rs`).
@@ -890,6 +933,9 @@ fn s_crystal_hand(p: vec3<f32>) -> f32 {
 }
 
 fn sculpt_proto(p: vec3<f32>, theme: i32, shape: i32) -> vec2<f32> {
+    if theme == 4 {
+        return s_sprout_cursor(p, shape);
+    }
     if theme == 3 {
         return s_voxels(p, shape);
     }
@@ -897,7 +943,6 @@ fn sculpt_proto(p: vec3<f32>, theme: i32, shape: i32) -> vec2<f32> {
         return vec2<f32>(select(s_crystal_hand(p), s_gem_arrow(p), shape == 0), 8.0);
     }
     var body: vec2<f32>;
-    var star: vec3<f32>;
     if shape == 0 {
         var h = 0.075;
         var re = 0.03;
@@ -907,22 +952,12 @@ fn sculpt_proto(p: vec3<f32>, theme: i32, shape: i32) -> vec2<f32> {
             re = 0.06;
             dome = 0.035;
         }
-        if theme == 4 {
-            h = 0.07;
-            re = 0.055;
-            dome = 0.025;
-        }
         body = vec2<f32>(s_arrow_solid(p, h, re, dome), 1.0);
         if theme == 0 {
             body = s_opu(body, vec2<f32>(s_piping(p, SCULPT_HOVER + 2.0 * h - 0.004), 2.0));
         }
-        star = vec3<f32>(0.57, -0.86, SCULPT_HOVER + 2.0 * h + dome);
     } else {
         body = s_opu(vec2<f32>(s_glove(p, SCULPT_HAND_ZC), 1.0), vec2<f32>(s_cuff(p, SCULPT_HAND_ZC), 2.0));
-        star = vec3<f32>(0.185, -0.93, SCULPT_HAND_ZC + 0.15);
-    }
-    if theme == 4 {
-        return s_opu(body, s_sprout(p, star));
     }
     return body;
 }
@@ -1063,21 +1098,21 @@ fn sculpt_material(mat: f32, p: vec3<f32>, theme: i32, shape: i32) -> SculptMat 
     }
     if theme == 4 {
         if primary && shape == 0 {
-            return SculptMat(s_lin(0.62, 0.91, 0.78), 0.22, 0.8, 0.25, 0.6);
+            return SculptMat(s_lin(0.64, 0.94, 0.82), 0.30, 0.65, 0.20, 0.45);
         }
         if primary {
-            return SculptMat(s_lin(0.96, 0.94, 0.88), 0.5, 0.35, 0.35, 0.25);
+            return SculptMat(s_lin(0.98, 0.96, 0.89), 0.40, 0.45, 0.25, 0.30);
         }
         if mat < 2.5 {
-            return SculptMat(s_lin(0.62, 0.91, 0.78), 0.25, 0.7, 0.25, 0.5);
+            return SculptMat(s_lin(0.48, 0.90, 0.79), 0.28, 0.65, 0.20, 0.45);
         }
         if mat < 3.5 {
-            return SculptMat(s_lin(1.0, 0.80, 0.20), 0.3, 0.6, 0.3, 0.4);
+            return SculptMat(s_lin(1.0, 0.76, 0.16), 0.30, 0.65, 0.25, 0.40);
         }
         if mat < 4.5 {
-            return SculptMat(s_lin(0.38, 0.80, 0.55), 0.35, 0.5, 0.35, 0.3);
+            return SculptMat(s_lin(0.53, 0.91, 0.69), 0.30, 0.60, 0.20, 0.40);
         }
-        return SculptMat(s_lin(0.16, 0.12, 0.10), 0.2, 0.8, 0.0, 0.5);
+        return SculptMat(s_lin(0.035, 0.14, 0.27), 0.40, 0.40, 0.0, 0.40);
     }
     if mat < 6.5 {
         return SculptMat(s_pixel_colour(p, shape), 0.45, 0.35, 0.15, 0.2);

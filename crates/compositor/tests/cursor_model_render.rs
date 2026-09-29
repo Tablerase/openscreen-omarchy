@@ -824,6 +824,88 @@ fn the_sculpted_cursors_stand_at_the_hotspot() {
     assert!(failures.is_empty(), "{failures:#?}");
 }
 
+/// Star Sprout garde le contour marine de la référence, les inserts menthe et les deux yeux
+/// distincts dans l'étoile dorée, sur la flèche comme sur la manchette de la main.
+#[test]
+fn star_sprout_has_navy_rims_mint_inserts_and_two_eyes() {
+    let Some(gpu) = gpu() else { return };
+    let comp = Compositor::new_sized(&gpu, 1280, 720).expect("compositor");
+    let (blue, orange) = (
+        FakeFrame::new(&gpu, Tint::Blue),
+        FakeFrame::new(&gpu, Tint::Orange),
+    );
+    let bare = render_any(
+        &comp,
+        &blue,
+        &hidden_json("null"),
+        &resting("sprout-bare", false),
+    )
+    .0;
+    for state in ["arrow", "pointer"] {
+        let json = sculpted_scene_json("null", "star-sprout", 8.0);
+        let track = resting_at(
+            &format!("sprout-reference-{state}"),
+            Some(state),
+            false,
+            0.5,
+        );
+        let rgba = render(&comp, &blue, &json, &track).0;
+        let other = render(&comp, &orange, &json, &track).0;
+        let mask = opaque_mask(&rgba, &other, &bare);
+        save(&format!("sprout-reference-{state}"), &rgba);
+        let navy = |p: [u8; 4]| p[2] > p[0].saturating_add(15) && luma(p) < 140.0;
+        let gold = |p: [u8; 4]| p[0] > 150 && p[1] > 100 && p[2] < p[1] / 2;
+        let mut bounds = [1280, 720, 0, 0];
+        let (mut body, mut rim, mut mint) = (0usize, 0usize, 0usize);
+        for y in 0..720 {
+            for x in 0..1280 {
+                if !mask[(y * 1280 + x) as usize] {
+                    continue;
+                }
+                let p = px(&rgba, x, y);
+                body += 1;
+                rim += usize::from(navy(p));
+                mint += usize::from(p[1] > p[0].saturating_add(20) && p[1] > 130 && p[2] > 90);
+                if gold(p) {
+                    bounds = [
+                        bounds[0].min(x),
+                        bounds[1].min(y),
+                        bounds[2].max(x),
+                        bounds[3].max(y),
+                    ];
+                }
+            }
+        }
+        assert!(
+            rim * 10 > body,
+            "{state}: contour marine absent ({rim}/{body})"
+        );
+        assert!(
+            mint * 20 > body,
+            "{state}: insert menthe absent ({mint}/{body})"
+        );
+        assert!(
+            bounds[0] < bounds[2] && bounds[1] < bounds[3],
+            "{state}: étoile dorée absente"
+        );
+        let [x0, y0, x1, y1] = bounds;
+        let (w, h) = (x1 - x0, y1 - y0);
+        // La fenêtre centrale du visage exclut la bordure de l'étoile et ses branches.
+        let (mut runs, mut in_eye) = (0, false);
+        for x in x0 + w * 32 / 100..=x0 + w * 68 / 100 {
+            let eye = (y0 + h * 40 / 100..=y0 + h * 67 / 100).any(|y| navy(px(&rgba, x, y)));
+            if eye && !in_eye {
+                runs += 1;
+            }
+            in_eye = eye;
+        }
+        assert_eq!(
+            runs, 2,
+            "{state}: les deux yeux ne sont pas séparés (étoile {bounds:?})"
+        );
+    }
+}
+
 /// Planches à regarder (opt-in, `OPENSCREEN_CURSOR3D_OUT`) : les seize états en l'air sur un
 /// écran à plat, chacun à côté de son sprite plat ; la flèche, la main et le I posés sur un écran
 /// incliné ; et les grandes flèches (taille 8) qui servent à la comparaison avec le modèle

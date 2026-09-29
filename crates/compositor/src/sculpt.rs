@@ -57,8 +57,23 @@ pub fn sculpted_shape(name: &str) -> Option<SpriteShape> {
         "pointer" => false,
         _ => return None,
     };
-    let [x0, x1, y1] = if arrow { BOX_ARROW } else { BOX_HAND };
-    let (zref, z_high) = if arrow { (ZREF_ARROW, Z_HIGH_ARROW) } else { (ZREF_HAND, Z_HIGH_HAND) };
+    // L'étoile de Star Sprout déborde à droite de la flèche et se pose sur sa face :
+    // inclure son contour marine et ses yeux dans la boîte de marche des rayons.
+    let star_sprout = THEMES[theme] == "star-sprout";
+    let [x0, x1, y1] = if arrow && star_sprout {
+        [-0.1, 0.86, 0.09]
+    } else if arrow {
+        BOX_ARROW
+    } else {
+        BOX_HAND
+    };
+    let (zref, z_high) = if arrow && star_sprout {
+        (ZREF_ARROW, 0.35)
+    } else if arrow {
+        (ZREF_ARROW, Z_HIGH_ARROW)
+    } else {
+        (ZREF_HAND, Z_HIGH_HAND)
+    };
     let s = SCULPT_SCALE;
     // Repère du modèle : y vers le bas, le coin haut-gauche de la boîte est donc (x0, y1).
     let size = [(x1 - x0) * s, 1.0];
@@ -115,6 +130,37 @@ mod tests {
             assert!(s.thick > 0.05 && s.max_height > 0.0, "{name}");
             assert!(s.size[0] < 1.0 && s.size[1] == 1.0, "{name} : le plus grand côté n'est pas 1");
         }
+    }
+
+    /// La flèche porte une étoile en relief à droite de son corps : la boîte doit la garder
+    /// entière, sinon le marcheur coupe sa branche droite ou ses yeux à la première intersection.
+    #[test]
+    fn star_sprout_arrow_box_contains_the_raised_badge() {
+        let s = sculpted_shape("star-sprout/arrow").unwrap();
+        let right = s.size[0] * (1.0 - s.hotspot[0]);
+        assert!(
+            right >= 0.83 * SCULPT_SCALE,
+            "branche droite de l'étoile hors de la boîte"
+        );
+        assert!(
+            s.max_height >= (0.335 - ZREF_ARROW) * SCULPT_SCALE,
+            "yeux hors de la boîte"
+        );
+    }
+
+    /// Valider le port Linux même lorsqu'on travaille sous Windows : le shader livré doit
+    /// accepter les mêmes volumes et matériaux que HLSL et Metal.
+    #[test]
+    fn the_wgsl_shader_parses_and_validates() {
+        let src = include_str!("vk_shaders/layer.wgsl");
+        let module = wgpu::naga::front::wgsl::parse_str(src)
+            .unwrap_or_else(|err| panic!("{}", err.emit_to_string(src)));
+        wgpu::naga::valid::Validator::new(
+            wgpu::naga::valid::ValidationFlags::all(),
+            wgpu::naga::valid::Capabilities::all(),
+        )
+        .validate(&module)
+        .expect("shader WGSL valide");
     }
 
     /// Les constantes que ce module et les shaders partagent ne divergent pas.
