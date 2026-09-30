@@ -701,7 +701,15 @@ final class ScreenCaptureRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
 		configuration.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(max(1, request.video.fps)))
 		configuration.queueDepth = 6
 		configuration.showsCursor = !request.video.hideSystemCursor
-		configuration.pixelFormat = kCVPixelFormatType_32BGRA
+		// Studio-range BT.709 YCbCr from ScreenCaptureKit itself, which the encoder takes as is
+		// and the compositor decodes (#943). BGRA left the matrix to VideoToolbox. Nothing here
+		// reads the pixels: a frame goes through `retimedSampleBuffer` (timing only) to
+		// `append`, and `isCompleteFrame` reads attachments. 1.5 bytes a pixel instead of 4,
+		// times `queueDepth`.
+		configuration.pixelFormat = kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
+		configuration.colorMatrix = captureYCbCrMatrix
+		// Unset, the buffers carry the display's colour space: P3 on most Macs.
+		configuration.colorSpaceName = CGColorSpace.sRGB
 		configuration.sampleRate = 48_000
 		configuration.channelCount = 2
 		configuration.excludesCurrentProcessAudio = true
@@ -754,6 +762,8 @@ final class ScreenCaptureRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
 			AVVideoCodecKey: AVVideoCodecType.h264,
 			AVVideoWidthKey: outputWidth,
 			AVVideoHeightKey: outputHeight,
+			// BT.709 tags, the colour the stream is captured in (#943).
+			AVVideoColorPropertiesKey: videoColorProperties,
 			AVVideoCompressionPropertiesKey: [
 				// From the size this stream really got. The renderer sends none (#924).
 				AVVideoAverageBitRateKey: request.video.bitrate
