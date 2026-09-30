@@ -3,14 +3,21 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
+// Timing from technical-documentation/engineering/tooltips.md: a tooltip appears 400 ms after
+// the pointer stops, and moving to a neighbouring control within 300 ms shows its tooltip at once.
+const TOOLTIP_OPEN_DELAY_MS = 400;
+const TOOLTIP_SKIP_DELAY_MS = 300;
+
 function TooltipProvider({
-	delayDuration = 200,
+	delayDuration = TOOLTIP_OPEN_DELAY_MS,
+	skipDelayDuration = TOOLTIP_SKIP_DELAY_MS,
 	...props
 }: React.ComponentProps<typeof TooltipPrimitive.Provider>) {
 	return (
 		<TooltipPrimitive.Provider
 			data-slot="tooltip-provider"
 			delayDuration={delayDuration}
+			skipDelayDuration={skipDelayDuration}
 			{...props}
 		/>
 	);
@@ -40,9 +47,13 @@ function TooltipContent({
 		<TooltipPrimitive.Portal>
 			<TooltipPrimitive.Content
 				data-slot="tooltip-content"
+				// Follows the text's own direction, so Arabic starts at its own edge.
+				dir="auto"
 				sideOffset={sideOffset}
 				className={cn(
-					"px-2.5 py-1.5 text-xs leading-4 font-medium text-white/95 bg-black/85 border border-white/10 rounded-lg shadow-lg z-50",
+					// Popper sizes its wrapper to `max-content`, so without a cap a long tooltip is one
+					// long line. 260px is about 40 characters a line at this size.
+					"max-w-[260px] break-words px-2.5 py-1.5 text-xs leading-4 font-medium text-white/95 bg-black/85 border border-white/10 rounded-lg shadow-lg z-50",
 					"animate-in fade-in-0 zoom-in-95",
 					"data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
 					className,
@@ -61,16 +72,32 @@ const Tooltip = React.forwardRef<
 	{
 		children: React.ReactNode;
 		content: React.ReactNode;
+		/**
+		 * The current key binding, already formatted (`formatBinding`). Shown as a chip after the
+		 * text, never inside the translated string: a remapped key would make that string lie, and
+		 * a Latin key inside Arabic text breaks the order of the words.
+		 */
+		shortcut?: string;
 		side?: "top" | "right" | "bottom" | "left";
+		/** Keeps the tooltip this far from the viewport's edges. */
+		collisionPadding?: number;
 		className?: string;
 	}
->(({ children, content, side, className }, ref) => (
+>(({ children, content, shortcut, side, collisionPadding, className }, ref) => (
 	<TooltipRoot>
 		<TooltipTrigger ref={ref} asChild>
 			{children}
 		</TooltipTrigger>
-		<TooltipContent side={side} className={className}>
+		<TooltipContent side={side} collisionPadding={collisionPadding} className={className}>
 			{content}
+			{shortcut ? (
+				<kbd
+					dir="ltr"
+					className="ms-2 inline-block rounded border border-white/15 bg-white/10 px-1 font-sans text-[11px] leading-4 text-white/80"
+				>
+					{shortcut}
+				</kbd>
+			) : null}
 		</TooltipContent>
 	</TooltipRoot>
 ));
