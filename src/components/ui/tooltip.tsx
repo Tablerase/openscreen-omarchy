@@ -7,6 +7,9 @@ import { cn } from "@/lib/utils";
 // the pointer stops, and moving to a neighbouring control within 300 ms shows its tooltip at once.
 const TOOLTIP_OPEN_DELAY_MS = 400;
 const TOOLTIP_SKIP_DELAY_MS = 300;
+// The space between the trigger and the tooltip. 6px read as touching on a dark surface: a
+// tooltip is dark too, so it needs a gap the eye can see.
+export const TOOLTIP_GAP_PX = 8;
 
 function TooltipProvider({
 	delayDuration = TOOLTIP_OPEN_DELAY_MS,
@@ -40,7 +43,7 @@ TooltipTrigger.displayName = "TooltipTrigger";
 
 function TooltipContent({
 	className,
-	sideOffset = 6,
+	sideOffset = TOOLTIP_GAP_PX,
 	...props
 }: React.ComponentProps<typeof TooltipPrimitive.Content>) {
 	return (
@@ -52,8 +55,9 @@ function TooltipContent({
 				sideOffset={sideOffset}
 				className={cn(
 					// Popper sizes its wrapper to `max-content`, so without a cap a long tooltip is one
-					// long line. 260px is about 40 characters a line at this size.
-					"max-w-[260px] break-words px-2.5 py-1.5 text-xs leading-4 font-medium text-white/95 bg-black/85 border border-white/10 rounded-lg shadow-lg z-50",
+					// long line. 260px is about 40 characters a line at this size. `text-balance` evens the
+					// lines out, so a translation does not end on one orphan word.
+					"max-w-[260px] break-words text-balance px-2.5 py-1.5 text-xs leading-4 font-medium text-white/95 bg-black/85 border border-white/10 rounded-lg shadow-lg z-50",
 					"animate-in fade-in-0 zoom-in-95",
 					"data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
 					className,
@@ -79,28 +83,56 @@ const Tooltip = React.forwardRef<
 		 */
 		shortcut?: string;
 		side?: "top" | "right" | "bottom" | "left";
+		/**
+		 * The distance from the trigger. Only for a trigger that is not the edge of what the eye
+		 * sees, such as a button padded inside a bar: the tooltip then has to clear the bar.
+		 */
+		sideOffset?: number;
 		/** Keeps the tooltip this far from the viewport's edges. */
 		collisionPadding?: number;
 		className?: string;
+		/** Controlled, for a caller that must measure something at the moment the tooltip opens. */
+		open?: boolean;
+		onOpenChange?: (open: boolean) => void;
 	}
->(({ children, content, shortcut, side, collisionPadding, className }, ref) => (
-	<TooltipRoot>
-		<TooltipTrigger ref={ref} asChild>
-			{children}
-		</TooltipTrigger>
-		<TooltipContent side={side} collisionPadding={collisionPadding} className={className}>
-			{content}
-			{shortcut ? (
-				<kbd
-					dir="ltr"
-					className="ms-2 inline-block rounded border border-white/15 bg-white/10 px-1 font-sans text-[11px] leading-4 text-white/80"
-				>
-					{shortcut}
-				</kbd>
-			) : null}
-		</TooltipContent>
-	</TooltipRoot>
-));
+>(
+	(
+		{
+			children,
+			content,
+			shortcut,
+			side,
+			sideOffset,
+			collisionPadding,
+			className,
+			open,
+			onOpenChange,
+		},
+		ref,
+	) => (
+		<TooltipRoot open={open} onOpenChange={onOpenChange}>
+			<TooltipTrigger ref={ref} asChild>
+				{children}
+			</TooltipTrigger>
+			<TooltipContent
+				side={side}
+				sideOffset={sideOffset}
+				collisionPadding={collisionPadding}
+				className={className}
+			>
+				{content}
+				{shortcut ? (
+					<kbd
+						dir="ltr"
+						className="ms-2 inline-block rounded border border-white/15 bg-white/10 px-1 font-sans text-[11px] leading-4 text-white/80"
+					>
+						{shortcut}
+					</kbd>
+				) : null}
+			</TooltipContent>
+		</TooltipRoot>
+	),
+);
 Tooltip.displayName = "Tooltip";
 
 export { Tooltip, TooltipContent, TooltipProvider, TooltipRoot, TooltipTrigger };

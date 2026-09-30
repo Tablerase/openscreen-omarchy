@@ -1,8 +1,8 @@
 import { Check, Languages, NotepadText, Settings } from "lucide-react";
-import { createContext, memo, type ReactElement, useContext } from "react";
+import { createContext, memo, type ReactElement, useContext, useRef, useState } from "react";
 import { formatTimePadded } from "../../utils/timeUtils";
 import { Button } from "../ui/button";
-import { Tooltip } from "../ui/tooltip";
+import { TOOLTIP_GAP_PX, Tooltip } from "../ui/tooltip";
 import {
 	CameraIcon,
 	CursorIcon,
@@ -15,6 +15,7 @@ import {
 	SourceIcon,
 	VolumeIcon,
 } from "./HudIcons";
+import { computeHudTooltipClearance } from "./hudGeometry";
 import styles from "./LaunchWindow.module.css";
 
 // Every control below is a `memo` boundary on purpose. The HUD's root re-renders
@@ -43,13 +44,42 @@ export const HudLayoutProvider = HudVerticalContext.Provider;
 // Keeps a tooltip off the window's own edge, where its shadow would be cut.
 const HUD_TOOLTIP_EDGE_PADDING = 8;
 
+// Radix places a tooltip against its trigger, but what the eye sees is the bar around it. The
+// bar pads the button, and a vertical bar widens to fit the timer while recording, so a gap
+// measured from the trigger left the tooltip overlapping the bar. The distance to the bar's
+// edge is measured when the tooltip opens (hence the controlled `open`: the offset has to be
+// right in the render that shows it, not one effect later) and added to the primitive's gap.
 function HudTooltip({ content, children }: { content: string; children: ReactElement }) {
 	const vertical = useContext(HudVerticalContext);
+	const side = vertical ? "right" : "top";
+	const triggerRef = useRef<HTMLButtonElement | null>(null);
+	const [open, setOpen] = useState(false);
+	const [clearance, setClearance] = useState(0);
+
+	const handleOpenChange = (next: boolean) => {
+		const trigger = triggerRef.current;
+		const bar = trigger?.closest("[data-tray-layout]");
+		if (next && trigger && bar) {
+			setClearance(
+				computeHudTooltipClearance(
+					trigger.getBoundingClientRect(),
+					bar.getBoundingClientRect(),
+					side,
+				),
+			);
+		}
+		setOpen(next);
+	};
+
 	return (
 		<Tooltip
+			ref={triggerRef}
 			content={content}
-			side={vertical ? "right" : "top"}
+			side={side}
+			sideOffset={TOOLTIP_GAP_PX + clearance}
 			collisionPadding={HUD_TOOLTIP_EDGE_PADDING}
+			open={open}
+			onOpenChange={handleOpenChange}
 		>
 			{children}
 		</Tooltip>

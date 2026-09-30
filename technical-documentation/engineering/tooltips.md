@@ -60,7 +60,8 @@ If the icon has to swap and the wording has to follow (Play, Pause), it is an ac
 |---|---|
 | English text | 80 characters. 95 for the strings that define the two cursor modes |
 | Sentences | 2, one idea each. Punctuation at the end only when there are two |
-| Layout | `max-w-[260px]`, `dir="auto"`. 3 lines in English, 4 in French, Italian and Spanish |
+| Layout | `max-w-[260px]`, `dir="auto"`, balanced lines. 3 lines in English, 4 in French, Italian and Spanish |
+| Gap | 8px from the trigger. Where the trigger sits inside a padded surface (a button in the HUD bar), the gap is measured from that surface's edge |
 | Case | Sentence case. Form for an icon-only control: `Name: effect` |
 | First appearance | 400 ms after the pointer stops, 300 ms to move between neighbours. One value, set on the shared provider |
 | Disappearance | Never on a timer. Pointer leaves, focus leaves, or Escape |

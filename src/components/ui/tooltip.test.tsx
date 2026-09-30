@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Tooltip, TooltipProvider } from "./tooltip";
+import { TOOLTIP_GAP_PX, Tooltip, TooltipProvider } from "./tooltip";
 
 class StubResizeObserver {
 	observe() {
@@ -43,6 +43,10 @@ function visibleTooltip() {
 	return document.querySelector<HTMLElement>('[data-slot="tooltip-content"]');
 }
 
+function popperWrapper() {
+	return document.querySelector<HTMLElement>("[data-radix-popper-content-wrapper]");
+}
+
 describe("Tooltip", () => {
 	it("wraps long text and follows the text's own direction", () => {
 		const button = renderTooltip();
@@ -51,6 +55,8 @@ describe("Tooltip", () => {
 		const content = visibleTooltip();
 		expect(content).toHaveAttribute("dir", "auto");
 		expect(content?.className).toContain("max-w-[260px]");
+		// Balanced lines, so a translation never ends on a single orphan word.
+		expect(content?.className).toContain("text-balance");
 		expect(content).toHaveTextContent("Add a zoom at the playhead");
 	});
 
@@ -70,6 +76,23 @@ describe("Tooltip", () => {
 		act(() => button.focus());
 
 		expect(visibleTooltip()?.querySelector("kbd")).toBeNull();
+	});
+
+	// The eye reads the gap against the trigger's edge. It was 6px, which two dark surfaces make
+	// look like overlap; the jsdom boxes are all zero-sized, so the offset is the whole translation.
+	it("keeps a real gap between the trigger and the tooltip", async () => {
+		expect(TOOLTIP_GAP_PX).toBe(8);
+		const button = renderTooltip();
+		act(() => button.focus());
+
+		await waitFor(() => expect(popperWrapper()?.style.transform).toBe("translate(0px, -8px)"));
+	});
+
+	it("lets a trigger that sits inside a padded surface ask for a larger gap", async () => {
+		const button = renderTooltip({ sideOffset: 8 + 28 });
+		act(() => button.focus());
+
+		await waitFor(() => expect(popperWrapper()?.style.transform).toBe("translate(0px, -36px)"));
 	});
 
 	it("opens 400 ms after the pointer arrives, not before", () => {

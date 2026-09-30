@@ -333,6 +333,9 @@ function emitSourceSelectorClosed() {
 
 function resetLaunchMocks() {
 	vi.stubGlobal("ResizeObserver", StubResizeObserver);
+	// The bar's orientation is a saved preference: a test that switches it must not leave the
+	// next one starting on a vertical bar.
+	localStorage.clear();
 	recorderState.value.toggleRecording = vi.fn();
 	recorderState.value.cursorCaptureMode = "editable-overlay";
 	recorderState.value.systemAudioEnabled = false;
@@ -672,6 +675,49 @@ describe("LaunchWindow record button", () => {
 				"right",
 			),
 		);
+	});
+
+	// Radix measures from the small trigger, but the bar is what the eye sees: while recording, a
+	// vertical bar widens to fit the timer and the Pause button sits well inside its edge. The
+	// tooltip has to clear the bar, or it overlaps it.
+	it("opens a tooltip clear of the bar's edge, not just the trigger's", async () => {
+		recorderState.value.recording = true;
+		recorderState.value.canPauseRecording = true;
+		renderLaunchWindow();
+		fireEvent.click(await screen.findByTestId("launch-tray-layout-button"));
+		const pause = await screen.findByTestId("launch-pause-button");
+		const bar = pause.closest("[data-tray-layout]") as HTMLElement;
+
+		const box = (x: number, width: number, height: number) => ({
+			x,
+			y: 0,
+			left: x,
+			top: 0,
+			right: x + width,
+			bottom: height,
+			width,
+			height,
+			toJSON: () => ({}),
+		});
+		// The bar is 100px wide; the button's right edge is 28px inside it.
+		vi.spyOn(bar, "getBoundingClientRect").mockReturnValue(box(0, 100, 300));
+		vi.spyOn(pause, "getBoundingClientRect").mockReturnValue(box(38, 34, 34));
+		// jsdom's viewport is zero-sized, which would make every placement overflow and flip.
+		const root = document.documentElement;
+		Object.defineProperty(root, "clientWidth", { value: 1000, configurable: true });
+		Object.defineProperty(root, "clientHeight", { value: 800, configurable: true });
+
+		try {
+			act(() => pause.focus());
+			await screen.findByRole("tooltip");
+
+			// Trigger's right edge 72 + the primitive's 8px gap + the 28px to the bar's edge.
+			const wrapper = document.querySelector<HTMLElement>("[data-radix-popper-content-wrapper]");
+			await waitFor(() => expect(wrapper?.style.transform).toBe("translate(108px, 17px)"));
+		} finally {
+			Reflect.deleteProperty(root, "clientWidth");
+			Reflect.deleteProperty(root, "clientHeight");
+		}
 	});
 
 	// Chromium records the pointer itself on these platforms once the native helper is missing,
