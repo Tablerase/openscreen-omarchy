@@ -125,3 +125,12 @@ if (!fs.existsSync(frameVisibilityTestPath)) {
 // reads every black frame as content.
 await run(frameVisibilityTestPath, [], { cwd: BUILD_DIR });
 console.log(`Passed ${frameVisibilityTestPath}`);
+
+const webcamSnapshotTestPath = path.join(BUILD_DIR, "webcam_snapshot_test.exe");
+if (!fs.existsSync(webcamSnapshotTestPath)) {
+	throw new Error(`WGC helper build completed but ${webcamSnapshotTestPath} was not found.`);
+}
+// Guards the per-tick webcam poll. The writer asks at the screen's rate, twice
+// the camera's, so a frame it already holds must not be copied again.
+await run(webcamSnapshotTestPath, [], { cwd: BUILD_DIR });
+console.log(`Passed ${webcamSnapshotTestPath}`);

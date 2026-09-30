@@ -1172,8 +1172,7 @@ int wmain(int argc, wchar_t* argv[]) {
                 }
                 if (webcamActive) {
                     WebcamFrameSnapshot candidateWebcamFrame;
-                    if (webcamCapture.copyLatestFrame(candidateWebcamFrame) &&
-                        candidateWebcamFrame.sequence != latestWebcamSequence &&
+                    if (webcamCapture.copyLatestFrame(candidateWebcamFrame, latestWebcamSequence) &&
                         hasVisibleWebcamContent(candidateWebcamFrame.data, webcamCapture.deliversNv12())) {
                         latestWebcamFrame = std::move(candidateWebcamFrame.data);
                         latestWebcamWidth = candidateWebcamFrame.width;
@@ -1467,7 +1466,7 @@ int wmain(int argc, wchar_t* argv[]) {
         const auto webcamDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(3);
         while (std::chrono::steady_clock::now() < webcamDeadline && !hasVisibleWebcamFrame) {
             WebcamFrameSnapshot candidateWebcamFrame;
-            if (webcamCapture.copyLatestFrame(candidateWebcamFrame) &&
+            if (webcamCapture.copyLatestFrame(candidateWebcamFrame, latestWebcamSequence) &&
                 hasVisibleWebcamContent(candidateWebcamFrame.data, webcamCapture.deliversNv12())) {
                 latestWebcamFrame = std::move(candidateWebcamFrame.data);
                 latestWebcamWidth = candidateWebcamFrame.width;

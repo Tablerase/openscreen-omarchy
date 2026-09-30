@@ -32,7 +32,7 @@ public:
         bool preferNv12);
     bool start();
     void stop();
-    bool copyLatestFrame(WebcamFrameSnapshot& destination);
+    bool copyLatestFrame(WebcamFrameSnapshot& destination, uint64_t lastSeenSequence);
 
     int width() const;
     int height() const;

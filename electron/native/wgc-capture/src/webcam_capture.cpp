@@ -619,20 +619,13 @@ void WebcamCapture::captureLoop() {
     CoUninitialize();
 }
 
-bool WebcamCapture::copyLatestFrame(WebcamFrameSnapshot& destination) {
+bool WebcamCapture::copyLatestFrame(WebcamFrameSnapshot& destination, uint64_t lastSeenSequence) {
     if (usingDirectShow_) {
-        return directShowCapture_.copyLatestFrame(destination);
+        return directShowCapture_.copyLatestFrame(destination, lastSeenSequence);
     }
     std::scoped_lock lock(frameMutex_);
-    if (latestFrame_.empty() || width_ <= 0 || height_ <= 0) {
-        return false;
-    }
-
-    destination.data = latestFrame_;
-    destination.width = width_;
-    destination.height = height_;
-    destination.sequence = latestFrameSequence_;
-    return true;
+    return snapshotWebcamFrame(
+        latestFrame_, width_, height_, latestFrameSequence_, lastSeenSequence, destination);
 }
 
 bool WebcamCapture::deliversNv12() const {

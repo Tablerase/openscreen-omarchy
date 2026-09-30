@@ -16,6 +16,33 @@ struct WebcamFrameSnapshot {
     uint64_t sequence = 0;
 };
 
+/**
+ * Copies the latest camera frame into `destination`, unless the caller already has it.
+ *
+ * The video writer asks on every screen tick, 60 times a second, while a camera
+ * delivers 30: copying first and comparing sequences after cost a full frame
+ * copied for nothing on every other tick. Returns false, leaving `destination`
+ * untouched, when there is no frame yet or its sequence is `lastSeenSequence`.
+ * Both capture backends route `copyLatestFrame` through this.
+ */
+inline bool snapshotWebcamFrame(
+    const std::vector<BYTE>& frame,
+    int width,
+    int height,
+    uint64_t sequence,
+    uint64_t lastSeenSequence,
+    WebcamFrameSnapshot& destination) {
+    if (frame.empty() || width <= 0 || height <= 0 || sequence == lastSeenSequence) {
+        return false;
+    }
+
+    destination.data = frame;
+    destination.width = width;
+    destination.height = height;
+    destination.sequence = sequence;
+    return true;
+}
+
 class DirectShowWebcamCapture {
 public:
     DirectShowWebcamCapture() = default;
@@ -33,7 +60,7 @@ public:
         int requestedFps);
     bool start();
     void stop();
-    bool copyLatestFrame(WebcamFrameSnapshot& destination);
+    bool copyLatestFrame(WebcamFrameSnapshot& destination, uint64_t lastSeenSequence);
 
     int width() const;
     int height() const;
