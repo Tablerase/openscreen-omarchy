@@ -12,8 +12,8 @@
 		"changeSource": "Başka bir ekran veya pencere seç",
 		"systemAudio": "Sistem sesi: bilgisayarın çaldığı sesi kaydeder",
 		"microphone": "Mikrofon: sesinizi kaydeder",
-		"camera": "Kamera: sizi editörde taşıyabileceğiniz ayrı bir katman olarak kaydeder",
-		"openStudio": "Stüdyoyu aç: kayıtlarınızın editörü",
+		"camera": "Kamera: sizi düzenleyicide taşıyabileceğiniz ayrı bir katman olarak kaydeder",
+		"openStudio": "Stüdyoyu aç: kayıtlarınızın düzenleyicisi",
 		"openNotes": "Notları aç: kayıt sırasında okuyacağınız metin",
 		"openNotesPlaceholder": "Notlarınızı buraya yazın...",
 		"notesToolbar": {
@@ -53,7 +53,7 @@
 	},
 	"cursor": {
 		"name": "Düzenlenebilir imleç",
-		"editableTip": "Düzenlenebilir imleç: ayrı kaydedilir; editörde stilini değiştirebilir, otomatik yakınlaştırma kullanabilirsiniz",
+		"editableTip": "Düzenlenebilir imleç: ayrı kaydedilir; düzenleyicide stilini değiştirebilir, otomatik yakınlaştırma kullanabilirsiniz",
 		"systemTip": "Sistem imleci: gerçek imleciniz, videoya kaydedilir. Stil değişikliği ve otomatik yakınlaştırma yok."
 	},
 	"sourceSelector": {

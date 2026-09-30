@@ -1,7 +1,7 @@
 {
 	"tooltips": {
 		"hideHUD": "Ẩn HUD",
-		"hideHUDTip": "Ẩn thanh. Hiện lại từ biểu tượng ở khay hệ thống.",
+		"hideHUDTip": "Ẩn thanh ghi hình. Hiện lại từ biểu tượng ở khay hệ thống.",
 		"closeApp": "Đóng ứng dụng",
 		"restartRecording": "Xóa bản ghi hình này và bắt đầu bản mới",
 		"cancelRecording": "Dừng và xóa bản ghi hình này",

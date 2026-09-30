@@ -54,7 +54,7 @@
 	"cursor": {
 		"name": "Bearbeitbarer Cursor",
 		"editableTip": "Bearbeitbarer Cursor: wird getrennt aufgenommen, damit du im Editor sein Aussehen ändern und Auto-Zoom nutzen kannst",
-		"systemTip": "System-Cursor: dein echter Cursor, im Video aufgenommen. Keine Umgestaltung, kein Auto-Zoom."
+		"systemTip": "System-Cursor: dein echter Cursor, im Video aufgenommen. Aussehen nicht änderbar, kein Auto-Zoom."
 	},
 	"sourceSelector": {
 		"loading": "Quellen werden geladen…",

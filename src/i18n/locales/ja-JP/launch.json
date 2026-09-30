@@ -1,9 +1,9 @@
 {
 	"tooltips": {
 		"hideHUD": "HUDを隠す",
-		"hideHUDTip": "バーを隠します。通知領域のアイコンから再表示できます。",
+		"hideHUDTip": "録画バーを隠します。通知領域のアイコンから再表示できます。",
 		"closeApp": "アプリを閉じる",
-		"restartRecording": "この録画を削除して新しく始める",
+		"restartRecording": "この録画を削除して、新しく録画を開始",
 		"cancelRecording": "停止してこの録画を削除",
 		"pauseRecording": "録画を一時停止",
 		"resumeRecording": "録画を再開",
@@ -53,7 +53,7 @@
 	},
 	"cursor": {
 		"name": "編集可能なカーソル",
-		"editableTip": "編集可能なカーソル：別に記録されるため、エディターでスタイルを変えたり自動ズームを使えます",
+		"editableTip": "編集可能なカーソル：別途記録されるため、エディターでスタイルを変更でき、自動ズームも使えます",
 		"systemTip": "システムカーソル：実際のカーソルが動画に録画されます。スタイル変更や自動ズームは使えません。"
 	},
 	"sourceSelector": {
