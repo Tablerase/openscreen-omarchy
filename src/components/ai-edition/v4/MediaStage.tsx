@@ -426,8 +426,14 @@ export function MediaStage({
 										<button
 											type="button"
 											aria-label={t("mediaStage.regenerate")}
-											disabled={selectedBusy}
-											onClick={() => void requestTranscription(selected.id, lang)}
+											// `aria-disabled`, not `disabled`: a natively disabled button cannot take focus or
+											// open its tooltip. It does nothing while a transcription runs.
+											aria-disabled={selectedBusy || undefined}
+											onClick={
+												selectedBusy
+													? undefined
+													: () => void requestTranscription(selected.id, lang)
+											}
 											style={{
 												width: 36,
 												height: 36,

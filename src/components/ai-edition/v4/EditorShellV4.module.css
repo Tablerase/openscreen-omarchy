@@ -1351,6 +1351,11 @@
 	background: var(--surface-3);
 	color: var(--fg);
 }
+/* Busy (Auto-enhance while a pass runs): still hoverable, so its tooltip opens. */
+.tlToolBtn[aria-disabled="true"] {
+	opacity: 0.55;
+	cursor: not-allowed;
+}
 /* Toggle tools (Auto-Focus) read their lit state off aria-pressed, so the styling can't
    drift from what assistive tech announces. */
 .tlToolBtn[aria-pressed="true"] {

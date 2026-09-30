@@ -1828,7 +1828,12 @@ export function V4Timeline({
 											type="button"
 											className={styles.tlToolBtn}
 											aria-label={t("toolbar.autoEnhance")}
-											disabled={autoBusy}
+											// `aria-disabled`, not `disabled`, so the tooltip still opens while a pass runs; the
+											// click must not open the menu meanwhile (Radix skips a prevented click).
+											aria-disabled={autoBusy || undefined}
+											onClick={(e) => {
+												if (autoBusy) e.preventDefault();
+											}}
 										>
 											{autoBusy ? (
 												<Loader2 className="animate-spin" size={16} />

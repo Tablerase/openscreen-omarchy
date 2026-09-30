@@ -357,8 +357,10 @@ export function RecStage({
 							{t("rec.systemAudio")}
 						</div>
 						{/* "System audio" is jargon for what the computer plays: the one row whose label
-						    alone does not say what it records. */}
-						<Tooltip content={t("rec.systemAudioTip")} side="left">
+						    alone does not say what it records. The row tooltips open above their pill: to
+						    the left they would sit on the label being read, and below the last row they
+						    would cover Start recording. */}
+						<Tooltip content={t("rec.systemAudioTip")} side="top">
 							<button
 								type="button"
 								className={`${styles.recToggleBtn}${prefs.systemAudioEnabled ? ` ${styles.on}` : ""}`}
@@ -485,7 +487,7 @@ export function RecStage({
 								<MousePointer2 size={15} />
 								{t("rec.editableCursor")}
 							</div>
-							<Tooltip content={t("rec.editableCursorTip")} side="left">
+							<Tooltip content={t("rec.editableCursorTip")} side="top">
 								<button
 									type="button"
 									className={`${styles.recToggleBtn}${editableCursor ? ` ${styles.on}` : ""}`}
@@ -530,7 +532,7 @@ export function RecStage({
 								<LayoutGrid size={15} />
 								{t("rec.hideDesktopIcons")}
 							</div>
-							<Tooltip content={desktopIconsHint} side="left">
+							<Tooltip content={desktopIconsHint} side="top">
 								<button
 									type="button"
 									className={`${styles.recToggleBtn}${prefs.hideDesktopIcons ? ` ${styles.on}` : ""}`}

@@ -607,6 +607,26 @@ describe("RecStage names and tooltips", () => {
 		expect(await tooltipOn(pill("rec.editableCursor"))).toBe("rec.editableCursorTip");
 	});
 
+	// To the left a tooltip sits on the label the user is reading, and below the last row it covers
+	// Start recording: it opens above the pill.
+	it("opens the row tooltips above their pill, never over the row's own label", async () => {
+		stubRecordingPrefs({ cursorCaptureMode: "editable-overlay" });
+		// Windows offers the desktop icons row too, so all three tooltips can be checked.
+		Object.assign(window.electronAPI as object, { getPlatform: () => "win32" });
+		renderRecStage();
+		await screen.findByText("rec.hideDesktopIcons");
+		for (const row of ["rec.systemAudio", "rec.editableCursor", "rec.hideDesktopIcons"]) {
+			const control = pill(row);
+			act(() => control.focus());
+			await screen.findByRole("tooltip");
+			expect(
+				document.querySelector('[data-slot="tooltip-content"]')?.getAttribute("data-side"),
+			).toBe("top");
+			act(() => control.blur());
+			await waitFor(() => expect(screen.queryByRole("tooltip")).toBeNull());
+		}
+	});
+
 	// Decided: the rest are labelled and say what they do, so a tooltip would repeat the label.
 	it("gives the microphone, camera and auto-zoom pills no tooltip", async () => {
 		await renderReady();

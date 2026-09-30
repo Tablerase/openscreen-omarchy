@@ -1169,8 +1169,9 @@ export function ChatStripPanel() {
 							<button
 								type="button"
 								aria-label={t("chat.renameConversation")}
-								disabled={editingSessionId === activeSessionId}
+								aria-disabled={editingSessionId === activeSessionId || undefined}
 								onClick={() => {
+									if (editingSessionId === activeSessionId) return;
 									const current = sessions.find((s) => s.id === activeSessionId);
 									if (current) beginEditTitle(activeSessionId, current.title);
 								}}

@@ -196,6 +196,18 @@ describe("ChatStripPanel tooltips", () => {
 		expect(tip.chip).toBe("Enter");
 	});
 
+	// While the title is being edited the button is greyed, but it stays hoverable and does nothing.
+	it("keeps Rename tooltip-able while the title is being edited", async () => {
+		sessions.list = oneSession;
+		renderPanel();
+		const rename = await screen.findByRole("button", { name: "chat.renameConversation" });
+		fireEvent.click(rename);
+		await screen.findByDisplayValue("Conversation 1");
+		expect(rename).toHaveAttribute("aria-disabled", "true");
+		expect(rename).not.toBeDisabled();
+		expect((await tooltipOn(rename)).text).toBe("chat.renameConversation");
+	});
+
 	it("keeps Compact tooltip-able while there is no conversation, and does nothing", async () => {
 		renderPanel();
 		const compact = await screen.findByRole("button", { name: "chat.compactContext" });
