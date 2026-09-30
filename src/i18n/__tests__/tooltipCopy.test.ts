@@ -220,6 +220,15 @@ describe("editor tooltip strings", () => {
 		expect(bakedIn).toEqual([]);
 	});
 
+	// French sets a no-break space before : ; ? !, so a tooltip never wraps with the mark starting
+	// the next line ("Ajouter Caméra plein écran" / ": affiche ...").
+	it("fr keeps punctuation with the word before it", () => {
+		const loose = editorEntries
+			.map(([namespace, key]) => [`${namespace}.${key}`, read("fr", namespace, key)] as const)
+			.filter(([, text]) => / [:;?!]/.test(text));
+		expect(loose).toEqual([]);
+	});
+
 	// One term per concept: the HUD's toggle and this row are the same setting.
 	it.each(locales)("%s calls the Record mode cursor row what the HUD calls it", (locale) => {
 		expect(read(locale, "editor", "rec.editableCursor")).toBe(

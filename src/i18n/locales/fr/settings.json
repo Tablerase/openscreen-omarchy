@@ -336,11 +336,11 @@
 		"transcript": "Transcription",
 		"captions": "Sous-titres",
 		"tips": {
-			"effects": "Composition : arrière-plan, cadre, ombre et marge",
-			"layout": "Disposition caméra : position, forme et taille de la caméra",
-			"audio": "Audio : niveau de sortie de toute la vidéo",
-			"cursor": "Curseur : style, taille et effets",
-			"transcript": "Transcription : modifiez les mots pour couper la vidéo"
+			"effects": "Composition : arrière-plan, cadre, ombre et marge",
+			"layout": "Disposition caméra : position, forme et taille de la caméra",
+			"audio": "Audio : niveau de sortie de toute la vidéo",
+			"cursor": "Curseur : style, taille et effets",
+			"transcript": "Transcription : modifiez les mots pour couper la vidéo"
 		}
 	},
 	"crop": {
