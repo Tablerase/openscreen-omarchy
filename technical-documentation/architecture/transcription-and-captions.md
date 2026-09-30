@@ -18,7 +18,7 @@ flowchart LR
     A -- "extract mono 16 kHz" --> B["transcribeAsset<br/>(src/lib/ai-edition/document/transcribe.ts)"]
     B -- "IPC: Float32Array + language" --> C["SttManager<br/>(electron/stt/index.ts)"]
     C -- "POST /inference (WAV)" --> D["whisper-stt-server<br/>(electron/native/whisper-stt/)"]
-    D -- "whisper_full() + DTW" --> E["SttTranscribeResponse<br/>(segments + wordSegments)"]
+    D -- "VAD cut + whisper_full() + DTW" --> E["SttTranscribeResponse<br/>(segments + wordSegments)"]
     E --> C
     C -- "IPC return" --> B
     B --> F["AxcutTranscript<br/>on document.transcripts[]"]
@@ -186,6 +186,23 @@ it verbatim in the response.
 
 ### Word-level alignment (DTW token timestamps)
 
+0. **Speech only** — when the Silero VAD model is on disk (`ggml-silero-v6.2.0.bin`,
+   downloaded next to the whisper model), the helper cuts the silence out of
+   the upload before whisper sees it, the way whisper.cpp's own VAD does: each
+   speech stretch plus 0.1 s of tail, 0.1 s of silence between stretches. It
+   keeps the map, and every time below goes back through it onto the upload's
+   clock. The stretches are returned as `speech` for step 5.
+   > **Not whisper_full's `vad` param.** whisper.cpp 1.9.1 maps its *segment*
+   > times back onto the original audio but not its token times, `t_dtw`
+   > included, so every word came back early by all the silence removed before
+   > it: 13 s into a 25 s clip. That shipped in 2.0.0-rc.1, and the harness
+   > missed it (times were monotonic and inside the clip, just wrong); it now
+   > checks that every word starts inside a stretch of speech.
+   >
+   > **The VAD runs on the CPU, always.** Asked for the GPU on Vulkan, 1.9.1
+   > puts the VAD weights in a Vulkan buffer, finds no GPU for the VAD's own
+   > backend and aborts in ggml (`0xC0000409`), so `SttManager` relaunched the
+   > helper with `--cpu` and every transcription lost its GPU.
 1. **Decode** — `whisper_full()` runs with the default sampling parameters
    (`WHISPER_SAMPLING_GREEDY`), returning phrase segments plus a per-token
    array.
@@ -214,6 +231,15 @@ it verbatim in the response.
    the quietest frame *is* the reported one and nothing moves. Boundaries
    past the end of the decoded audio are left untouched.
 
+   The edges of a phrase are past that reach. Its first word, DTW reports
+   0.1–0.6 s after the speech starts (measured against the VAD on a real
+   French take); its last word ends on whisper's segment end, which can stop
+   short of the speech. With `speech`, the first real word of each stretch
+   starts on the stretch's onset and its last real word ends on its offset,
+   punctuation between collapsing onto the edge. `MAX_ANCHOR_SEC` is that
+   step's knob: a word further off than 1 s is more likely the neighbour of
+   one whisper dropped, and is left alone.
+
 > Why this matters beyond caption timing: the transcript editor turns a word
 > selection into a trim of exactly `[firstWord.startSec, lastWord.endSec]`,
 > so a late boundary leaves the attack of the first removed word audible and
@@ -239,9 +265,11 @@ linked above).
 
 ### Model
 
-The single shipped artifact is `ggml-small-q8_0.bin` from
+The recogniser is `ggml-small-q8_0.bin` from
 `ggerganov/whisper.cpp` on HuggingFace: Whisper `small`, multilingual (~99
-languages), q8_0 quantised, ~264 MB. Precision is baked into the GGML file —
+languages), q8_0 quantised, ~264 MB. Beside it, the same code path fetches
+Silero VAD v6.2.0 (`ggml-org/whisper-vad`, 0.9 MB) for step 0 of the
+alignment. Precision is baked into the GGML file —
 there is no runtime `--int8` flag. `electron/stt/modelManager.ts` downloads
 the file once into the user-data cache and writes it through an atomic
 `.partial` rename, so a half-downloaded file can never be picked up as a
@@ -270,13 +298,13 @@ and the digest together.
 | Module | Role |
 |---|---|
 | `electron/stt/whisperServer.ts` | Server lifecycle; `POST /inference` client; verbose_json parser. |
-| `electron/stt/snapWordBoundaries.ts` | Re-anchors DTW word boundaries on the audio's RMS envelope (see step 5 above). |
+| `electron/stt/snapWordBoundaries.ts` | Re-anchors DTW word boundaries on the audio's RMS envelope, and phrase edges on the VAD's speech (see step 5 above). |
 | `electron/stt/wav.ts` | WAV write + temp-file cleanup helpers. |
 | `electron/stt/gpuDetector.ts` | Per-platform binary resolver (no GPU probing). |
 | `electron/stt/modelManager.ts` | Single GGML file download, SHA-256 verify, atomic write. |
 | `electron/stt/transcriptionContract.ts` | Shared IPC types (`SttBackend`, `SttWordSegment`, `SttPhraseSegment`, `SttStatusEvent`). |
 | `electron/stt/index.ts` | `SttManager` — IPC entry point; wires the pieces together. |
-| `electron/native/whisper-stt/src/main.cpp` | httplib HTTP server; calls `whisper_full()` with DTW; reports the device it bound via `ggml_backend_dev_name()`. |
+| `electron/native/whisper-stt/src/main.cpp` | httplib HTTP server; cuts the silence out with Silero VAD and maps times back (step 0); calls `whisper_full()` with DTW; reports the device it bound via `ggml_backend_dev_name()`. |
 | `electron/native/whisper-stt/CMakeLists.txt` | Pulls whisper.cpp via FetchContent; enables Metal (macOS arm64), Vulkan (Windows/Linux x64), CPU fallback everywhere; static backend linking into `whisper.dll`/`ggml.dll`. |
 
 The helper is one executable per platform; backends are baked in at build
@@ -736,9 +764,8 @@ it deletes data
 - **No C++ unit tests.** The WAV reader and the DTW-inactive guardrail
   in `electron/native/whisper-stt/src/main.cpp` are exercised only at
   runtime.
-- **Caption sync fine-tuning.** DTW `t_dtw` is a *word-end* (the moment
-  the ASR committed the token), so a caption can look a touch late on
-  screen for the first second of a word. A future tweak could blend
-  with the previous word's `t_dtw` for the start bound or mix with
-  `token.t0`; record the final choice here once verified against real
-  recordings.
+- **Word timing inside a phrase.** Phrase edges sit on the VAD (step 5), but
+  a word in the middle of continuous speech still starts on its DTW time
+  pulled back by at most 150 ms of RMS lookback. A dedicated forced aligner
+  is the upgrade path (issue #626); measure against the VAD-anchored edges
+  before adopting one.

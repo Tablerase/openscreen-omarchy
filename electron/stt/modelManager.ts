@@ -20,8 +20,9 @@ import { pipeline } from "node:stream/promises";
  * The file is verified by SHA-256 and written atomically (via .partial rename)
  * to prevent partial downloads from being treated as complete.
  *
- * Word timestamps come from whisper.cpp's native DTW token timestamps, so no
- * separate VAD model is required. See `technical-documentation/architecture/transcription-and-captions.md`.
+ * Word timestamps come from whisper.cpp's native DTW token timestamps. The
+ * Silero VAD model only decides which audio whisper decodes, and gives the
+ * speech edges phrases are anchored on. See `technical-documentation/architecture/transcription-and-captions.md`.
  */
 
 export type SttModelId = "whisper" | "silero-vad";

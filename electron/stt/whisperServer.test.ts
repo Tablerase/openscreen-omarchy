@@ -350,6 +350,34 @@ describe("WhisperServerManager", () => {
 		}
 	});
 
+	it("anchors a phrase's first word on the speech onset the helper reports", async () => {
+		const fakeJson = {
+			segments: [
+				{
+					text: " Salut",
+					start: 1.57,
+					end: 2.56,
+					words: [{ word: " Salut", start: 2.15, end: 2.56 }],
+				},
+			],
+			speech: [{ start: 1.57, end: 2.56 }],
+			backend: "whispercpp-cpu",
+		};
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => new Response(JSON.stringify(fakeJson), { status: 200 })),
+		);
+		try {
+			const mgr = new WhisperServerManager();
+			(mgr as unknown as { process: unknown; port: number }).process = {};
+			(mgr as unknown as { process: unknown; port: number }).port = 9999;
+			const result = await mgr.transcribe({ samples: new Float32Array(16_000 * 3) });
+			expect(result.wordSegments[0].startSec).toBeCloseTo(1.57, 6);
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
+
 	it("spawns whisper-stt-server with --model", async () => {
 		const fs = await import("node:fs/promises");
 		const { spawn } = await import("node:child_process");

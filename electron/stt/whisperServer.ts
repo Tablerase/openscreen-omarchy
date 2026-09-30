@@ -115,6 +115,8 @@ interface WhisperJsonResponse {
 	detected_language?: string;
 	backend?: string;
 	timing?: WhisperJsonTiming;
+	/** Silero VAD's speech intervals; absent when the helper runs without the VAD model. */
+	speech?: Array<{ start?: number | string; end?: number | string }>;
 }
 
 export class WhisperServerManager {
@@ -597,9 +599,14 @@ export class WhisperServerManager {
 					return { text, startSec, endSec: Math.max(endSec, startSec + 0.05) };
 				})
 				.filter((s) => s.text.length > 0);
-			// whisper.cpp's DTW boundaries run ~80–150 ms behind the audio, which the
-			// transcript editor turns into imprecise trims (see snapWordBoundaries.ts).
-			// Re-anchor them on the same samples whisper was given.
+			const speech = json.speech?.map((s) => ({
+				startSec: this.toSec(s.start, 0),
+				endSec: this.toSec(s.end, 0),
+			}));
+			// whisper.cpp's DTW boundaries run ~80–150 ms behind the audio, and a
+			// phrase's first word up to 0.6 s, which the transcript editor turns into
+			// imprecise trims (see snapWordBoundaries.ts). Re-anchor them on the same
+			// samples whisper was given, and on the helper's speech intervals.
 			const wordSegments: SttWordSegment[] = snapWordBoundariesToAudio(
 				raw
 					.flatMap((seg) =>
@@ -613,6 +620,7 @@ export class WhisperServerManager {
 					)
 					.filter((w) => w.word.length > 0),
 				opts.samples,
+				speech,
 			);
 			const detectedLanguage = json.detected_language ?? json.language ?? "auto";
 			const backend = this.toBackend(json.backend);
