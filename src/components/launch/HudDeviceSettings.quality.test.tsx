@@ -2,6 +2,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { WEBCAM_QUALITY_IDS } from "../../hooks/webcamCaptureTarget";
+import { TooltipProvider } from "../ui/tooltip";
 import { HudDeviceSettings, type HudDeviceSettingsLabels } from "./HudDeviceSettings";
 
 vi.mock("../../hooks/useAudioLevelMeter", () => ({
@@ -13,7 +14,7 @@ vi.mock("../../hooks/useCameraPreviewStream", () => ({
 
 const labels: HudDeviceSettingsLabels = {
 	title: "Device settings",
-	done: "Done",
+	close: "Close",
 	microphone: "Microphone",
 	camera: "Camera",
 	micLevel: "Input level",
@@ -38,27 +39,30 @@ const labels: HudDeviceSettingsLabels = {
 function renderPanel(overrides: Partial<Parameters<typeof HudDeviceSettings>[0]> = {}) {
 	const onSelectCameraQuality = vi.fn();
 	render(
-		<HudDeviceSettings
-			showMicrophone
-			micDevices={[]}
-			cameraDevices={[{ deviceId: "cam-1", label: "Logitech BRIO", groupId: "group-1" }]}
-			activeMicId={undefined}
-			activeCameraId="cam-1"
-			cameraLoading={false}
-			cameraError={null}
-			labels={labels}
-			versionLabel={null}
-			canCheckForUpdates={false}
-			checkingForUpdates={false}
-			cameraQuality="1440p"
-			onSelectCameraQuality={onSelectCameraQuality}
-			onSelectMic={vi.fn()}
-			onSelectCamera={vi.fn()}
-			onCheckForUpdates={vi.fn()}
-			onClose={vi.fn()}
-			panelRef={() => undefined}
-			{...overrides}
-		/>,
+		// The close button's tooltip needs the provider the app mounts around every window.
+		<TooltipProvider>
+			<HudDeviceSettings
+				showMicrophone
+				micDevices={[]}
+				cameraDevices={[{ deviceId: "cam-1", label: "Logitech BRIO", groupId: "group-1" }]}
+				activeMicId={undefined}
+				activeCameraId="cam-1"
+				cameraLoading={false}
+				cameraError={null}
+				labels={labels}
+				versionLabel={null}
+				canCheckForUpdates={false}
+				checkingForUpdates={false}
+				cameraQuality="1440p"
+				onSelectCameraQuality={onSelectCameraQuality}
+				onSelectMic={vi.fn()}
+				onSelectCamera={vi.fn()}
+				onCheckForUpdates={vi.fn()}
+				onClose={vi.fn()}
+				panelRef={() => undefined}
+				{...overrides}
+			/>
+		</TooltipProvider>,
 	);
 	return { onSelectCameraQuality };
 }

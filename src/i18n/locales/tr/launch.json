@@ -1,15 +1,20 @@
 {
 	"tooltips": {
 		"hideHUD": "Kontrol panelini gizle",
+		"hideHUDTip": "Araç çubuğunu gizle. Bildirim alanındaki simgeden yeniden gösterebilirsiniz.",
 		"closeApp": "Uygulamayı kapat",
-		"restartRecording": "Kaydı yeniden başlat",
-		"cancelRecording": "Kaydı iptal et",
+		"restartRecording": "Bu kaydı sil ve yenisini başlat",
+		"cancelRecording": "Durdur ve bu kaydı sil",
 		"pauseRecording": "Kaydı duraklat",
 		"resumeRecording": "Kayda devam et",
 		"useVerticalTray": "Dikey araç çubuğunu kullan",
 		"useHorizontalTray": "Yatay araç çubuğunu kullan",
-		"openStudio": "Stüdyoyu aç",
-		"openNotes": "Notları aç",
+		"changeSource": "Başka bir ekran veya pencere seç",
+		"systemAudio": "Sistem sesi: bilgisayarın çaldığı sesi kaydeder",
+		"microphone": "Mikrofon: sesinizi kaydeder",
+		"camera": "Kamera: sizi editörde taşıyabileceğiniz ayrı bir katman olarak kaydeder",
+		"openStudio": "Stüdyoyu aç: kayıtlarınızın editörü",
+		"openNotes": "Notları aç: kayıt sırasında okuyacağınız metin",
 		"openNotesPlaceholder": "Notlarınızı buraya yazın...",
 		"notesToolbar": {
 			"bold": "Kalın",
@@ -31,21 +36,11 @@
 		}
 	},
 	"audio": {
-		"enableSystemAudio": "Sistem sesini etkinleştir",
-		"disableSystemAudio": "Sistem sesini devre dışı bırak",
-		"enableMicrophone": "Mikrofonu etkinleştir",
-		"disableMicrophone": "Mikrofonu devre dışı bırak",
-		"defaultMicrophone": "Varsayılan Mikrofon",
 		"systemAudio": "Sistem sesi",
 		"microphone": "Mikrofon",
-		"on": "Açık",
-		"off": "Kapalı",
 		"inputDevice": "Giriş cihazı"
 	},
 	"webcam": {
-		"enableWebcam": "Kamerayı etkinleştir",
-		"disableWebcam": "Kamerayı devre dışı bırak",
-		"defaultCamera": "Varsayılan Kamera",
 		"searching": "Aranıyor...",
 		"noneFound": "Kamera bulunamadı",
 		"unavailable": "Kamera kullanılamıyor",
@@ -57,8 +52,9 @@
 		"quality2160p": "4K"
 	},
 	"cursor": {
-		"useEditableCursorHint": "Düzenlenebilir imleci kullan: otomatik yakınlaştırmayı ve imleç efektlerini yeniden açar",
-		"useSystemCursorHint": "Sistem imlecini kullan: otomatik yakınlaştırmayı ve imleç efektlerini kapatır"
+		"name": "Düzenlenebilir imleç",
+		"editableTip": "Düzenlenebilir imleç: ayrı kaydedilir; editörde stilini değiştirebilir, otomatik yakınlaştırma kullanabilirsiniz",
+		"systemTip": "Sistem imleci: gerçek imleciniz, videoya kaydedilir. Stil değişikliği ve otomatik yakınlaştırma yok."
 	},
 	"sourceSelector": {
 		"loading": "Kaynaklar yükleniyor...",
@@ -72,10 +68,12 @@
 	"recording": {
 		"selectSource": "Lütfen kayıt için bir kaynak seçin",
 		"systemPicker": "Sisteminiz neyi paylaşacağınızı soracak",
-		"inProgress": "Kaydediliyor",
+		"start": "Kaydı başlat",
+		"stop": "Kaydı durdur ve kaydet",
 		"saving": "Kaydediliyor..."
 	},
 	"language": "Dil",
+	"languageWithName": "Dil: {{language}}",
 	"systemLanguagePrompt": {
 		"title": "Sistem dilinizi kullanmak ister misiniz?",
 		"description": "Sistem diliniz {{language}} olarak algılandı. OpenScreen i {{language}} diline geçirmek ister misiniz?",
@@ -90,7 +88,7 @@
 	},
 	"deviceSettings": {
 		"title": "Cihaz ayarları",
-		"done": "Tamam",
+		"close": "Kapat",
 		"micLevel": "Giriş seviyesi",
 		"micHint": "Mikrofonunuzu test etmek için konuşun",
 		"noMicrophones": "Mikrofon bulunamadı",
