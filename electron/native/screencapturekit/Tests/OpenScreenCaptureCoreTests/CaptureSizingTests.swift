@@ -150,4 +150,15 @@ final class CaptureSizingTests: XCTestCase {
 		XCTAssertEqual(defaultVideoBitrate(width: 320, height: 240, fps: 30), 2_000_000)
 		XCTAssertEqual(defaultVideoBitrate(width: 3840, height: 2160, fps: 120), 60_000_000)
 	}
+
+	// MARK: - Keyframe interval (#937)
+
+	func testKeyFrameIntervalIsOneSecondOfFrames() {
+		XCTAssertEqual(videoKeyFrameInterval(fps: 60), 60)
+		XCTAssertEqual(videoKeyFrameInterval(fps: 30), 30)
+	}
+
+	func testKeyFrameIntervalNeverFallsBelowOneFrame() {
+		XCTAssertEqual(videoKeyFrameInterval(fps: 0), 1)
+	}
 }

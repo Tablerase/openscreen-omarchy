@@ -152,6 +152,9 @@ final class ScreenCaptureRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
 	private var totalPausedDuration = CMTime.zero
 	/// Sample queue only. See `VideoTimestampGate` for the failure it exists to prevent.
 	private var videoTimestampGate = VideoTimestampGate()
+	/// Sample queue only. Frames the writer input was not ready for, or refused, reported in
+	/// `recording-stopped` so a macOS drop rate can be measured at all (#937).
+	private var droppedVideoFrames = 0
 	private var nativeMicrophoneEnabled = false
 	private var outputWidth = 1920
 	private var outputHeight = 1080
@@ -454,8 +457,11 @@ final class ScreenCaptureRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
 					"captureBounds": captureBoundsPayload(),
 				])
 			} else if !appended {
+				droppedVideoFrames += 1
 				reportWriterFailure("video append")
 			}
+		} else {
+			droppedVideoFrames += 1
 		}
 	}
 
@@ -786,6 +792,11 @@ final class ScreenCaptureRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
 				// particular run happened to die. Reordering off is 3/3 clean across
 				// both rates, and a SIGKILL at 25s still leaves 27 readable `moof`.
 				AVVideoAllowFrameReorderingKey: false,
+				// A keyframe every second, by frame count and by time: a still screen
+				// delivers fewer frames than the fps, and the count alone would then
+				// stretch the GOP, which is the editor's scrub cost (#937).
+				AVVideoMaxKeyFrameIntervalKey: videoKeyFrameInterval(fps: request.video.fps),
+				AVVideoMaxKeyFrameIntervalDurationKey: 1,
 			],
 		]
 		let input = AVAssetWriterInput(mediaType: .video, outputSettings: settings)
@@ -908,7 +919,9 @@ final class ScreenCaptureRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
 			}
 		}
 
-		let refusedVideoFrames = sampleQueue.sync { videoTimestampGate.rejectedCount }
+		let (refusedVideoFrames, droppedFrames) = sampleQueue.sync {
+			(videoTimestampGate.rejectedCount, droppedVideoFrames)
+		}
 		if refusedVideoFrames > 1 {
 			emit([
 				"event": "warning",
@@ -931,6 +944,7 @@ final class ScreenCaptureRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
 			emit([
 				"event": "recording-stopped",
 				"screenPath": request.outputs.screenPath,
+				"droppedVideoFrames": droppedFrames,
 			])
 		} else {
 			emitError(

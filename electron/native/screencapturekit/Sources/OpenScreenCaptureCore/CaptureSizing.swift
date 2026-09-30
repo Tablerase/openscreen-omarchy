@@ -86,3 +86,10 @@ public func defaultVideoBitrate(width: Int, height: Int, fps: Int) -> Int {
 	let pixelsPerSecond = Double(max(1, width)) * Double(max(1, height)) * Double(max(1, fps))
 	return min(max(Int(pixelsPerSecond * bitsPerPixel), 2_000_000), 60_000_000)
 }
+
+/// The H.264 keyframe interval, in frames: one second of video, the interval Windows uses.
+/// Left to VideoToolbox it had no bound, and the editor's scrub cost is the GOP length: a
+/// seek decodes from the keyframe before it (getopenscreen/openscreen#937).
+public func videoKeyFrameInterval(fps: Int) -> Int {
+	max(1, fps)
+}
