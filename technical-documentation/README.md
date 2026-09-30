@@ -39,6 +39,7 @@ who reads and writes the project document.
 | [build-and-packaging.md](engineering/build-and-packaging.md) | Build commands, native artifacts, per-platform packaging |
 | [ci-workflows.md](engineering/ci-workflows.md) | The GitHub Actions tiers and how artifacts flow between them |
 | [release-and-secrets.md](engineering/release-and-secrets.md) | Cutting and promoting a release; the secrets it needs |
+| [tooltips.md](engineering/tooltips.md) | Writing and building tooltips and accessible names: the rules, the toggle pattern, the shared terms |
 
 ## Testing
 
