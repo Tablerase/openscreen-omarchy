@@ -216,7 +216,7 @@
 		"trimHiddenDuration": "{{duration}}s media gốc bị ẩn khỏi dòng thời gian đã chỉnh sửa.",
 		"restoreDeleteTrim": "Khôi phục (xóa cắt)",
 		"collapseInspector": "Thu gọn bảng kiểm tra",
-		"editClipTip": "Chỉnh sửa clip: cắt, điểm bắt đầu và kết thúc",
+		"editClipTip": "Chỉnh sửa clip: cắt xén, điểm bắt đầu và kết thúc",
 		"captionsDescription": "Tạo phụ đề đồng bộ theo từng từ từ bản ghi lời thoại và thả vào dòng thời gian.",
 		"generateCaptions": "Tạo phụ đề",
 		"cropDescription": "Đóng khung lại bản ghi — chọn tỷ lệ khung hình và phóng to vào vùng bạn muốn giữ lại.",

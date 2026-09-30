@@ -119,7 +119,7 @@
 		"autoZoom": "Zoom automatico dopo la registrazione",
 		"hideDesktopIcons": "Nascondi icone della scrivania",
 		"hideDesktopIconsHintMac": "Esclude le icone della scrivania dalle registrazioni dello schermo. Restano sulla tua scrivania.",
-		"hideDesktopIconsHintWindows": "Copre le icone del desktop durante la registrazione. Tornano alla fine.",
+		"hideDesktopIconsHintWindows": "Copre le icone della scrivania durante la registrazione. Tornano alla fine.",
 		"on": "Attivo",
 		"off": "Disattivo",
 		"loading": "Caricamento…",

@@ -2,10 +2,10 @@
 	"buttons": {
 		"addZoom": "Zoom zum aktuellen Zeitpunkt hinzufügen",
 		"autoFocusAll": "Auto-Fokus für alle Zooms",
-		"autoFocusAllTip": "Alle Zooms folgen dem Cursor. Aus: du wählst den Fokus jedes Zooms selbst.",
+		"autoFocusAllTip": "Alle Zooms folgen dem Cursor. Aus: Du wählst den Fokus jedes Zooms selbst.",
 		"clearTimeline": "Alle Zooms, Trims, Tempowechsel, Anmerkungen und Vollbild-Kameras entfernen. Clips, Audio und Untertitel bleiben.",
 		"addTrim": "Trim hinzufügen: entfernt einen Abschnitt des Videos zum aktuellen Zeitpunkt",
-		"addAnnotation": "Text, Pfeil, Bild oder Unschärfe zum aktuellen Zeitpunkt hinzufügen",
+		"addAnnotation": "Text, Pfeil, Bild oder Weichzeichner zum aktuellen Zeitpunkt hinzufügen",
 		"addSpeed": "Tempowechsel zum aktuellen Zeitpunkt hinzufügen",
 		"addCameraFullscreen": "Vollbild-Kamera hinzufügen: zeigt die Kamera im Vollbild zum aktuellen Zeitpunkt"
 	},

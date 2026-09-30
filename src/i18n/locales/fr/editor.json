@@ -166,7 +166,7 @@
 		"initializingModel": "Démarrage du modèle vocal",
 		"pendingTranscription": "Transcription en attente",
 		"transcriptionFailed": "Échec de la transcription",
-		"cpuBackendHint": "Exécution sur le processeur : environ 2× plus lent que sur le GPU",
+		"cpuBackendHint": "Exécution sur le CPU : environ 2× plus lent que sur le GPU",
 		"noTranscript": "Aucune transcription",
 		"generationFailedHint": "Échec de la génération — choisissez une langue et régénérez.",
 		"detectedLanguage": "Langue détectée : {{language}}",
