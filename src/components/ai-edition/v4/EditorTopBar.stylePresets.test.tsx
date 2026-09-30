@@ -5,7 +5,9 @@
 import "@testing-library/jest-dom";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { I18nProvider } from "@/contexts/I18nContext";
+import { ShortcutsProvider } from "@/contexts/ShortcutsContext";
 import { LOCALE_STORAGE_KEY } from "@/i18n/config";
 import {
 	DEFAULT_EDITOR_SETTINGS,
@@ -92,30 +94,34 @@ function renderPane() {
 	localStorage.setItem(LOCALE_STORAGE_KEY, "en");
 	return render(
 		<I18nProvider>
-			<EditorTopBar
-				mode="edit"
-				onModeChange={noop}
-				projectTitle="Project"
-				dirty={false}
-				canExport={false}
-				canUndo={false}
-				canRedo={false}
-				chatOpen={false}
-				actions={{
-					openProject: noop,
-					newProject: noop,
-					save: noop,
-					export: noop,
-					openSettings: noop,
-					renameProject: noop,
-					toggleChat: noop,
-					openProviderSettings: noop,
-					showAbout: noop,
-					checkForUpdates: noop,
-					undo: noop,
-					redo: noop,
-				}}
-			/>
+			<ShortcutsProvider>
+				<TooltipProvider>
+					<EditorTopBar
+						mode="edit"
+						onModeChange={noop}
+						projectTitle="Project"
+						dirty={false}
+						canExport={false}
+						canUndo={false}
+						canRedo={false}
+						chatOpen={false}
+						actions={{
+							openProject: noop,
+							newProject: noop,
+							save: noop,
+							export: noop,
+							openSettings: noop,
+							renameProject: noop,
+							toggleChat: noop,
+							openProviderSettings: noop,
+							showAbout: noop,
+							checkForUpdates: noop,
+							undo: noop,
+							redo: noop,
+						}}
+					/>
+				</TooltipProvider>
+			</ShortcutsProvider>
 		</I18nProvider>,
 	);
 }

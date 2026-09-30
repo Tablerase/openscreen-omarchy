@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { Profiler, type ProfilerOnRenderCallback } from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -85,6 +85,11 @@ function clip(startSec: number, endSec: number) {
 /** The asset every clip above points at. No `cameraTrack`: this recording has no webcam,
  *  which is what the Full Camera button is gated on. */
 const NO_CAMERA_ASSET = { id: "a1", label: "rec", durationSec: TOTAL_SEC };
+/** The same recording, with a camera track: the Full Camera button is offered. */
+const CAMERA_ASSET = {
+	...NO_CAMERA_ASSET,
+	cameraTrack: { sourcePath: "/tmp/cam.webm", startMs: 0, offsetMs: 0, visible: true },
+};
 
 /** By default one 30-minute clip carrying a single one-second annotation, and a store that
  *  holds an edit region (so Clear timeline shows); `overrides` replaces any `tl` member. */
@@ -440,7 +445,7 @@ describe("V4Timeline create-from-toolbar", () => {
 	});
 
 	it("puts Clear timeline last, behind a divider, after the Add Full Camera button", () => {
-		renderTimeline();
+		renderTimeline(undefined, undefined, [CAMERA_ASSET]);
 		const toolbar = toolbarOf();
 		const buttons = Array.from(toolbar.querySelectorAll("button"));
 		const clear = screen.getByLabelText("buttons.clearTimeline");
@@ -457,19 +462,15 @@ describe("V4Timeline create-from-toolbar", () => {
 	// #353. A camera-fullscreen region grows the webcam overlay, so with no webcam on the
 	// timeline it renders nothing in the preview and nothing in the export — the region is
 	// stored and forgotten. `addCameraFullscreen` now refuses to write one; the button says
-	// so before it is clicked instead of looking like it worked.
-	it("disables Add Full Camera when no clip on the timeline has a camera", () => {
+	// so before it is clicked instead of looking like it worked. Absent, not greyed out: an
+	// inoperative control is hidden, and a greyed one with no reason is a puzzle.
+	it("shows no Add Full Camera button when no clip on the timeline has a camera", () => {
 		renderTimeline();
-		expect(screen.getByLabelText("buttons.addCameraFullscreen")).toBeDisabled();
+		expect(screen.queryByLabelText("buttons.addCameraFullscreen")).not.toBeInTheDocument();
 	});
 
-	it("enables Add Full Camera as soon as a clip's asset carries one", () => {
-		renderTimeline(undefined, undefined, [
-			{
-				...NO_CAMERA_ASSET,
-				cameraTrack: { sourcePath: "/tmp/cam.webm", startMs: 0, offsetMs: 0, visible: true },
-			},
-		]);
+	it("shows Add Full Camera as soon as a clip's asset carries one", () => {
+		renderTimeline(undefined, undefined, [CAMERA_ASSET]);
 		expect(screen.getByLabelText("buttons.addCameraFullscreen")).toBeEnabled();
 	});
 
@@ -840,5 +841,109 @@ describe("V4Timeline audio lane drag", () => {
 		// The head is pinned; only the tail comes in, so the span gets shorter.
 		expect(placement.startMs).toBe(100_000);
 		expect(placement.endMs - placement.startMs).toBeLessThan(60_000);
+	});
+});
+
+describe("V4Timeline toolbar tooltips", () => {
+	afterEach(() => {
+		(window as unknown as { electronAPI?: unknown }).electronAPI = undefined;
+	});
+
+	const toolbarOf = () => screen.getByRole("toolbar", { name: "toolbar.timelineTools" });
+
+	/** Opens a toolbar button's tooltip the way the keyboard does (focus opens it at once), and
+	 *  returns the text and the chip of the visible copy. */
+	async function tooltipOn(name: string) {
+		const control = screen.getByLabelText(name);
+		act(() => control.focus());
+		await screen.findByRole("tooltip");
+		const visible = document.querySelector('[data-slot="tooltip-content"]');
+		const result = {
+			text: screen.getByRole("tooltip").textContent,
+			chip: visible?.querySelector("kbd")?.textContent ?? null,
+		};
+		act(() => control.blur());
+		return result;
+	}
+
+	it("shows each creator's default key as a chip, and no key in its name", async () => {
+		renderTimeline(undefined, undefined, [CAMERA_ASSET]);
+		const chips: Record<string, string | null> = {};
+		for (const name of [
+			"buttons.addZoom",
+			"buttons.addTrim",
+			"buttons.addSpeed",
+			"buttons.addAnnotation",
+			"buttons.addCameraFullscreen",
+		]) {
+			chips[name] = (await tooltipOn(name)).chip;
+			// The name is the string alone: a "(Z)" in it would be a second, stale copy of the key.
+			expect(screen.getByLabelText(name)).toHaveAccessibleName(name);
+		}
+		expect(chips).toEqual({
+			"buttons.addZoom": "Z",
+			"buttons.addTrim": "T",
+			"buttons.addSpeed": "S",
+			"buttons.addAnnotation": "A",
+			"buttons.addCameraFullscreen": "C",
+		});
+	});
+
+	// The five creators are remappable, so the chip must follow the saved binding, not the default.
+	it("shows the key the user remapped, not the default", async () => {
+		const getShortcuts = vi.fn(async () => ({
+			addZoom: { key: "q" },
+			addTrim: { key: "t", ctrl: true, shift: true },
+		}));
+		(window as unknown as { electronAPI?: unknown }).electronAPI = { getShortcuts };
+		renderTimeline();
+		await vi.waitFor(() => expect(getShortcuts).toHaveBeenCalled());
+		await act(() => Promise.resolve());
+		expect((await tooltipOn("buttons.addZoom")).chip).toBe("Q");
+		expect((await tooltipOn("buttons.addTrim")).chip).toBe("Ctrl + Shift + T");
+		// Unset actions keep their default.
+		expect((await tooltipOn("buttons.addSpeed")).chip).toBe("S");
+	});
+
+	it("gives Auto-Focus one name and one tip for both states, with the state in aria-pressed", async () => {
+		renderTimeline();
+		const button = screen.getByLabelText("buttons.autoFocusAll");
+		expect(button).toHaveAttribute("aria-pressed");
+		const before = await tooltipOn("buttons.autoFocusAll");
+		fireEvent.click(button);
+		expect(screen.getByLabelText("buttons.autoFocusAll")).toBe(button);
+		const after = await tooltipOn("buttons.autoFocusAll");
+		expect(before.text).toBe("buttons.autoFocusAllTip");
+		expect(after.text).toBe(before.text);
+		expect(before.chip).toBeNull();
+	});
+
+	it("says what Clear timeline removes in its tooltip, without a chip", async () => {
+		renderTimeline();
+		const clear = await tooltipOn("buttons.clearTimeline");
+		expect(clear.text).toBe("buttons.clearTimeline");
+		expect(clear.chip).toBeNull();
+	});
+
+	// A native `title` next to the shared tooltip is a second, slower tooltip on the same button.
+	it("uses no native title on the toolbar buttons that have the shared tooltip", () => {
+		renderTimeline(undefined, undefined, [CAMERA_ASSET]);
+		const buttons = Array.from(toolbarOf().querySelectorAll("button"));
+		expect(buttons.length).toBeGreaterThanOrEqual(8);
+		for (const button of buttons) expect(button).not.toHaveAttribute("title");
+	});
+
+	it("names a pill on hover only when it cannot draw its own label", () => {
+		// A hairline pill draws nothing, so the title is the only place its name is.
+		renderTimeline();
+		const hairline = screen.getByTitle("toolbar.newAnnotation");
+		expect(hairline.textContent).toBe("");
+
+		// One that fills the timeline draws its label, and a title would repeat it.
+		cleanup();
+		renderTimeline(undefined, { id: "ann1", startMs: 0, endMs: TOTAL_SEC * 1000 });
+		const wide = document.querySelector("[class*=lanePill]") as HTMLElement;
+		expect(wide).toHaveTextContent("toolbar.newAnnotation");
+		expect(wide).not.toHaveAttribute("title");
 	});
 });

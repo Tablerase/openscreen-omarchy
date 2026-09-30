@@ -235,7 +235,8 @@
 	background: var(--surface-2);
 	color: var(--fg);
 }
-.iconBtn:disabled {
+.iconBtn:disabled,
+.iconBtn[aria-disabled="true"] {
 	opacity: 0.45;
 	cursor: not-allowed;
 }

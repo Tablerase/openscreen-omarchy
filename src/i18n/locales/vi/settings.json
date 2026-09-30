@@ -275,7 +275,7 @@
 		"fadeIn": "Mờ vào",
 		"remove": "Xóa bản nhạc",
 		"loop": "Lặp",
-		"slipHint": "Giữ Alt và kéo để trượt âm thanh bên trong",
+		"slipHint": "Giữ {{modifier}} và kéo để trượt âm thanh bên trong bản âm thanh",
 		"help": "Âm lượng, fade và lặp của rãnh âm thanh này. Nó được trộn lên trên bản ghi trong xem trước và khi xuất. Rãnh nhạc tự động nhỏ lại khi có người nói. Kéo rãnh trên dòng thời gian để di chuyển hoặc đổi kích thước, hoặc giữ Alt và kéo để trượt âm thanh bên trong.",
 		"add": "Thêm bản âm thanh",
 		"mute": "Tắt tiếng"
@@ -334,7 +334,14 @@
 	},
 	"facets": {
 		"transcript": "Bản ghi lời thoại",
-		"captions": "Phụ đề"
+		"captions": "Phụ đề",
+		"tips": {
+			"effects": "Bố cục hình ảnh: nền, khung, bóng đổ và phần đệm",
+			"layout": "Bố cục camera: vị trí, hình dạng và kích thước của camera",
+			"audio": "Âm thanh: mức đầu ra của toàn bộ video",
+			"cursor": "Con trỏ: kiểu, kích thước và hiệu ứng",
+			"transcript": "Bản ghi lời thoại: chỉnh sửa từ để cắt video"
+		}
 	},
 	"crop": {
 		"title": "Cắt xén",

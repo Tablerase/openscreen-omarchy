@@ -121,3 +121,127 @@ describe("long-tail tooltip strings", () => {
 		expect(untranslated).toEqual([]);
 	});
 });
+
+// The editor's own block: the timeline toolbar and transport, the top bar, the inspector rail,
+// Record mode and the chat. Kept apart from the list above so the two grow independently.
+const EDITOR_TOOLTIP_KEYS: Record<string, string[]> = {
+	timeline: [
+		"buttons.addZoom",
+		"buttons.addTrim",
+		"buttons.addSpeed",
+		"buttons.addAnnotation",
+		"buttons.addCameraFullscreen",
+		"buttons.autoFocusAll",
+		"buttons.autoFocusAllTip",
+		"buttons.clearTimeline",
+		"toolbar.dragToReorderHint",
+		"toolbar.editInOutPoints",
+		"toolbar.deleteClip",
+		"labels.panTip",
+		"labels.zoomTip",
+	],
+	editor: [
+		"transport.play",
+		"transport.pause",
+		"topbar.toggleChatPanel",
+		"inspector.editClipTip",
+		"rec.systemAudioTip",
+		"rec.editableCursor",
+		"rec.editableCursorTip",
+		"rec.hideDesktopIconsHintMac",
+		"rec.hideDesktopIconsHintWindows",
+		"chat.contextTooltip",
+		"chat.compactContext",
+		"chat.aiSettings",
+		"chat.history",
+		"chat.newConversation",
+		"chat.clickToRename",
+		"chat.renameConversation",
+		"chat.deleteConversation",
+		"chat.rewindToMessage",
+		"chat.rewindTip",
+		"chat.copyMessage",
+		"chat.send",
+		"chat.composerDisabledNoProvider",
+		"mediaStage.regenerate",
+		"mediaStage.regenerateTip",
+		"mediaStage.cpuBackendHint",
+	],
+	settings: [
+		"facets.tips.effects",
+		"facets.tips.layout",
+		"facets.tips.audio",
+		"facets.tips.cursor",
+		"facets.tips.transcript",
+		"audioTrack.slipHint",
+	],
+	shortcuts: ["fixedActions.undo", "fixedActions.redo"],
+};
+// Tooltips that end in a chip built from the user's live binding (formatBinding). A key written
+// into the string would lie after a remap, and inside Arabic text it breaks the order of words.
+const CHIP_KEYS: Record<string, string[]> = {
+	timeline: [
+		"buttons.addZoom",
+		"buttons.addTrim",
+		"buttons.addSpeed",
+		"buttons.addAnnotation",
+		"buttons.addCameraFullscreen",
+	],
+	editor: ["transport.play", "transport.pause", "chat.send"],
+};
+const editorEntries = Object.entries(EDITOR_TOOLTIP_KEYS).flatMap(([namespace, keys]) =>
+	keys.map((key) => [namespace, key] as const),
+);
+const chipEntries = Object.entries(CHIP_KEYS).flatMap(([namespace, keys]) =>
+	keys.map((key) => [namespace, key] as const),
+);
+
+describe("editor tooltip strings", () => {
+	it.each(locales)("%s keeps the placeholders of en and stays short", (locale) => {
+		const placeholderDrift: string[] = [];
+		const tooLong: string[] = [];
+		for (const [namespace, key] of editorEntries) {
+			const text = read(locale, namespace, key);
+			const source = read("en", namespace, key);
+			if (placeholders(text).join() !== placeholders(source).join()) {
+				placeholderDrift.push(`${namespace}.${key}: ${text}`);
+			}
+			if (text.length > MAX_LENGTH) tooLong.push(`${namespace}.${key} (${text.length})`);
+		}
+		expect(placeholderDrift).toEqual([]);
+		expect(tooLong).toEqual([]);
+	});
+
+	it.each(locales)("%s writes no key into a tooltip that shows a shortcut chip", (locale) => {
+		const bakedIn = chipEntries
+			.map(([namespace, key]) => [`${namespace}.${key}`, read(locale, namespace, key)] as const)
+			// "(Z)", "(Space)", "（Z）" and the like, in any script.
+			.filter(([, text]) => /[(（]\s*(?:[A-Z]|Space|Enter|Ctrl[^)）]*)\s*[)）]/.test(text));
+		expect(bakedIn).toEqual([]);
+	});
+
+	// One term per concept: the HUD's toggle and this row are the same setting.
+	it.each(locales)("%s calls the Record mode cursor row what the HUD calls it", (locale) => {
+		expect(read(locale, "editor", "rec.editableCursor")).toBe(
+			read(locale, "launch", "cursor.name"),
+		);
+	});
+
+	// Clear timeline has no confirmation, so its tooltip is where the loss is said: what goes
+	// (Full Camera included) and what stays.
+	it("says what Clear timeline removes and what it keeps", () => {
+		const text = read("en", "timeline", "buttons.clearTimeline");
+		for (const goes of ["zooms", "trims", "speeds", "annotations", "Full Camera"]) {
+			expect(text).toContain(goes);
+		}
+		expect(text).toContain("Clips, audio and captions stay");
+	});
+
+	it.each(locales)("%s does not call the moving line on the timeline the playhead", (locale) => {
+		// It is the word for the mouse cursor in pt-BR, ru and tr: the strings say "current time".
+		const uses = editorEntries
+			.map(([namespace, key]) => [`${namespace}.${key}`, read(locale, namespace, key)] as const)
+			.filter(([, text]) => /playhead/i.test(text));
+		expect(uses).toEqual([]);
+	});
+});

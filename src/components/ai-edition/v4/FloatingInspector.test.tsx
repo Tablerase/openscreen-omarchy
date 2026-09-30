@@ -1,7 +1,17 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom";
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+	act,
+	fireEvent,
+	type RenderOptions,
+	render as renderWithoutTooltips,
+	screen,
+	waitFor,
+	within,
+} from "@testing-library/react";
+import type { ReactElement } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { assetSchema, clipSchema, createEmptyDocument } from "@/lib/ai-edition/schema";
 import { useProjectStore } from "@/lib/ai-edition/store/projectStore";
 import { nativeBridgeClient } from "@/native";
@@ -51,6 +61,17 @@ vi.mock("../CaptionsPane", () => ({
 
 import { AnnotationSizeControl, AnnotationSizeField, FloatingInspector } from "./FloatingInspector";
 
+// The rail's buttons have tooltips, and the app's root provides the provider they need.
+function render(ui: ReactElement, options?: Omit<RenderOptions, "wrapper">) {
+	return renderWithoutTooltips(ui, { wrapper: TooltipProvider, ...options });
+}
+
+class StubResizeObserver {
+	observe = vi.fn();
+	unobserve = vi.fn();
+	disconnect = vi.fn();
+}
+
 describe("FloatingInspector", () => {
 	const defaultProps: React.ComponentProps<typeof FloatingInspector> = {
 		facet: "layout" as const,
@@ -77,6 +98,67 @@ describe("FloatingInspector", () => {
 		// lucide Camera icon renders an svg with class lucide-camera
 		const svg = layoutBtn.querySelector("svg");
 		expect(svg?.classList.contains("lucide-camera")).toBe(true);
+	});
+
+	// The rail is icon-only. The name is the pane's title (which is also its heading), and the tip
+	// says what the pane holds: a second key, because the title cannot carry the list.
+	describe("rail tooltips", () => {
+		beforeEach(() => {
+			vi.stubGlobal("ResizeObserver", StubResizeObserver);
+		});
+		afterEach(() => {
+			vi.unstubAllGlobals();
+		});
+
+		async function tooltipOf(name: string) {
+			const button = screen.getByRole("button", { name });
+			act(() => button.focus());
+			await screen.findByRole("tooltip");
+			const visible = document.querySelector<HTMLElement>('[data-slot="tooltip-content"]');
+			const text = screen.getByRole("tooltip").textContent;
+			const side = visible?.getAttribute("data-side");
+			act(() => button.blur());
+			await waitFor(() => expect(screen.queryByRole("tooltip")).toBeNull());
+			return { text, side, hasChip: Boolean(visible?.querySelector("kbd")) };
+		}
+
+		const oneClip = [
+			clipSchema.parse({
+				id: "c1",
+				assetId: "a1",
+				sourceStartSec: 0,
+				sourceEndSec: 10,
+				timelineStartSec: 0,
+				timelineEndSec: 10,
+				origin: "user",
+			}),
+		];
+
+		it("says what each facet holds, on the side that does not cover the next button", async () => {
+			render(<FloatingInspector {...defaultProps} clips={oneClip} />);
+
+			const names: Array<[string, string]> = [
+				["settings.effects.title", "settings.facets.tips.effects"],
+				["settings.layout.title", "settings.facets.tips.layout"],
+				["settings.audio.title", "settings.facets.tips.audio"],
+				["settings.facets.transcript", "settings.facets.tips.transcript"],
+				["editor.editClipDialog.title", "editor.inspector.editClipTip"],
+			];
+			for (const [name, tip] of names) {
+				const opened = await tooltipOf(name);
+				expect(opened.text).toBe(tip);
+				expect(opened.side).toBe("left");
+				expect(opened.hasChip).toBe(false);
+			}
+		});
+
+		it("uses no native title on any rail button", () => {
+			render(<FloatingInspector {...defaultProps} clips={oneClip} />);
+			const rail = screen.getByRole("button", { name: "settings.layout.title" }).parentElement;
+			const buttons = Array.from(rail?.querySelectorAll("button") ?? []);
+			expect(buttons.length).toBeGreaterThanOrEqual(5);
+			for (const button of buttons) expect(button).not.toHaveAttribute("title");
+		});
 	});
 
 	it("renders collapse button with editor.inspector.collapseInspector and collapses inspector when clicked", () => {
@@ -421,6 +503,17 @@ describe("FloatingInspector", () => {
 			render(<FloatingInspector {...defaultProps} facet="cursor" />);
 			expect(await screen.findByTestId("cursor-pane")).toBeInTheDocument();
 			expect(cursorFacet()).toHaveAttribute("aria-pressed", "true");
+		});
+
+		it("says what the cursor facet holds, once it is offered", async () => {
+			vi.stubGlobal("ResizeObserver", StubResizeObserver);
+			openProject(3);
+			render(<FloatingInspector {...defaultProps} />);
+			const facet = await screen.findByRole("button", { name: "settings.cursor.title" });
+			act(() => facet.focus());
+			expect((await screen.findByRole("tooltip")).textContent).toBe("settings.facets.tips.cursor");
+			expect(facet).not.toHaveAttribute("title");
+			vi.unstubAllGlobals();
 		});
 	});
 });

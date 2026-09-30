@@ -275,7 +275,7 @@
 		"fadeIn": "Zesílení",
 		"remove": "Smazat stopu",
 		"loop": "Opakovat",
-		"slipHint": "Alt-přetažením posuňte zvuk uvnitř",
+		"slipHint": "Podržte {{modifier}} a přetažením posuňte zvuk uvnitř stopy",
 		"help": "Hlasitost, přechody a opakování pro tuto zvukovou stopu. Mixuje se s nahrávkou v náhledu i při exportu. Hudební stopa se při mluvení sama ztiší. Přetáhněte stopu na časové ose pro přesunutí nebo změnu velikosti, nebo podržte Alt a přetáhněte pro posun zvuku uvnitř.",
 		"add": "Přidat zvukovou stopu",
 		"mute": "Ztlumit"
@@ -334,7 +334,14 @@
 	},
 	"facets": {
 		"transcript": "Přepis",
-		"captions": "Titulky"
+		"captions": "Titulky",
+		"tips": {
+			"effects": "Kompozice: pozadí, rám, stín a odsazení",
+			"layout": "Rozvržení kamery: poloha, tvar a velikost kamery",
+			"audio": "Zvuk: výstupní úroveň celého videa",
+			"cursor": "Kurzor: styl, velikost a efekty",
+			"transcript": "Přepis: upravujte slova a stříhejte video"
+		}
 	},
 	"crop": {
 		"title": "Oříznutí",

@@ -275,7 +275,7 @@
 		"fadeIn": "Dissolvenza in entrata",
 		"remove": "Elimina traccia",
 		"loop": "Ripeti",
-		"slipHint": "Alt + trascina per far scorrere l’audio all’interno",
+		"slipHint": "Tieni premuto {{modifier}} e trascina per far scorrere l'audio nella traccia",
 		"help": "Volume, dissolvenze e loop di questa traccia audio. Viene mixata sopra la registrazione nell’anteprima e nell’esportazione. Una traccia musicale si abbassa da sola mentre qualcuno parla. Trascina la traccia sulla timeline per spostarla o ridimensionarla, oppure tieni premuto Alt e trascina per far scorrere l’audio all’interno.",
 		"add": "Aggiungi traccia audio",
 		"mute": "Muto"
@@ -334,7 +334,14 @@
 	},
 	"facets": {
 		"transcript": "Trascrizione",
-		"captions": "Sottotitoli"
+		"captions": "Sottotitoli",
+		"tips": {
+			"effects": "Composizione: sfondo, cornice, ombra e spaziatura",
+			"layout": "Disposizione camera: posizione, forma e dimensione della fotocamera",
+			"audio": "Audio: livello di uscita di tutto il video",
+			"cursor": "Cursore: stile, dimensione ed effetti",
+			"transcript": "Trascrizione: modifica le parole per tagliare il video"
+		}
 	},
 	"crop": {
 		"title": "Ritaglia",

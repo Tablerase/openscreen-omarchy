@@ -275,7 +275,7 @@
 		"fadeIn": "Einblenden",
 		"remove": "Spur löschen",
 		"loop": "Wiederholen",
-		"slipHint": "Mit Alt ziehen, um das Audio darin zu verschieben",
+		"slipHint": "{{modifier}} halten und ziehen, um das Audio in der Spur zu verschieben",
 		"help": "Lautstärke, Blenden und Wiederholung für diese Audiospur. Sie wird in der Vorschau und im Export über die Aufnahme gemischt. Eine Musikspur wird automatisch leiser, während jemand spricht. Zieh die Spur auf der Timeline, um sie zu verschieben oder ihre Länge zu ändern, oder halte Alt und zieh, um das Audio darin zu verschieben.",
 		"add": "Audiospur hinzufügen",
 		"mute": "Stumm"
@@ -334,7 +334,14 @@
 	},
 	"facets": {
 		"transcript": "Transkript",
-		"captions": "Untertitel"
+		"captions": "Untertitel",
+		"tips": {
+			"effects": "Komposition: Hintergrund, Rahmen, Schatten und Abstand",
+			"layout": "Kamera-Layout: Position, Form und Größe der Kamera",
+			"audio": "Audio: Ausgangspegel des ganzen Videos",
+			"cursor": "Cursor: Stil, Größe und Effekte",
+			"transcript": "Transkript: Wörter bearbeiten, um das Video zu schneiden"
+		}
 	},
 	"crop": {
 		"title": "Zuschneiden",

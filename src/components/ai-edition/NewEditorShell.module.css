@@ -1512,7 +1512,8 @@ textarea.control {
 	background: var(--surface-3);
 	color: var(--fg-2);
 }
-.stripActions button:disabled {
+.stripActions button:disabled,
+.stripActions button[aria-disabled="true"] {
 	opacity: 0.4;
 	cursor: not-allowed;
 }
@@ -1666,8 +1667,9 @@ textarea.control {
 	cursor: pointer;
 	transition: background var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease);
 }
-.sendBtn:hover:not(:disabled) { background: var(--brand-lo); transform: scale(1.05); }
-.sendBtn:disabled {
+.sendBtn:hover:not(:disabled):not([aria-disabled="true"]) { background: var(--brand-lo); transform: scale(1.05); }
+.sendBtn:disabled,
+.sendBtn[aria-disabled="true"] {
 	background: color-mix(in oklab, var(--fg) 8%, transparent);
 	color: var(--muted);
 	cursor: not-allowed;
@@ -2467,7 +2469,8 @@ textarea.control {
   cursor: pointer;
 }
 .iconBtn:hover { background: var(--surface-3); color: var(--fg); }
-.iconBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+.iconBtn:disabled,
+.iconBtn[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
 
 /* A labelled sibling of .iconBtn. Captions lost their own tab (issue #560), so the
    control that replaces it cannot be an icon you must hover to identify: the whole

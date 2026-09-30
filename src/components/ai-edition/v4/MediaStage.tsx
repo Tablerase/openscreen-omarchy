@@ -1,6 +1,7 @@
 import { ArrowDown, Film, Plus, RotateCw, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useI18n, useScopedT } from "@/contexts/I18nContext";
 import type { AxcutAsset, AxcutTranscript, TranscriptLanguageCode } from "@/lib/ai-edition/schema";
 import { useProjectStore } from "@/lib/ai-edition/store/projectStore";
@@ -420,28 +421,30 @@ export function MediaStage({
 											</option>
 										))}
 									</select>
-									<button
-										type="button"
-										title={t("mediaStage.regenerate")}
-										aria-label={t("mediaStage.regenerate")}
-										disabled={selectedBusy}
-										onClick={() => void requestTranscription(selected.id, lang)}
-										style={{
-											width: 36,
-											height: 36,
-											flexShrink: 0,
-											display: "grid",
-											placeItems: "center",
-											borderRadius: 9,
-											color: "var(--fg-2)",
-											background: "var(--surface-2)",
-											border: "1px solid var(--border)",
-											cursor: selectedBusy ? "not-allowed" : "pointer",
-											opacity: selectedBusy ? 0.6 : 1,
-										}}
-									>
-										<RotateCw size={14} className={selectedBusy ? "animate-spin" : undefined} />
-									</button>
+									{/* A bare refresh icon beside a language list: the tip says what it redoes. */}
+									<Tooltip content={t("mediaStage.regenerateTip")}>
+										<button
+											type="button"
+											aria-label={t("mediaStage.regenerate")}
+											disabled={selectedBusy}
+											onClick={() => void requestTranscription(selected.id, lang)}
+											style={{
+												width: 36,
+												height: 36,
+												flexShrink: 0,
+												display: "grid",
+												placeItems: "center",
+												borderRadius: 9,
+												color: "var(--fg-2)",
+												background: "var(--surface-2)",
+												border: "1px solid var(--border)",
+												cursor: selectedBusy ? "not-allowed" : "pointer",
+												opacity: selectedBusy ? 0.6 : 1,
+											}}
+										>
+											<RotateCw size={14} className={selectedBusy ? "animate-spin" : undefined} />
+										</button>
+									</Tooltip>
 								</div>
 							</div>
 

@@ -275,7 +275,7 @@
 		"fadeIn": "Fondu d'entrée",
 		"remove": "Supprimer la piste",
 		"loop": "Boucle",
-		"slipHint": "Alt + glisser pour déplacer l’audio à l’intérieur",
+		"slipHint": "Maintenez {{modifier}} et faites glisser pour déplacer l'audio dans la piste",
 		"help": "Volume, fondus et boucle de cette piste audio. Elle se mixe par-dessus l’enregistrement dans l’aperçu et à l’export. Une piste de musique baisse d’elle-même quand quelqu’un parle. Faites glisser la piste sur la timeline pour la déplacer ou la redimensionner, ou maintenez Alt en glissant pour déplacer l’audio à l’intérieur.",
 		"add": "Ajouter une piste audio",
 		"mute": "Muet"
@@ -334,7 +334,14 @@
 	},
 	"facets": {
 		"transcript": "Transcription",
-		"captions": "Sous-titres"
+		"captions": "Sous-titres",
+		"tips": {
+			"effects": "Composition : arrière-plan, cadre, ombre et marge",
+			"layout": "Disposition caméra : position, forme et taille de la caméra",
+			"audio": "Audio : niveau de sortie de toute la vidéo",
+			"cursor": "Curseur : style, taille et effets",
+			"transcript": "Transcription : modifiez les mots pour couper la vidéo"
+		}
 	},
 	"crop": {
 		"title": "Recadrage",

@@ -275,7 +275,7 @@
 		"fadeIn": "Fade in",
 		"remove": "Excluir faixa",
 		"loop": "Repetir",
-		"slipHint": "Alt + arrastar para deslizar o áudio dentro",
+		"slipHint": "Segure {{modifier}} e arraste para deslizar o áudio dentro da faixa",
 		"help": "Volume, fades e repetição desta faixa de áudio. Ela é mixada sobre a gravação na visualização e na exportação. Uma faixa de música abaixa sozinha enquanto alguém fala. Arraste a faixa na linha do tempo para movê-la ou redimensioná-la, ou segure Alt e arraste para deslizar o áudio dentro dela.",
 		"add": "Adicionar faixa de áudio",
 		"mute": "Silenciar"
@@ -334,7 +334,14 @@
 	},
 	"facets": {
 		"transcript": "Transcrição",
-		"captions": "Legendas"
+		"captions": "Legendas",
+		"tips": {
+			"effects": "Composição: fundo, moldura, sombra e espaçamento",
+			"layout": "Layout da câmera: posição, formato e tamanho da câmera",
+			"audio": "Áudio: nível de saída de todo o vídeo",
+			"cursor": "Cursor: estilo, tamanho e efeitos",
+			"transcript": "Transcrição: edite as palavras para cortar o vídeo"
+		}
 	},
 	"crop": {
 		"title": "Cortar",
