@@ -1572,6 +1572,26 @@ int main() {
             expect("mixer-resume-continues-at-the-pause", first != left.end() && std::abs(at - pausedAtMs) <= 40.0, detail);
         }
 
+        // (5) A pause followed by a stop, as the helper ends every take (#942):
+        // the track ends at the pause, not at the stop that comes later.
+        {
+            const auto packet = dcPacket(0.5f);
+            double pausedAtMs = 0.0;
+            const auto left = runTake(false, true, [&](AudioMixer& mixer, Clock::time_point t0) {
+                capture(
+                    [&] { mixer.pushMicrophone(packet.data(), static_cast<DWORD>(packet.size())); },
+                    t0, 40, 1000, 0);
+                pausedAtMs = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+                mixer.setPaused(true);
+                std::this_thread::sleep_for(milliseconds(300));
+            });
+            const double lengthMs = msAt(left.size());
+            char detail[96]{};
+            sprintf_s(detail, "track %.1f ms long, paused at %.1f ms", lengthMs, pausedAtMs);
+            std::cout << "JITTER_RAW stop-after-pause " << detail << std::endl;
+            expect("mixer-track-ends-at-the-pause-before-a-stop", std::abs(lengthMs - pausedAtMs) <= 20.0, detail);
+        }
+
         // (4) The same with a resume that follows the pause at once, before the
         // mixer has had a chance to see the pause: the resume must wait for the
         // cushion to be written, or it throws the cushion away and what follows

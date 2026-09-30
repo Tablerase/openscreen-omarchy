@@ -1549,6 +1549,17 @@ int wmain(int argc, wchar_t* argv[]) {
 
     control.waitForStop();
 
+    // The take ends here, for the sound as for the picture: the video writer
+    // stops on this same request. The mixer is clock-driven, so left running
+    // it would go on writing chunks through the half second the steps below
+    // take, and every take ended with ~0.5 s of audio past its video
+    // (getopenscreen/openscreen#942, measured on three takes). A pause writes
+    // what the cushion holds up to this instant and then nothing; one already
+    // in place is left where it is.
+    if (audioMixer) {
+        audioMixer->setPaused(true);
+    }
+
     const auto stopStart = std::chrono::steady_clock::now();
     auto stopElapsedMs = [&] {
         return std::chrono::duration_cast<std::chrono::milliseconds>(
