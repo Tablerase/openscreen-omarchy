@@ -1525,7 +1525,9 @@ mod tests {
         // Three seconds at 30 fps with audio, then a simulated kill: no trailer,
         // no flush of the write buffer, no interleave queue drained (#944).
         let (width, height, fps) = (64, 32, 30);
-        let output = std::env::temp_dir().join("openscreen-killed-muxer.mp4");
+        // Per process, so two test runs on one machine never share the file.
+        let output = std::env::temp_dir()
+            .join(format!("openscreen-killed-muxer-{}.mp4", std::process::id()));
         let _ = std::fs::remove_file(&output);
         let mut video = VideoEncoder::open(
             VideoParams { width, height, fps, bitrate: 1_000_000 },
@@ -1590,6 +1592,7 @@ mod tests {
         // slides 21 ms off its capture time (see FRAGMENT_OPTIONS).
         let one_frame = 1.0 / f64::from(fps);
         assert!((second_frame_at - one_frame).abs() < 1e-3, "frame 1 at {second_frame_at} s");
+        let _ = std::fs::remove_file(&output);
     }
 
     #[test]
