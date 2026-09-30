@@ -20,9 +20,10 @@
 //
 // The edges of a phrase are the exception. Its first word, DTW reports 0.1–0.6 s
 // late (measured against Silero VAD on a real French recording), far past what
-// the lookback can reach; its last word ends where whisper's segment ends, which
-// can stop short of the speech. When the helper sent its speech intervals, both
-// are pulled onto the edges of the stretch of speech they belong to.
+// the lookback can reach. Its last word ends where whisper's segment ends, which
+// can stop short of the speech, or where the next word starts, which runs on
+// through the whole pause. When the helper sent its speech intervals, both are
+// put on the edges of the stretch of speech they belong to.
 
 import type { SttVadSegment, SttWordSegment } from "./transcriptionContract";
 
@@ -45,12 +46,19 @@ const MIN_WORD_SEC = 0.02;
 
 /**
  * How far a phrase's first word may start after its speech, or its last word
- * end before it, and still be pulled onto that edge — the calibration knob of
+ * end before it, and still be stretched onto that edge — the calibration knob of
  * the anchoring step, sized above the measured 0.1–0.6 s. Past it, the word is
  * more likely a neighbour of one whisper dropped, and stretching it over that
- * audio would be a guess.
+ * audio would be a guess. Cutting a word back to where the speech stops needs
+ * no such bound: the VAD says nothing is said past it.
  */
 const MAX_ANCHOR_SEC = 1;
+
+/**
+ * Audio the helper keeps past each speech offset, as whisper.cpp does, so a soft
+ * ending survives. A word DTW reports in there belongs to the stretch it trails.
+ */
+const TAIL_SEC = 0.1;
 
 /** French puts a space before `!`, `?`, `:` and `;`, so whisper emits them as words. */
 const isPunctuation = (word: string) => /^[\p{P}\p{S}]+$/u.test(word);
@@ -73,20 +81,22 @@ function rmsEnvelope(samples: Float32Array): Float32Array {
 }
 
 /**
- * Pull the first and last word of every speech stretch onto the stretch's
- * edges. The onset already carries the VAD's 30 ms pad, so a cut there lands
- * just before the attack. What sits past an edge moves with it: the previous
- * word's shared boundary, and any punctuation DTW dropped inside the speech,
- * which collapses to a point on the edge.
+ * Put the first and last word of every speech stretch on the stretch's edges.
+ * The onset already carries the VAD's 30 ms pad, so a cut there lands just
+ * before the attack. Words own the speech and no pause: the last word ends on
+ * the offset, and the punctuation closing the phrase collapses to a point
+ * there, wherever DTW dropped it.
  */
 function anchorOnSpeech(words: SttWordSegment[], speech: SttVadSegment[]): SttWordSegment[] {
 	const out = words.map((w) => ({ ...w }));
 	let k = 0;
 	for (let i = 0; i < speech.length; i++) {
 		const { startSec: onset, endSec: offset } = speech[i];
-		const previousEnd = i > 0 ? speech[i - 1].endSec : Number.NEGATIVE_INFINITY;
-		// The phrase's first word: the first real word reported after the previous stretch ended.
-		while (k < out.length && (out[k].startSec < previousEnd || isPunctuation(out[k].word))) k++;
+		const previousTail =
+			i > 0 ? Math.min(speech[i - 1].endSec + TAIL_SEC, onset) : Number.NEGATIVE_INFINITY;
+		const tail = Math.min(offset + TAIL_SEC, speech[i + 1]?.startSec ?? Number.POSITIVE_INFINITY);
+		// The phrase's first word: the first real word reported past the previous stretch's tail.
+		while (k < out.length && (out[k].startSec < previousTail || isPunctuation(out[k].word))) k++;
 		if (k === out.length) break;
 		const late = out[k].startSec - onset;
 		if (late > 0 && late <= MAX_ANCHOR_SEC && out[k].startSec < offset) {
@@ -96,18 +106,16 @@ function anchorOnSpeech(words: SttWordSegment[], speech: SttVadSegment[]): SttWo
 				out[j].startSec = Math.min(out[j].startSec, onset);
 			}
 		}
-		// Its last word: the last real word reported before the speech stops.
+		// Its last word: the last real word reported before its tail ends.
 		let m = -1;
-		for (let j = k; j < out.length && out[j].startSec < offset; j++) {
+		for (let j = k; j < out.length && out[j].startSec < tail; j++) {
 			if (!isPunctuation(out[j].word)) m = j;
 		}
-		const early = m < 0 ? 0 : offset - out[m].endSec;
-		if (early > 0 && early <= MAX_ANCHOR_SEC) {
-			out[m].endSec = offset;
-			for (let j = m + 1; j < out.length && out[j].startSec < offset; j++) {
-				out[j].startSec = offset;
-				out[j].endSec = Math.max(out[j].endSec, offset);
-			}
+		if (m < 0 || offset - out[m].endSec > MAX_ANCHOR_SEC) continue;
+		out[m].endSec = Math.max(offset, out[m].startSec + MIN_WORD_SEC);
+		for (let j = m + 1; j < out.length && isPunctuation(out[j].word); j++) {
+			out[j].startSec = out[m].endSec;
+			out[j].endSec = out[m].endSec;
 		}
 	}
 	return out;

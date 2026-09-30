@@ -233,12 +233,16 @@ it verbatim in the response.
 
    The edges of a phrase are past that reach. Its first word, DTW reports
    0.1–0.6 s after the speech starts (measured against the VAD on a real
-   French take); its last word ends on whisper's segment end, which can stop
-   short of the speech. With `speech`, the first real word of each stretch
-   starts on the stretch's onset and its last real word ends on its offset,
-   punctuation between collapsing onto the edge. `MAX_ANCHOR_SEC` is that
-   step's knob: a word further off than 1 s is more likely the neighbour of
-   one whisper dropped, and is left alone.
+   French take). Its last word ends on whisper's segment end, which can stop
+   short of the speech, or on the next word's start, which runs on through the
+   pause. With `speech`, the first real word of each stretch starts on the
+   stretch's onset and its last real word ends on its offset; the punctuation
+   closing the phrase collapses to a point there. Words own the speech, never
+   the pause: deleting a phrase's last word keeps the pause after it. A word
+   reported in the 0.1 s tail the helper keeps past an offset belongs to that
+   stretch. `MAX_ANCHOR_SEC` bounds the stretching only: a word further off
+   than 1 s is more likely the neighbour of one whisper dropped, and is left
+   alone.
 
 > Why this matters beyond caption timing: the transcript editor turns a word
 > selection into a trim of exactly `[firstWord.startSec, lastWord.endSec]`,
