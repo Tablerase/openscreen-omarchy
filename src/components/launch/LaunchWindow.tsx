@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useI18n, useScopedT } from "@/contexts/I18nContext";
 import { getAvailableLocales, getLocaleName } from "@/i18n/loader";
+import { offersEditableCursor } from "@/lib/editableCursorAvailability";
 import { loadUserPreferences, saveUserPreferences } from "@/lib/userPreferences";
 import { nativeBridgeClient } from "@/native";
 import { canRecordMicrophone } from "@/utils/platformUtils";
@@ -244,31 +245,14 @@ export function LaunchWindow() {
 					// you get two cursors. Verified against a real recording at the
 					// time. The helper is what makes the control mean something,
 					// because it owns the video and never asks WebRTC for anything.
-					const offersCursorMode =
-						platform === "win32" || platform === "darwin" || platform === "linux";
 					setIsLinuxHud(platform === "linux");
 					// Without its native helper, macOS or Linux records through the browser, which
-					// always bakes in the system cursor (`effectiveBrowserCursorMode`). Switching
-					// to the editable cursor then restores nothing: an option that changes nothing
-					// is not shown, so the toggle waits for the helper's answer, and a failed
-					// answer keeps it hidden. Windows has no such fallback and no probe.
-					const probe =
-						platform === "darwin"
-							? window.electronAPI?.isNativeMacCaptureAvailable
-							: platform === "linux"
-								? window.electronAPI?.isNativeLinuxCaptureAvailable
-								: undefined;
-					if (!probe) {
-						setSupportsCursorModeToggle(offersCursorMode);
-						return;
-					}
-					probe()
-						.then((result) => {
-							if (!cancelled) setSupportsCursorModeToggle(result.success && result.available);
-						})
-						.catch(() => {
-							if (!cancelled) setSupportsCursorModeToggle(false);
-						});
+					// always bakes in the system cursor: an option that changes nothing is not
+					// shown, so the toggle waits for the helper's answer, and a failed answer keeps
+					// it hidden. The editor's Record mode asks the same question, in one place.
+					void offersEditableCursor(platform, window.electronAPI).then((offered) => {
+						if (!cancelled) setSupportsCursorModeToggle(offered);
+					});
 				}
 			})
 			.catch(() => {
