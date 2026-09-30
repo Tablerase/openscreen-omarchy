@@ -2028,6 +2028,9 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 				"error",
 				() => {
 					setRecording(false);
+					// The main process was told a take started (below), so it has to hear
+					// that it ended too, or the tray and the display-sleep blocker stay on.
+					window.electronAPI?.setRecordingState(false);
 				},
 				{ once: true },
 			);
