@@ -175,4 +175,25 @@ describe("snapWordBoundariesToAudio with speech intervals", () => {
 			["c", 3, 4],
 		]);
 	});
+
+	it("keeps a word with the stretch whisper heard it in, once the snap pulls it before the onset", () => {
+		// 80 ms between two stretches: the snap moves "b" from 2.10 to the silence
+		// at 2.07, inside what would be the first stretch's tail. It still opens
+		// the second stretch and keeps its audio.
+		const samples = audioWithSilences(6, [[2, 2.08]]);
+		const words = [
+			word({ word: "a", startSec: 1, endSec: 2.1 }),
+			word({ word: "b", startSec: 2.1, endSec: 2.4 }),
+			word({ word: "c", startSec: 2.4, endSec: 3 }),
+		];
+		const speech = [
+			{ startSec: 1, endSec: 2 },
+			{ startSec: 2.08, endSec: 3 },
+		];
+		expect(times(snapWordBoundariesToAudio(words, samples, speech))).toEqual([
+			["a", 1, 2],
+			["b", 2.07, 2.4],
+			["c", 2.4, 3],
+		]);
+	});
 });

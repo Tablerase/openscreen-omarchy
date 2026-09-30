@@ -86,36 +86,44 @@ function rmsEnvelope(samples: Float32Array): Float32Array {
  * before the attack. Words own the speech and no pause: the last word ends on
  * the offset, and the punctuation closing the phrase collapses to a point
  * there, wherever DTW dropped it.
+ *
+ * Which stretch a word belongs to is read off `reportedStarts`, whisper's own
+ * times: the RMS snap pulls a phrase's first word back into the silence before
+ * it, which can lie in the previous stretch's tail.
  */
-function anchorOnSpeech(words: SttWordSegment[], speech: SttVadSegment[]): SttWordSegment[] {
+function anchorOnSpeech(
+	words: SttWordSegment[],
+	reportedStarts: number[],
+	speech: SttVadSegment[],
+): SttWordSegment[] {
 	const out = words.map((w) => ({ ...w }));
 	let k = 0;
 	for (let i = 0; i < speech.length; i++) {
 		const { startSec: onset, endSec: offset } = speech[i];
-		const previousTail =
-			i > 0 ? Math.min(speech[i - 1].endSec + TAIL_SEC, onset) : Number.NEGATIVE_INFINITY;
+		// A stretch owns the words reported before the end of the audio the helper
+		// kept for it: its speech, plus a tail that stops short of the next one.
 		const tail = Math.min(offset + TAIL_SEC, speech[i + 1]?.startSec ?? Number.POSITIVE_INFINITY);
-		// The phrase's first word: the first real word reported past the previous stretch's tail.
-		while (k < out.length && (out[k].startSec < previousTail || isPunctuation(out[k].word))) k++;
-		if (k === out.length) break;
-		const late = out[k].startSec - onset;
-		if (late > 0 && late <= MAX_ANCHOR_SEC && out[k].startSec < offset) {
-			out[k].startSec = onset;
-			for (let j = k - 1; j >= 0 && out[j].endSec > onset; j--) {
+		let first = -1;
+		let last = -1;
+		for (; k < out.length && reportedStarts[k] < tail; k++) {
+			if (isPunctuation(out[k].word)) continue;
+			if (first < 0) first = k;
+			last = k;
+		}
+		if (first < 0) continue;
+		const late = out[first].startSec - onset;
+		if (late > 0 && late <= MAX_ANCHOR_SEC) {
+			out[first].startSec = onset;
+			for (let j = first - 1; j >= 0 && out[j].endSec > onset; j--) {
 				out[j].endSec = onset;
 				out[j].startSec = Math.min(out[j].startSec, onset);
 			}
 		}
-		// Its last word: the last real word reported before its tail ends.
-		let m = -1;
-		for (let j = k; j < out.length && out[j].startSec < tail; j++) {
-			if (!isPunctuation(out[j].word)) m = j;
-		}
-		if (m < 0 || offset - out[m].endSec > MAX_ANCHOR_SEC) continue;
-		out[m].endSec = Math.max(offset, out[m].startSec + MIN_WORD_SEC);
-		for (let j = m + 1; j < out.length && isPunctuation(out[j].word); j++) {
-			out[j].startSec = out[m].endSec;
-			out[j].endSec = out[m].endSec;
+		if (offset - out[last].endSec > MAX_ANCHOR_SEC) continue;
+		out[last].endSec = Math.max(offset, out[last].startSec + MIN_WORD_SEC);
+		for (let j = last + 1; j < out.length && isPunctuation(out[j].word); j++) {
+			out[j].startSec = out[last].endSec;
+			out[j].endSec = out[last].endSec;
 		}
 	}
 	return out;
@@ -167,5 +175,11 @@ export function snapWordBoundariesToAudio(
 			endSec: Math.max(snap(w.endSec), startSec + MIN_WORD_SEC),
 		};
 	});
-	return speech ? anchorOnSpeech(snapped, speech) : snapped;
+	return speech
+		? anchorOnSpeech(
+				snapped,
+				words.map((w) => w.startSec),
+				speech,
+			)
+		: snapped;
 }
