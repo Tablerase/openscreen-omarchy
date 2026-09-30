@@ -58,7 +58,7 @@ If the icon has to swap and the wording has to follow (Play, Pause), it is an ac
 
 | | Limit |
 |---|---|
-| English text | 80 characters. 95 for the strings that define the two cursor modes |
+| English text | 80 characters. 95 for the strings that define the two cursor modes, and for Clear timeline, which has no confirmation and must say what goes and what stays |
 | Sentences | 2, one idea each. Punctuation at the end only when there are two |
 | Layout | `max-w-[260px]`, `dir="auto"`, balanced lines. 3 lines in English, 4 in French, Italian and Spanish |
 | Gap | 8px from the trigger. Where the trigger sits inside a padded surface (a button in the HUD bar), the gap is measured from that surface's edge |
@@ -80,9 +80,9 @@ If the icon has to swap and the wording has to follow (Play, Pause), it is an ac
 | Mode tabs | title "Media" on the text "Media" | no tooltip |
 | HUD record | "Display 1" (the source name) | "Start recording", then "Stop and save the recording" |
 | HUD cancel | "Cancel recording" (deletes it, no confirmation) | "Stop and delete this recording" |
-| Timeline | "Add zoom (Z)" | "Add a zoom at the playhead" and a chip |
+| Timeline | "Add zoom (Z)" | "Add a zoom at the current time" and a chip |
 | Timeline | "Auto-Focus on for all zooms, click to switch all to manual", changing with `aria-pressed` | name "Auto-Focus for all zooms", one tooltip |
-| Timeline | "Clear timeline" | "Remove all zooms, trims, speeds, annotations and Full Camera. Clips stay." |
+| Timeline | "Clear timeline" | "Remove all zooms, trims, speeds, annotations and Full Camera. Clips, audio and captions stay." |
 | HUD hide | "Hide recording bar" | add how to get it back: "Show it again from the tray icon." |
 | Chat | "Compact context" | "Summarize earlier messages to use less context" |
 | Segmented rows | every option has a title equal to its text | title only for an icon-only option |
@@ -113,7 +113,7 @@ One term per concept, across the HUD, Record mode and the editor. Where a locale
 | What the computer plays | **System audio** | computer audio, desktop audio | Gloss it once in the tooltip: "the sound your computer plays". |
 | The voice input | **Microphone** | mic | Never abbreviate in English. |
 | One recording session and its file | **Recording** | take, clip (a clip is a piece on the timeline), capture | "Take" is a code word (`discardRecordingId`). It does not appear in any UI string. |
-| The moving line on the timeline | **playhead** | current time marker, cursor | Also the reference for "add at the playhead". Never call it "cursor": the cursor is the mouse pointer. |
+| The moving line on the timeline | **playhead** | current time marker, cursor | Never call it "cursor": the cursor is the mouse pointer. In a tooltip write "at the current time", not "at the playhead": in pt-BR, ru and tr the word for playhead is the word for the mouse cursor. |
 | The editing window | **Studio** as the name of the HUD button, **the editor** in sentences | "Editor" as a button name | The HUD tooltip defines the name once: "Open Studio: the editor for your recordings". |
 | A region on the timeline | zoom, trim, speed change, annotation, Full Camera | segment, block, clip (for a region) | Same words as the region pills ("Zoom 1", "Trim 1"). |
 | Toggle position | on / off | enabled / disabled, active | Off is a state, not a verb: never "turn off" or "switch on". |

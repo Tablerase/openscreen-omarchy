@@ -137,14 +137,14 @@ The in-app source selector below is the Windows one, and the macOS one before 15
 Record mode is the editor's pre-flight panel for the HUD: it edits the same settings, and *Start recording* hands them over. The HUD is closed while the editor is open, so every check here that ends in a take goes through that hand-over.
 
 - [ ] On a first run, with no saved project (otherwise the editor reopens the most recent one), open the editor and confirm the empty state leads with *Record your screen*, followed by *Import a video* and an *Open project* link; activate *Record your screen* and confirm it opens the **Record** tab.
-- [ ] Confirm Record mode lists Source, System audio, Microphone (absent on macOS 13 and 14), Camera, Cursor highlight, Auto-zoom after recording (only while Cursor highlight is On), and Hide desktop icons (macOS and Windows only).
+- [ ] Confirm Record mode lists Source, System audio, Microphone (absent on macOS 13 and 14), Camera, Editable cursor, Auto-zoom after recording (only while Editable cursor is On), and Hide desktop icons (macOS and Windows only). Editable cursor and Auto-zoom are both absent when capture falls back to the browser (macOS or Linux without their native helper), as the HUD's cursor button is.
 - [ ] Turn Camera on and confirm a live preview; turn Microphone on and confirm its level meter moves when you speak; switch each device from its menu and confirm the preview or the meter follows.
 - [ ] Pick a source from the Source row and confirm its name shows on the row and on the preview's badge. On Linux the row is plain text, "Your system will ask what to share", with nothing to pick.
 - [ ] Activate *Cancel* and confirm the editor returns to Edit mode.
 - [ ] Activate *Start recording* and confirm the editor window closes, the HUD comes back with the same source, audio, camera and cursor settings, and the take starts without another click (through the source picker first when no source was picked).
-- [ ] With Cursor highlight and Auto-zoom after recording On, click a few places during a take, stop, and confirm the editor opens with zoom regions already on the timeline at those clicks.
+- [ ] With Editable cursor and Auto-zoom after recording On, click a few places during a take, stop, and confirm the editor opens with zoom regions already on the timeline at those clicks.
 - [ ] Turn Auto-zoom after recording Off, record again, and confirm the new take opens with no zoom region; restart the app and confirm the row is still Off.
-- [ ] Turn Cursor highlight Off and confirm the Auto-zoom after recording row disappears; confirm a take recorded that way opens without automatic zooms.
+- [ ] Turn Editable cursor Off and confirm the Auto-zoom after recording row disappears; confirm a take recorded that way opens without automatic zooms.
 - [ ] On Windows, turn Hide desktop icons On, record a screen, and confirm the recording shows the wallpaper where the icons were, and that the icons are back when the take stops. On macOS, confirm the icons are absent from the recording while they stay on the desktop.
 
 ### Webcam capture quality — v2.0.0
@@ -229,16 +229,17 @@ The helper waits up to 3 s for the camera's first visible frame before starting 
 - [ ] Confirm the dot after the project name reports "Saved" on hover after the rename: edits are saved as they land, with no save step.
 - [ ] Switch among the Media, Edit, and Record tabs and confirm each selected tab visibly changes state.
 - [ ] Return to Edit after visiting Media and Record and confirm the preview, timeline, and inspector are back and usable. Media shows the media library over a short arrange-only timeline; Record shows its settings panel and no timeline.
-- [ ] In Edit mode, activate "Toggle chat panel" and confirm the chat panel opens or closes without changing the project.
+- [ ] In Edit mode, activate the *Chat panel* button in the top bar and confirm the chat panel opens or closes without changing the project.
+- [ ] Hover the timeline toolbar, the top bar (chat panel, undo, redo), the inspector rail and the Record mode rows with real mouse moves. Confirm each icon-only control names itself in one tooltip and shows no native one beside it, that the Add buttons, Play or Pause, Undo, Redo and Send show your own key as a chip, and that no tooltip covers the next control you would reach for (the rail opens its tooltips to the left).
 - [ ] Resize the chat panel by its visible divider and confirm the preview area resizes without moving the timeline content.
 - [ ] Resize the timeline by its visible top divider and confirm the timeline height changes without a layout crash.
 
 ## Transport and preview
 
-The transport sits in the timeline header: Play / Pause and the time readout, nothing else. The ruler seeks, and Left / Right step 1/60 s.
+The transport sits in the timeline header: Play (which becomes Pause) and the time readout, nothing else. The ruler seeks, and Left / Right step 1/60 s.
 
-- [ ] Activate Play / Pause (also `Space`) and confirm `[data-testid="preview"]` changes `data-is-playing` from `false` to `true`.
-- [ ] Activate play/pause again and confirm playback stops and the preview reports `data-is-playing="false"`.
+- [ ] Activate *Play* (also `Space`, or the key you set in the shortcuts dialog) and confirm `[data-testid="preview"]` changes `data-is-playing` from `false` to `true`.
+- [ ] Activate *Pause* and confirm playback stops and the preview reports `data-is-playing="false"`.
 - [ ] Confirm the transport time readout advances while playback is running.
 - [ ] Confirm the playhead advances with the video instead of remaining at its starting position.
 - [ ] Seek while paused and confirm the preview frame changes to the selected time.
@@ -282,13 +283,13 @@ The transport sits in the timeline header: Play / Pause and the time readout, no
 
 ## Regions (trim/skip, zoom, speed, annotation)
 
-The timeline toolbar adds each kind: *Add zoom (Z)*, *Add trim (T)*, *Add speed (S)*, *Add annotation (A)*, *Add Full Camera (C)*. Selecting a pill opens its settings in the inspector.
+The timeline toolbar adds each kind at the current time: *Add a zoom* (`Z`), *Add a trim* (`T`), *Add a speed change* (`S`), *Add text, an arrow, an image or a blur* (an annotation, `A`), *Add Full Camera* (`C`, offered only in a project with a camera). The key shown in each tooltip is your own binding. Selecting a pill opens its settings in the inspector.
 
 - [ ] Drag a trim region's left edge and confirm its start time changes.
 - [ ] Drag a trim region's right edge and confirm its end time changes.
 - [ ] Scrub across a trim region and confirm the preview skips the marked interval during playback.
 - [ ] Select a trim, activate *Bring this part back* in its inspector, and confirm the interval is restored.
-- [ ] Activate *Add zoom (Z)* and confirm a zoom region appears.
+- [ ] Activate *Add a zoom at the current time* and confirm a zoom region appears.
 - [ ] Select the zoom region and pick each level in the *Zoom level* row, then type one in the field beside it; confirm the preview scale follows. Levels deeper than the recording can take without blurring are not offered, and a typed value out of range answers "Zoom goes from 1× to …×".
 - [ ] Drag the zoom focus point in the preview and confirm the zoom follows the new focus.
 - [ ] Change the zoom's *3D camera* among Off, 3D Orbit, Screen turned left and Screen turned right, and confirm the preview orientation changes; with 3D Orbit under Auto focus, move the cursor or click from one side of the recording to the other and confirm the screen turns to that side; under Manual focus, drag the focus point to one side and confirm the camera settles on that side and stays there while the cursor moves.
@@ -296,13 +297,13 @@ The timeline toolbar adds each kind: *Add zoom (Z)*, *Add trim (T)*, *Add speed 
 - [ ] Set a zoom region's *Focus mode* to Auto and confirm its focus follows cursor telemetry across the whole region.
 - [ ] Use *Auto-enhance* → *Automatic zooms* and confirm it adds suggested zoom regions when cursor telemetry supports suggestions, or says why not ("No room for automatic zooms" on a take whose zooms were already placed after recording).
 - [ ] Select a zoom region and activate *Delete zoom* in the inspector; confirm it disappears from the lane.
-- [ ] With a zoom, a speed, a trim, an annotation and a Full Camera region on the timeline, plus an imported audio track and captions, activate *Clear timeline* (the eraser button at the end of the toolbar, after *Add Full Camera (C)* and a divider; both are absent while no region exists) and confirm every region disappears in one step while the clips, the audio track and the captions stay, and one `Ctrl+Z` brings all the regions back.
-- [ ] Activate *Add speed (S)* and confirm a speed region appears.
+- [ ] With a zoom, a speed, a trim, an annotation and a Full Camera region on the timeline, plus an imported audio track and captions, activate *Clear timeline* (the eraser button at the end of the toolbar, after *Add Full Camera* and a divider, or after the last add button when there is no camera; both are absent while no region exists) and confirm every region disappears in one step while the clips, the audio track and the captions stay, and one `Ctrl+Z` brings all the regions back.
+- [ ] Activate *Add a speed change at the current time* and confirm a speed region appears.
 - [ ] Pick each speed in the *Playback speed* row (0.5×, 1×, 1.5×, 2×, 4×) and confirm the lane label and preview timing change.
 - [ ] Enter a custom speed in the *Custom speed* field, commit it, and confirm the value is kept, with no preset pressed.
 - [ ] Play across a speed region and confirm the preview reflects the region's speed.
 - [ ] Select a speed region and activate *Delete speed region*; confirm normal speed returns.
-- [ ] Activate *Add annotation (A)* and confirm an annotation region appears.
+- [ ] Activate *Add text, an arrow, an image or a blur at the current time* and confirm an annotation region appears.
 - [ ] Select a text annotation, replace its text, and confirm the new text appears in the preview, its box fitted to the text.
 - [ ] Change the text's size (24, 32, 48, 72 or typed), its colour, and its *Background* plate (None, Dark, Light); confirm each change is visible in the preview and that the text stays readable on every plate.
 - [ ] Pick each *Text animation* (the row labelled "Select animation") and confirm the animation runs when the playhead enters the region.
@@ -469,7 +470,7 @@ must be visible, and at the insertion point rather than at the end of the clip.
 
 ## AI chat and providers — requires a configured provider
 
-- [ ] In Edit mode, open the chat panel with the top bar's *Toggle chat panel* and confirm the chat surface appears.
+- [ ] In Edit mode, open the chat panel with the top bar's *Chat panel* button and confirm the chat surface appears.
 - [ ] Confirm the chat header shows controls for AI settings, history, and a new conversation.
 - [ ] Send a short request and confirm the user message appears in the conversation.
 - [ ] Confirm the provider returns an assistant response without an unhandled error.
@@ -509,8 +510,8 @@ The agent may only call the fixed tool set in [ai-agent.md](../architecture/ai-a
 - [ ] Use the rewind control on an earlier user message, confirm in the dialog, and confirm the timeline, the conversation tail, and the later checkpoints all roll back together.
 - [ ] Cancel a rewind at the confirmation dialog and confirm both the timeline and the conversation are untouched.
 - [ ] Confirm the context badge shows a percentage and that its tooltip reports used and budget tokens.
-- [ ] Activate Compact context on a conversation with enough history and confirm an earlier-context summary message appears and the percentage drops.
-- [ ] Activate Compact context on a short conversation and confirm the "not enough history" message rather than a failure.
+- [ ] Activate the compact button (*Summarize earlier messages to use less context*) on a conversation with enough history and confirm an earlier-context summary message appears and the percentage drops.
+- [ ] Activate the compact button on a short conversation and confirm the "not enough history" message rather than a failure.
 - [ ] Confirm a compaction failure leaves the conversation history unchanged.
 - [ ] Use the copy control on an assistant message and confirm the message text reaches the clipboard.
 - [ ] Open the timeline toolbar's *Auto-enhance* menu, choose *Smart cuts* (it needs a transcript), and confirm the chat panel opens with the prompt prefilled and sent through the normal send path.
@@ -598,7 +599,7 @@ The inspector's rail holds five facets: Composition (background, format, frame, 
 - [ ] Open the Cursor facet and toggle *Show cursor* and *Auto-hide when inactive*; confirm the preview changes.
 - [ ] Change *Size*, *Smoothing* and *Motion blur*, pick each *Click bounce* (None, Light, Strong), and toggle *Click impact*; confirm each committed value remains visible.
 - [ ] Pick each *Cursor style* and toggle *3D cursor*; confirm the preview cursor changes. Under *Cursor types*, switch a type off and confirm that type is drawn as the arrow.
-- [ ] Record a take with *Cursor highlight* Off (the system cursor), open it in the editor, and confirm the rail has no Cursor facet; confirm a take recorded with it On shows the facet, and an imported video does not.
+- [ ] Record a take with *Editable cursor* Off (the system cursor), open it in the editor, and confirm the rail has no Cursor facet; confirm a take recorded with it On shows the facet, and an imported video does not.
 - [ ] Open OpenScreen menu → *Switch to light theme* (or dark) and confirm the editor switches between dark and light themes.
 - [ ] Open OpenScreen menu → *Change language*, choose a non-English locale, and confirm visible UI strings change.
 - [ ] Switch back to English and confirm the top bar, transport, inspector, and export labels return to English.
@@ -759,12 +760,12 @@ Edits are saved as they land. The dot after the project name reads "Unsaved" (ho
 
 #### Permissions window — v2.0.0
 
-On macOS 15.2+ it opens at launch, until it has been closed once, while one of its rows was never asked. Before 15.2 it opens at launch while Screen Recording is missing or waits on a relaunch. Tray → *Permissions…* and the app menu open it any time. A Record-mode start with Cursor highlight enabled may request Accessibility from macOS; a pending grant does not reopen this window or block recording. To see a first run on a Mac that has run OpenScreen before, its grants have to be reset first, which is the Mac owner's decision.
+On macOS 15.2+ it opens at launch, until it has been closed once, while one of its rows was never asked. Before 15.2 it opens at launch while Screen Recording is missing or waits on a relaunch. Tray → *Permissions…* and the app menu open it any time. A Record-mode start with Editable cursor enabled may request Accessibility from macOS; a pending grant does not reopen this window or block recording. To see a first run on a Mac that has run OpenScreen before, its grants have to be reset first, which is the Mac owner's decision.
 
 - [ ] On a first launch, confirm the window "OpenScreen needs a few permissions" lists, on macOS 15.2+, System audio (Optional), Accessibility (Recommended), Microphone (Optional) and Camera (Optional); before 15.2, or with `OPENSCREEN_MAC_SOURCE_PICKER=legacy`, Screen & system audio (Required) comes first instead of System audio.
 - [ ] For each row whose permission has not been requested, activate its button (*Allow*, or *Continue* for the screen row) and confirm macOS raises its prompt; allow it and confirm the row turns to *Allowed* while the window stays open.
 - [ ] For a permission already requested but still denied, confirm the row offers *Open Settings* on the window's first appearance, and that it opens that permission's System Settings pane instead of raising a new prompt.
-- [ ] With Screen Recording ready, Accessibility ungranted, and Cursor highlight enabled in Record mode, press *Start recording*. Confirm the macOS prompt may appear, the countdown still reaches an active take, and a warning says cursor effects may be limited while Accessibility is pending. Stop the take while leaving Accessibility pending, then start another take; confirm the OpenScreen permissions window does not reopen and recording still starts. Grant Accessibility in System Settings and confirm a later take has full cursor effects.
+- [ ] With Screen Recording ready, Accessibility ungranted, and Editable cursor enabled in Record mode, press *Start recording*. Confirm the macOS prompt may appear, the countdown still reaches an active take, and a warning says cursor effects may be limited while Accessibility is pending. Stop the take while leaving Accessibility pending, then start another take; confirm the OpenScreen permissions window does not reopen and recording still starts. Grant Accessibility in System Settings and confirm a later take has full cursor effects.
 - [ ] Refuse a permission, reopen the window from the tray, and confirm its row still offers *Open Settings* and opens the matching System Settings pane.
 - [ ] Before 15.2: confirm *Get started* stays disabled until Screen Recording is allowed; that the window offers *Restart OpenScreen* when macOS needs a relaunch to apply it; and that after System Settings' Quit & Reopen the window comes back.
 - [ ] Close the window with *Get started* and confirm it does not open again at the next launch.
