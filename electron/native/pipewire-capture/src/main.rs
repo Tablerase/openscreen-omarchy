@@ -1271,9 +1271,9 @@ fn run<W: Write>(
 
 /// Writes the trailer and reports what the recording cost.
 ///
-/// Runs even when the loop broke on an error: a file whose moov atom was never
-/// written is unplayable, and a partial recording is worth more to the user than
-/// none.
+/// Runs even when the loop broke on an error: a file whose trailer was never
+/// written loses its last fragment, and a partial recording is worth more to the
+/// user than none.
 fn finish_capture<W: Write>(
     emitter: &mut Emitter<W>,
     capture: Capture,
