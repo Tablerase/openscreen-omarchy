@@ -19,6 +19,8 @@
 // Env overrides:
 //   OPENSCREEN_WHISPER_SERVER_EXE  helper binary (default: the staged one for this host)
 //   OPENSCREEN_WHISPER_MODEL       GGML model    (default: the userData cache location)
+//   OPENSCREEN_VAD_MODEL           Silero VAD model (default: next to the GGML model;
+//                                  the speech checks run only when it is there, as in the app)
 
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -47,6 +49,9 @@ const BIN =
 	);
 
 const MODEL = process.env.OPENSCREEN_WHISPER_MODEL ?? defaultModelPath();
+const VAD_MODEL =
+	process.env.OPENSCREEN_VAD_MODEL ?? path.join(path.dirname(MODEL), "ggml-silero-v6.2.0.bin");
+const WITH_VAD = fs.existsSync(VAD_MODEL);
 const LANGUAGE = argOf("--language") ?? "auto";
 const WAV_ARG = argOf("--wav");
 const REF_ARG = argOf("--ref");
@@ -208,7 +213,8 @@ async function main() {
 			`${meta.durationSec.toFixed(2)}s`,
 	);
 	console.log(`helper : ${BIN}`);
-	console.log(`model  : ${MODEL}\n`);
+	console.log(`model  : ${MODEL}`);
+	console.log(`vad    : ${WITH_VAD ? VAD_MODEL : "(none, speech checks skipped)"}\n`);
 
 	const port = 20100 + Math.floor(process.pid % 400);
 	const child = spawn(
@@ -222,6 +228,7 @@ async function main() {
 			"127.0.0.1",
 			"--threads",
 			String(Math.max(1, os.cpus().length)),
+			...(WITH_VAD ? ["--vad-model", VAD_MODEL] : []),
 		],
 		{ stdio: ["ignore", "pipe", "pipe"] },
 	);
@@ -319,6 +326,24 @@ async function main() {
 		words.every((w, i) => i === 0 || w.start >= words[i - 1].start),
 		"word starts are monotonic non-decreasing",
 	);
+
+	// With the VAD model, whisper decodes only the speech and every time has to
+	// be mapped back onto the clip. whisper.cpp's own VAD mapped segment times
+	// but not word times, which put words seconds early (13 s into a 25 s clip)
+	// while every check above still passed. A word starting in what the VAD
+	// called silence is that bug; 0.15 s covers the 0.1 s tail kept past each stretch.
+	if (WITH_VAD) {
+		const speech = json.speech ?? [];
+		check(Array.isArray(json.speech), "response carries the speech intervals", `${speech.length}`);
+		const stray = words.filter(
+			(w) => !speech.some((s) => w.start >= s.start - 0.15 && w.start <= s.end + 0.15),
+		);
+		check(
+			stray.length === 0,
+			"every word starts inside a stretch of speech",
+			stray.map((w) => `${JSON.stringify(w.word)}@${w.start}`).join(", "),
+		);
+	}
 
 	// NOT a failure. whisper.cpp gives the last word of a segment the segment's
 	// own t1 as its end, while the word's DTW start runs 80–150 ms late — so a

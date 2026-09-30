@@ -27,7 +27,8 @@
 //         "start": 0.0, "end": 11.0,
 //         "words": [ { "word": "...", "start": 0.5, "end": 0.9, "probability": 0.9 }, ... ]
 //       }, ...
-//     ]
+//     ],
+//     "speech": [ { "start": 0.4, "end": 2.1 }, ... ]   // only when the VAD model loaded
 //   }
 //
 // Concurrency: whisper contexts are not thread-safe. /inference is serialized
@@ -228,6 +229,33 @@ struct Word {
 	std::string text;
 };
 
+// One stretch of speech copied from the upload into the buffer whisper decodes.
+struct Kept {
+	int64_t at;    // first sample in that buffer
+	int64_t from;  // first sample in the upload
+	int64_t len;
+};
+
+// A whisper time (centiseconds on the speech-only buffer) back on the upload's
+// clock, in seconds. Inside a kept stretch it moves with the stretch; in the
+// silence inserted between two stretches it snaps to the nearer edge, so a
+// word can never land in audio that was cut out. No stretches: VAD was off.
+double to_original_sec(int64_t cs, const std::vector<Kept>& kept) {
+	if (kept.empty()) return cs / 100.0;
+	const int64_t x = cs * 160;  // 16 kHz: 160 samples per centisecond
+	for (size_t i = 0; i < kept.size(); ++i) {
+		const Kept& k = kept[i];
+		if (x < k.at) {
+			if (i == 0) return k.from / 16000.0;
+			const Kept& p = kept[i - 1];
+			const bool nearer_prev = x - (p.at + p.len) <= k.at - x;
+			return (nearer_prev ? p.from + p.len : k.from) / 16000.0;
+		}
+		if (x < k.at + k.len) return (k.from + x - k.at) / 16000.0;
+	}
+	return (kept.back().from + kept.back().len) / 16000.0;
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -312,17 +340,17 @@ int main(int argc, char** argv) {
 	log("model loaded; backend=" + active_backend);
 
 	// ---- Init VAD context (Silero VAD v6.2.0) ----
+	// On the CPU, always. Asked for the GPU on Vulkan, whisper.cpp 1.9.1 puts the
+	// VAD weights in a Vulkan buffer, then finds no GPU for the VAD's own backend
+	// and aborts inside ggml (0xC0000409) — so the app relaunched the helper with
+	// --cpu and every transcription lost its GPU. Silero is 0.9 MB: the CPU is
+	// not where the time goes.
 	struct whisper_vad_context* vctx = nullptr;
 	if (!vad_model_path.empty()) {
 		struct whisper_vad_context_params vad_ctx_params = whisper_vad_default_context_params();
 		vad_ctx_params.n_threads = threads;
-		vad_ctx_params.use_gpu   = !force_cpu;
+		vad_ctx_params.use_gpu   = false;
 		vctx = whisper_vad_init_from_file_with_params(vad_model_path.c_str(), vad_ctx_params);
-		if (!vctx && vad_ctx_params.use_gpu) {
-			log("GPU VAD initialization failed; retrying with CPU inference");
-			vad_ctx_params.use_gpu = false;
-			vctx = whisper_vad_init_from_file_with_params(vad_model_path.c_str(), vad_ctx_params);
-		}
 		if (vctx) {
 			log("VAD model loaded; path=" + vad_model_path);
 		} else {
@@ -407,14 +435,52 @@ int main(int argc, char** argv) {
 		wparams.print_realtime   = false;
 		wparams.print_timestamps = false;
 		wparams.n_threads        = threads;
-		if (vctx && !vad_model_path.empty()) {
-			wparams.vad            = true;
-			wparams.vad_model_path = vad_model_path.c_str();
-			wparams.vad_params     = whisper_vad_default_params();
-		}
 
-		const auto t0 = std::chrono::steady_clock::now();
-		const int rc  = whisper_full(ctx, wparams, pcm.data(), static_cast<int>(pcm.size()));
+		// ---- Speech only (Silero VAD), cut here rather than by whisper_full ----
+		// whisper_full's own `vad` param maps SEGMENT times back onto the upload
+		// but not token times, so every word (t_dtw included) came back early by
+		// all the silence removed before it: 13 s into a 25 s clip. Cutting here
+		// keeps the map. The stretches also go out as `speech`, which the Node
+		// side anchors phrase edges on.
+		const auto t0 = std::chrono::steady_clock::now();  // VAD time is part of the run
+		std::vector<float> speech;
+		std::vector<Kept> kept;
+		nlohmann::json speech_json = nlohmann::json::array();
+		if (vctx) {
+			whisper_vad_segments* vs = whisper_vad_segments_from_samples(
+				vctx, whisper_vad_default_params(), pcm.data(), static_cast<int>(pcm.size()));
+			if (!vs) {
+				res.status = 500;
+				res.set_content(R"({"error":"VAD failed"})", "application/json");
+				return;
+			}
+			const int64_t n_pcm = static_cast<int64_t>(pcm.size());
+			const auto to_sample = [&](float cs) {
+				return std::clamp<int64_t>(std::llround(cs * 160.0), 0, n_pcm);
+			};
+			const int n_vs = whisper_vad_segments_n_segments(vs);
+			for (int i = 0; i < n_vs; ++i) {
+				const int64_t from = to_sample(whisper_vad_segments_get_segment_t0(vs, i));
+				const int64_t end  = to_sample(whisper_vad_segments_get_segment_t1(vs, i));
+				if (end <= from) continue;
+				speech_json.push_back({{"start", from / 16000.0}, {"end", end / 16000.0}});
+				// As whisper.cpp does: 0.1 s past the detected end so a soft ending
+				// survives, and 0.1 s of silence between stretches. Unlike it, the
+				// tail never runs into the next stretch and decodes it twice.
+				const int64_t next = i + 1 < n_vs
+					? to_sample(whisper_vad_segments_get_segment_t0(vs, i + 1))
+					: n_pcm;
+				const int64_t to = std::max(end, std::min(end + 1600, next));
+				if (!kept.empty()) speech.insert(speech.end(), 1600, 0.0f);
+				kept.push_back({static_cast<int64_t>(speech.size()), from, to - from});
+				speech.insert(speech.end(), pcm.begin() + from, pcm.begin() + to);
+			}
+			whisper_vad_free_segments(vs);
+		}
+		// VAD on and no speech found: nothing to decode, so nothing to report.
+		const std::vector<float>& input = vctx ? speech : pcm;
+
+		const int rc  = input.empty() ? 0 : whisper_full(ctx, wparams, input.data(), static_cast<int>(input.size()));
 		const auto t1 = std::chrono::steady_clock::now();
 		if (rc != 0) {
 			log("whisper_full returned " + std::to_string(rc));
@@ -451,11 +517,11 @@ int main(int argc, char** argv) {
 		};
 		std::vector<Segment> segments;
 
-		const int n_segments = whisper_full_n_segments(ctx);
+		const int n_segments = input.empty() ? 0 : whisper_full_n_segments(ctx);
 		for (int si = 0; si < n_segments; ++si) {
 			Segment seg;
-			seg.start = whisper_full_get_segment_t0(ctx, si) / 100.0;
-			seg.end   = whisper_full_get_segment_t1(ctx, si) / 100.0;
+			seg.start = to_original_sec(whisper_full_get_segment_t0(ctx, si), kept);
+			seg.end   = to_original_sec(whisper_full_get_segment_t1(ctx, si), kept);
 			if (const char* t = whisper_full_get_segment_text(ctx, si)) seg.text = t;
 
 			struct W { double t_dtw_first; double p_sum; int p_n; std::string text; };
@@ -486,7 +552,7 @@ int main(int argc, char** argv) {
 				++non_special_tokens;
 
 				const bool starts_word = (!in_word) || (!raw.empty() && raw[0] == ' ');
-				const double td_dtw = (td.t_dtw >= 0 ? td.t_dtw : 0) / 100.0;
+				const double td_dtw = to_original_sec(td.t_dtw >= 0 ? td.t_dtw : 0, kept);
 
 				if (starts_word && in_word) {
 					word_buf.push_back({ w_first_t_dtw, w_p_sum, w_p_n, cur_text });
@@ -547,7 +613,7 @@ int main(int argc, char** argv) {
 		// whisper resolved — the detected one under "auto", and the forced one
 		// otherwise, which is correct for both paths.
 		std::string resolved_language = language;
-		const int lang_id = whisper_full_lang_id(ctx);
+		const int lang_id = input.empty() ? -1 : whisper_full_lang_id(ctx);
 		if (lang_id >= 0) {
 			if (const char* lang_str = whisper_lang_str(lang_id)) {
 				resolved_language = lang_str;
@@ -583,6 +649,7 @@ int main(int argc, char** argv) {
 			segs.push_back(std::move(seg));
 		}
 		reply["segments"] = std::move(segs);
+		if (vctx) reply["speech"] = std::move(speech_json);
 		res.set_content(reply.dump(), "application/json");
 	});
 

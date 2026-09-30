@@ -74,3 +74,81 @@ describe("snapWordBoundariesToAudio", () => {
 		expect(snapWordBoundariesToAudio(untouched, new Float32Array(0))).toEqual(untouched);
 	});
 });
+
+describe("snapWordBoundariesToAudio with speech intervals", () => {
+	// Loud and flat everywhere, so the RMS snap moves nothing and only the
+	// anchoring on `speech` is under test.
+	const flat = audioWithSilences(6, []);
+	const ms = (sec: number) => Math.round(sec * 1000) / 1000;
+	const times = (words: SttWordSegment[]) =>
+		words.map((w) => [w.word, ms(w.startSec), ms(w.endSec)]);
+
+	it("pulls each phrase's first word onto its onset, past the punctuation DTW dropped there", () => {
+		// The shape of a real French take: whisper put "Salut" 0.58 s and "Bah"
+		// 0.25 s after the speech started, and the "!" closing the first phrase
+		// just after the second one began.
+		const words = [
+			word({ word: "Salut", startSec: 2.15, endSec: 3.37 }),
+			word({ word: "!", startSec: 3.37, endSec: 3.39 }),
+			word({ word: "Bah", startSec: 3.61, endSec: 4.01 }),
+			word({ word: "voilà", startSec: 4.01, endSec: 4.35 }),
+		];
+		const speech = [
+			{ startSec: 1.57, endSec: 2.56 },
+			{ startSec: 3.36, endSec: 4.35 },
+		];
+		expect(times(snapWordBoundariesToAudio(words, flat, speech))).toEqual([
+			["Salut", 1.57, 3.36],
+			["!", 3.36, 3.36],
+			["Bah", 3.36, 4.01],
+			["voilà", 4.01, 4.35],
+		]);
+	});
+
+	it("ends each phrase's last word where its speech stops, taking trailing punctuation along", () => {
+		// The end of the same take: whisper closed the last segment at 2.79 while
+		// "tac" ran to 3.04, and dropped the "!" on the word itself.
+		const words = [
+			word({ word: "tic,", startSec: 1.95, endSec: 2.59 }),
+			word({ word: "tac", startSec: 2.59, endSec: 2.79 }),
+			word({ word: "!", startSec: 2.62, endSec: 2.79 }),
+		];
+		const speech = [
+			{ startSec: 1.95, endSec: 2.37 },
+			{ startSec: 2.59, endSec: 3.04 },
+		];
+		expect(times(snapWordBoundariesToAudio(words, flat, speech))).toEqual([
+			["tic,", 1.95, 2.59],
+			["tac", 2.59, 3.04],
+			["!", 3.04, 3.04],
+		]);
+	});
+
+	it("leaves a phrase alone when its words are on time, or too far off to be its edges", () => {
+		const onTime = [word({ startSec: 0.95, endSec: 3.1 })];
+		expect(times(snapWordBoundariesToAudio(onTime, flat, [{ startSec: 1, endSec: 3 }]))).toEqual(
+			times(onTime),
+		);
+		// 1.2 s after the onset and 1.1 s before the offset: more likely a neighbour
+		// of words whisper dropped than the phrase's own edges.
+		const tooFar = [word({ startSec: 2.2, endSec: 2.5 })];
+		expect(times(snapWordBoundariesToAudio(tooFar, flat, [{ startSec: 1, endSec: 3.6 }]))).toEqual(
+			times(tooFar),
+		);
+	});
+
+	it("never mistakes a phrase's second word for its first", () => {
+		// "y" opens the second phrase but was reported just before its onset;
+		// "z" must not be dragged back over it.
+		const words = [
+			word({ word: "x", startSec: 0.5, endSec: 1.95 }),
+			word({ word: "y", startSec: 1.95, endSec: 2.4 }),
+			word({ word: "z", startSec: 2.4, endSec: 3 }),
+		];
+		const speech = [
+			{ startSec: 0.5, endSec: 1 },
+			{ startSec: 2, endSec: 3 },
+		];
+		expect(times(snapWordBoundariesToAudio(words, flat, speech))).toEqual(times(words));
+	});
+});
