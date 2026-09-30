@@ -7,7 +7,7 @@ import path from "node:path";
 import type { Readable } from "node:stream";
 
 import { resolveBinaryPath } from "./gpuDetector";
-import { snapWordBoundariesToAudio } from "./snapWordBoundaries";
+import { anchorWordsOnSpeech } from "./snapWordBoundaries";
 import type {
 	SttBackend,
 	SttPhraseSegment,
@@ -81,6 +81,8 @@ interface WhisperJsonWord {
 	word?: string;
 	start?: number;
 	end?: number;
+	/** End of the word's first token: always inside the word (see snapWordBoundaries.ts). */
+	anchor?: number;
 	probability?: number;
 }
 
@@ -576,23 +578,28 @@ export class WhisperServerManager {
 				startSec: this.toSec(s.start, 0),
 				endSec: this.toSec(s.end, 0),
 			}));
-			// whisper.cpp's DTW boundaries run ~80–150 ms behind the audio, and a
-			// phrase's first word up to 0.6 s, which the transcript editor turns into
-			// imprecise trims (see snapWordBoundaries.ts). Re-anchor them on the same
-			// samples whisper was given, and on the helper's speech intervals.
-			const wordSegments: SttWordSegment[] = snapWordBoundariesToAudio(
+			// The helper's word times are right inside a phrase but not on its edges,
+			// which the transcript editor turns into imprecise trims: put those on the
+			// helper's speech intervals (see snapWordBoundaries.ts).
+			const wordSegments: SttWordSegment[] = anchorWordsOnSpeech(
 				raw
 					.flatMap((seg) =>
 						(seg.words ?? []).map((w) => {
 							const word = (w.word ?? "").trim();
 							const startSec = this.toSec(w.start, 0);
 							const endSec = this.toSec(w.end, startSec + 0.05);
+							const anchorSec = this.toSec(w.anchor, startSec);
 							const confidence = typeof w.probability === "number" ? w.probability : undefined;
-							return { word, startSec, endSec: Math.max(startSec + 0.02, endSec), confidence };
+							return {
+								word,
+								startSec,
+								endSec: Math.max(startSec + 0.02, endSec),
+								anchorSec,
+								confidence,
+							};
 						}),
 					)
 					.filter((w) => w.word.length > 0),
-				opts.samples,
 				speech,
 			);
 			const detectedLanguage = json.detected_language ?? json.language ?? "auto";

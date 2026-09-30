@@ -215,41 +215,64 @@ it verbatim in the response.
 3. **Word grouping** — BPE tokens join into a single word whenever the
    detokenized text begins with a space, or at the first token of the
    segment.
-4. **Word range** — `word.start = t_dtw of the word's first token`, and
-   `word.end = t_dtw of the next word's first token` (or the segment's `t1`
-   for the segment's last word). The result is a monotonic, gap-free timeline
-   of word ranges that downstream code can use without rebasing.
-5. **Re-anchor on the audio** — `t_dtw` marks where the decoder *emitted* a
-   token, not where the speaker started saying it, so every boundary lands
-   80–150 ms late (measured across real recordings; the mean correction on
-   the reference clip is 83 ms). Because consecutive words share a boundary,
-   the whole transcript is dragged right by roughly a syllable.
-   [`electron/stt/snapWordBoundaries.ts`](../../electron/stt/snapWordBoundaries.ts)
-   pulls each boundary back to the quietest 10 ms frame in the preceding
-   150 ms of the same samples whisper was given. It is self-limiting: on a
-   decaying tail — a word ending a phrase, where whisper is already right —
-   the quietest frame *is* the reported one and nothing moves. Boundaries
-   past the end of the decoded audio are left untouched.
+4. **Word range** — a token's `t_dtw` marks where it **ends**, not where it
+   starts. In `whisper_exp_compute_token_level_timestamps_dtw` (whisper.cpp
+   1.9.1) the alignment rows start at `<|notimestamps|>`, whose output is text
+   token 0, and `t_dtw[k]` is written when the DTW path enters row *k+1*: the
+   row that predicts token *k+1*. So:
+   - `word.start` = `t_dtw` of the text token **before** the word's first
+     token. The previous token carries across segments; the request's very
+     first word has none and falls back to its own first token.
+   - `word.end` = `t_dtw` of the word's **last** token.
+   - `word.anchor` = `t_dtw` of the word's first token. It always lies inside
+     the word, and only decides which stretch of speech owns it (step 5).
 
-   The edges of a phrase are past that reach. Its first word, DTW reports
-   0.1–0.6 s after the speech starts (measured against the VAD on a real
-   French take). Its last word ends on whisper's segment end, which can stop
-   short of the speech, or on the next word's start, which runs on through the
-   pause. With `speech`, the first real word of each stretch starts on the
-   stretch's onset and its last real word ends on its offset; the punctuation
-   closing the phrase collapses to a point there. Words own the speech, never
-   the pause: deleting a phrase's last word keeps the pause after it. A word
-   reported in the 0.1 s tail the helper keeps past an offset belongs to that
-   stretch. `MAX_ANCHOR_SEC` bounds the stretching only: a word further off
-   than 1 s is more likely the neighbour of one whisper dropped, and is left
-   alone.
+   The result is a monotonic, gap-free timeline of word ranges on the upload's
+   clock. Taking the first token's `t_dtw` as the start, as the helper did
+   before, put every word one token late: +175 ms median on the TTS corpus
+   below, and a median 200 ms on a real French take. The repo's DTW POC saw
+   the same thing as whisper.cpp's `t_dtw` matching faster-whisper's word
+   **end** (`tools/stt-eval/whispercpp-dtw-poc/REPORT.md`).
+5. **Anchor phrase edges on the speech** —
+   [`electron/stt/snapWordBoundaries.ts`](../../electron/stt/snapWordBoundaries.ts)
+   leaves boundaries inside a phrase alone: they are within ~30 ms of the audio
+   already, and an energy snap on top of them drags correct boundaries early.
+   The edges of a phrase are different. The token before a phrase's first word
+   is the previous phrase's last one, so that word starts in the pause, as
+   early as the previous phrase's end; a word that opens a decode window starts
+   late on its own first token. Its last word ends on the last token DTW
+   aligned, short of the speech or past it into the pause. With `speech`:
+   - the first real word of each stretch starts on the stretch's onset, pulled
+     back when it is late and clamped forward when it is early;
+   - its last real word ends on the offset, and the punctuation closing the
+     phrase collapses to a point there;
+   - a stretch owns the words whose `anchor` falls in it or in the 0.1 s tail
+     the helper keeps past its offset.
+
+   Words own the speech, never the pause: deleting a phrase's last word keeps
+   the pause after it. `MAX_ANCHOR_SEC` bounds the stretching only: a word more
+   than 1 s past an edge is more likely the neighbour of one whisper dropped,
+   and is left alone.
 
 > Why this matters beyond caption timing: the transcript editor turns a word
 > selection into a trim of exactly `[firstWord.startSec, lastWord.endSec]`,
 > so a late boundary leaves the attack of the first removed word audible and
-> bites into the following kept word. `LOOKBACK_SEC` in that module is the
-> calibration knob — widen it and boundaries inside continuous speech start
-> snapping onto the previous syllable's trough.
+> an early one bites into the kept word next to it.
+
+**Measuring it** — [`tools/stt-eval/word-timing/`](../../tools/stt-eval/word-timing/README.md)
+scores the helper and this post-pass against a Windows-TTS corpus with exact
+word times (27 min of French and English narration, clean and noisy):
+boundary error by position, and the audible residue and clipping of deleting
+one word or one phrase. Issue #948 has the method, the baseline and the plan.
+
+| Pipeline (clean + noisy) | Inner start: median / P90 / within 50 ms | Phrase-initial start within 50 ms | One-word delete: clean cuts | Phrase delete: clean |
+|---|---|---|---|---|
+| First-token start + 150 ms RMS snap + VAD edges (before #948) | 105 / 275 ms / 32% | 83% | 5% | 84% |
+| Previous-token start + two-way VAD edges | 31 / 125 ms / 64% | 89% | 19% | 88% |
+
+A +15 ms calibration offset on every boundary gained 4 points of inner
+boundaries within 50 ms but dropped noisy phrase deletes to 82%, so it is not
+applied.
 
 The recognition call returns **both** the phrase segments and the per-word
 segments in one pass
@@ -302,7 +325,7 @@ and the digest together.
 | Module | Role |
 |---|---|
 | `electron/stt/whisperServer.ts` | Server lifecycle; `POST /inference` client; verbose_json parser. |
-| `electron/stt/snapWordBoundaries.ts` | Re-anchors DTW word boundaries on the audio's RMS envelope, and phrase edges on the VAD's speech (see step 5 above). |
+| `electron/stt/snapWordBoundaries.ts` | Anchors phrase edges on the VAD's speech (see step 5 above). |
 | `electron/stt/wav.ts` | WAV write + temp-file cleanup helpers. |
 | `electron/stt/gpuDetector.ts` | Per-platform binary resolver (no GPU probing). |
 | `electron/stt/modelManager.ts` | Single GGML file download, SHA-256 verify, atomic write. |
@@ -769,7 +792,7 @@ it deletes data
   in `electron/native/whisper-stt/src/main.cpp` are exercised only at
   runtime.
 - **Word timing inside a phrase.** Phrase edges sit on the VAD (step 5), but
-  a word in the middle of continuous speech still starts on its DTW time
-  pulled back by at most 150 ms of RMS lookback. A dedicated forced aligner
-  is the upgrade path (issue #626); measure against the VAD-anchored edges
-  before adopting one.
+  a word in the middle of continuous speech is only as good as whisper-small's
+  DTW: about 30 ms median and 125 ms P90, so one single-word delete in five is
+  clean. Character-level DTW, then a CTC forced aligner, are the upgrade path
+  (issue #948 Phases 2 and 3); `tools/stt-eval/word-timing` measures them.

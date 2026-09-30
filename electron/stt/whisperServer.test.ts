@@ -349,17 +349,22 @@ describe("WhisperServerManager", () => {
 		}
 	});
 
-	it("anchors a phrase's first word on the speech onset the helper reports", async () => {
+	it("anchors a phrase's first word on the onset of the speech its anchor falls in", async () => {
+		// "Salut" starts where the previous token ended, in the first stretch's
+		// tail, but its anchor puts it in the second stretch.
 		const fakeJson = {
 			segments: [
 				{
 					text: " Salut",
 					start: 1.57,
 					end: 2.56,
-					words: [{ word: " Salut", start: 2.15, end: 2.56 }],
+					words: [{ word: " Salut", start: 1.05, end: 2.56, anchor: 1.8 }],
 				},
 			],
-			speech: [{ start: 1.57, end: 2.56 }],
+			speech: [
+				{ start: 0.2, end: 1 },
+				{ start: 1.57, end: 2.56 },
+			],
 			backend: "whispercpp-cpu",
 		};
 		vi.stubGlobal(
@@ -371,7 +376,7 @@ describe("WhisperServerManager", () => {
 			(mgr as unknown as { process: unknown; port: number }).process = {};
 			(mgr as unknown as { process: unknown; port: number }).port = 9999;
 			const result = await mgr.transcribe({ samples: new Float32Array(16_000 * 3) });
-			expect(result.wordSegments[0].startSec).toBeCloseTo(1.57, 6);
+			expect(result.wordSegments).toEqual([{ word: "Salut", startSec: 1.57, endSec: 2.56 }]);
 		} finally {
 			vi.unstubAllGlobals();
 		}

@@ -345,23 +345,16 @@ async function main() {
 		);
 	}
 
-	// NOT a failure. whisper.cpp gives the last word of a segment the segment's
-	// own t1 as its end, while the word's DTW start runs 80–150 ms late — so a
-	// token emitted near the boundary (typically standalone punctuation) can land
-	// after it and invert. The contract's [startSec, endSec) guarantee is enforced
-	// one layer up, deliberately: whisperServer.ts clamps to
-	// `Math.max(startSec + 0.02, endSec)` and snapWordBoundaries.ts keeps
-	// "degenerate words (whisper sometimes reports end <= start) non-empty". This
-	// harness speaks to the raw helper, below that clamp, so it reports the count
-	// as information instead of asserting on it.
+	// A word runs from the end of the token before it to the end of its own last
+	// token, and the helper rejects a non-monotonic DTW path, so it cannot end
+	// before it starts. It can be empty (end == start): whisperServer.ts widens
+	// those to 20 ms before they reach the document.
 	const inverted = words.filter((w) => w.end < w.start);
-	if (inverted.length > 0) {
-		console.log(
-			`  info  ${inverted.length}/${words.length} raw word(s) have end < start ` +
-				`(${inverted.map((w) => JSON.stringify(w.word)).join(", ")}) — expected at segment ` +
-				"boundaries; whisperServer.ts clamps these before they reach the document.",
-		);
-	}
+	check(
+		inverted.length === 0,
+		"no word ends before it starts",
+		inverted.map((w) => JSON.stringify(w.word)).join(", "),
+	);
 
 	if (refText) {
 		const rate = wer(refText, text);

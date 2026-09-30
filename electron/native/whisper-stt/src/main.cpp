@@ -223,9 +223,12 @@ std::string detect_active_backend() {
 }
 
 struct Word {
-	double start = 0.0;
-	double end   = 0.0;
-	double prob  = 0.0;
+	double start  = 0.0;
+	double end    = 0.0;
+	// t_dtw of the word's first token: the end of that token, so always inside
+	// the word. Only used to tell which stretch of speech a word belongs to.
+	double anchor = 0.0;
+	double prob   = 0.0;
 	std::string text;
 };
 
@@ -517,6 +520,16 @@ int main(int argc, char** argv) {
 		};
 		std::vector<Segment> segments;
 
+		// whisper.cpp writes a token's t_dtw when the DTW path enters the decoder
+		// row that PREDICTS the next token (whisper_exp_compute_token_level_
+		// timestamps_dtw, v1.9.1): it marks the END of the token, not its start.
+		// So a word runs from the t_dtw of the text token before it to the t_dtw
+		// of its own last token. Taking its first token's t_dtw as the start put
+		// every word one token late (+175 ms median, tools/stt-eval/word-timing).
+		// The previous token carries across segments; the request's very first
+		// word has none and starts on its first token's time (the Node side
+		// anchors it on the speech onset anyway).
+		double prev_tok_end = -1.0;
 		const int n_segments = input.empty() ? 0 : whisper_full_n_segments(ctx);
 		for (int si = 0; si < n_segments; ++si) {
 			Segment seg;
@@ -524,11 +537,11 @@ int main(int argc, char** argv) {
 			seg.end   = to_original_sec(whisper_full_get_segment_t1(ctx, si), kept);
 			if (const char* t = whisper_full_get_segment_text(ctx, si)) seg.text = t;
 
-			struct W { double t_dtw_first; double p_sum; int p_n; std::string text; };
+			struct W { double start; double end; double anchor; double p_sum; int p_n; std::string text; };
 			std::vector<W> word_buf;
 			std::string cur_text;
 			bool in_word = false;
-			double w_first_t_dtw = 0;
+			double w_start = 0, w_end = 0, w_anchor = 0;
 			double w_p_sum = 0; int w_p_n = 0;
 
 			const int n_tokens = whisper_full_n_tokens(ctx, si);
@@ -555,30 +568,32 @@ int main(int argc, char** argv) {
 				const double td_dtw = to_original_sec(td.t_dtw >= 0 ? td.t_dtw : 0, kept);
 
 				if (starts_word && in_word) {
-					word_buf.push_back({ w_first_t_dtw, w_p_sum, w_p_n, cur_text });
+					word_buf.push_back({ w_start, w_end, w_anchor, w_p_sum, w_p_n, cur_text });
 					w_p_sum = 0; w_p_n = 0; cur_text.clear();
 				}
 				if (starts_word) {
 					in_word = true;
-					w_first_t_dtw = td_dtw;
+					w_start  = prev_tok_end >= 0 ? prev_tok_end : td_dtw;
+					w_anchor = td_dtw;
 					cur_text = (!raw.empty() && raw[0] == ' ') ? raw.substr(1) : raw;
 				} else {
 					cur_text += raw;
 				}
+				w_end        = td_dtw;
+				prev_tok_end = td_dtw;
 				w_p_sum += td.p;
 				w_p_n   += 1;
 			}
 			if (in_word) {
-				word_buf.push_back({ w_first_t_dtw, w_p_sum, w_p_n, cur_text });
+				word_buf.push_back({ w_start, w_end, w_anchor, w_p_sum, w_p_n, cur_text });
 			}
-			for (size_t wi = 0; wi < word_buf.size(); ++wi) {
+			for (const W& b : word_buf) {
 				Word w;
-				w.start = word_buf[wi].t_dtw_first;
-				w.end   = (wi + 1 < word_buf.size())
-				            ? word_buf[wi + 1].t_dtw_first
-				            : seg.end;
-				w.prob  = word_buf[wi].p_sum / std::max(1, word_buf[wi].p_n);
-				w.text  = word_buf[wi].text;
+				w.start  = b.start;
+				w.end    = b.end;
+				w.anchor = b.anchor;
+				w.prob   = b.p_sum / std::max(1, b.p_n);
+				w.text   = b.text;
 				seg.words.push_back(w);
 			}
 			segments.push_back(std::move(seg));
@@ -642,6 +657,7 @@ int main(int argc, char** argv) {
 					{"word",        w.text},
 					{"start",       w.start},
 					{"end",         w.end},
+					{"anchor",      w.anchor},
 					{"probability", w.prob},
 				});
 			}
