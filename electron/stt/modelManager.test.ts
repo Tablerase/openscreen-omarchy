@@ -8,6 +8,7 @@ import {
 	alignerPath,
 	areModelsPresent,
 	CTC_ALIGNERS,
+	cachedAligner,
 	ensureAligner,
 	ensureModels,
 	modelPaths,
@@ -283,17 +284,14 @@ describe("modelManager", () => {
 			const bytes = Buffer.from("gguf weights");
 			const original = CTC_ALIGNERS.fr.expectedSha256;
 			CTC_ALIGNERS.fr.expectedSha256 = createHash("sha256").update(bytes).digest("hex");
-			const progress: number[] = [];
 			try {
 				const file = await ensureAligner({
 					baseDir: dir,
 					language: "fr",
 					fetcher: async () => new Response(bytes, { status: 200 }),
-					onProgress: (done) => progress.push(done),
 				});
 				expect(file).toBe(alignerPath(dir, "fr"));
 				expect(await readFile(file as string)).toEqual(bytes);
-				expect(progress[progress.length - 1]).toBe(bytes.length);
 			} finally {
 				CTC_ALIGNERS.fr.expectedSha256 = original;
 			}
@@ -308,6 +306,73 @@ describe("modelManager", () => {
 				}),
 			).rejects.toThrow(/SHA-256 mismatch/);
 			expect(existsSync(alignerPath(dir, "en") as string)).toBe(false);
+		});
+
+		/** A body that sends a few bytes, then nothing, ever. */
+		const stalledBody = () =>
+			new Response(
+				new ReadableStream<Uint8Array>({
+					start(controller) {
+						controller.enqueue(new Uint8Array(8));
+					},
+				}),
+				{ status: 200 },
+			);
+
+		it("aborts a download that stops sending, and leaves no partial file", async () => {
+			const file = alignerPath(dir, "fr") as string;
+			await expect(
+				ensureAligner({
+					baseDir: dir,
+					language: "fr",
+					stallMs: 50,
+					fetcher: async () => stalledBody(),
+				}),
+			).rejects.toThrow(/stalled/);
+			expect(existsSync(file)).toBe(false);
+			expect(existsSync(`${file}.partial`)).toBe(false);
+		});
+
+		it("stops when its signal aborts, mid-body or between attempts", async () => {
+			const controller = new AbortController();
+			const download = ensureAligner({
+				baseDir: dir,
+				language: "fr",
+				signal: controller.signal,
+				fetcher: async () => stalledBody(),
+			});
+			setTimeout(() => controller.abort(new Error("cancelled")), 20);
+			await expect(download).rejects.toThrow("cancelled");
+
+			// A 503 puts it in a backoff of seconds: the abort must not wait for it.
+			const again = new AbortController();
+			const started = Date.now();
+			const retrying = ensureAligner({
+				baseDir: dir,
+				language: "fr",
+				signal: again.signal,
+				fetcher: async () => new Response("busy", { status: 503 }),
+			});
+			setTimeout(() => again.abort(new Error("quit")), 20);
+			await expect(retrying).rejects.toThrow("quit");
+			expect(Date.now() - started).toBeLessThan(1000);
+		});
+
+		it("verifies a cached copy without the network", async () => {
+			expect(await cachedAligner(dir, "fr")).toBeNull();
+			const file = alignerPath(dir, "fr") as string;
+			const bytes = Buffer.from("gguf weights");
+			await mkdir(path.dirname(file), { recursive: true });
+			await writeFile(file, bytes);
+			// Present but not the pinned bytes: not usable.
+			expect(await cachedAligner(dir, "fr")).toBeNull();
+			const original = CTC_ALIGNERS.fr.expectedSha256;
+			CTC_ALIGNERS.fr.expectedSha256 = createHash("sha256").update(bytes).digest("hex");
+			try {
+				expect(await cachedAligner(dir, "fr")).toBe(file);
+			} finally {
+				CTC_ALIGNERS.fr.expectedSha256 = original;
+			}
 		});
 	});
 });

@@ -126,9 +126,12 @@ for (const file of readdirSync(rawDir)
 	const full = postPass(rawWords, samples, speech);
 	const tsMs = performance.now() - t0;
 	const variants = { raw: rawWords, post, "post+vad": full };
-	if (json.emissions && speech) {
+	const emissions = json.emissions ? ctc.parseEmissions(json.emissions) : null;
+	if (json.emissions && !emissions)
+		console.warn(`${file}: unreadable emissions, CTC stages skipped`);
+	if (emissions && speech) {
 		const t1 = performance.now();
-		const aligned = ctc.alignWordsOnEmissions(rawWords, speech, ctc.parseEmissions(json.emissions));
+		const aligned = ctc.alignWordsOnEmissions(rawWords, speech, emissions);
 		variants.ctc = aligned;
 		variants["ctc+vad"] = postPass(aligned, samples, speech);
 		ctcMs += performance.now() - t1;

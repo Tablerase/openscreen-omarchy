@@ -174,6 +174,17 @@ describe("alignWordsOnEmissions", () => {
 		expect(out[1].endSec).toBe(out[0].endSec);
 	});
 
+	it("aligns a stretch that runs to the end of the upload, past the last frame", () => {
+		// 1 s of audio gives 49 frames (0.98 s): the stretch ends after them.
+		const tokens = [...gap(30), "a", "b", ...gap(17)];
+		const out = alignWordsOnEmissions(
+			[word("ab", 0.65, 1, 0.7)],
+			[{ startSec: 0.5, endSec: 1 }],
+			emissions(tokens),
+		);
+		expect(r(out[0].startSec)).toBe(r(30 * STRIDE + PAUSE_START_OFFSET_SEC));
+	});
+
 	it("keeps the helper's times where it cannot align", () => {
 		const words = [word("ab", 0.3, 0.5, 0.35), word("c", 1.5, 1.7, 1.6)];
 		// The second word is outside every stretch; the first one's letters do not fit.

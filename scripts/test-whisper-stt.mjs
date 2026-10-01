@@ -254,6 +254,7 @@ async function main() {
 	let json;
 	let emissions = null;
 	let alignerModel = null;
+	let alignerSkipped = "";
 	try {
 		await waitForReady(`http://127.0.0.1:${port}/`);
 		const form = new FormData();
@@ -284,7 +285,13 @@ async function main() {
 			if (!ares.ok) throw new Error(`/emissions returned ${ares.status}: ${await ares.text()}`);
 			emissions = await ares.json();
 		} else {
-			alignerModel = null;
+			// Say which file was looked for: a custom OPENSCREEN_WHISPER_MODEL moves
+			// the cache this path is derived from, and would read as "no aligner".
+			alignerSkipped = !WITH_VAD
+				? "no VAD model, so no speech to align"
+				: alignerModel
+					? `no aligner at ${alignerModel} (set OPENSCREEN_ALIGNER_MODEL)`
+					: `no aligner for "${json.detected_language}"`;
 		}
 	} finally {
 		child.kill();
@@ -458,7 +465,7 @@ async function main() {
 			console.log(`aligner: ${emissions.elapsed_s.toFixed(2)}s on ${emissions.device}`);
 		}
 	} else {
-		console.log("\n(no aligner for this language in the cache: aligner checks skipped)");
+		console.log(`\n(aligner checks skipped: ${alignerSkipped})`);
 	}
 
 	if (json.timing) {

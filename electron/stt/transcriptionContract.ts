@@ -71,7 +71,7 @@ export interface SttStatusEvent {
 	/** Total bytes for the in-flight download. */
 	totalBytes?: number;
 	/** Which model is downloading. */
-	model?: "whisper" | "silero-vad" | "ctc-aligner";
+	model?: "whisper" | "silero-vad";
 	/**
 	 * Seconds of audio transcribed so far, and the total for this request. Only
 	 * when `phase === "transcribe"`. Progress is reported per CHUNK (see

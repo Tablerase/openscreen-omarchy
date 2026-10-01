@@ -585,7 +585,8 @@ export class WhisperServerManager {
 	 * Run one transcription; serializes concurrent callers.
 	 *
 	 * `alignerFor` resolves the CTC aligner model for the language whisper
-	 * detected (downloading it if need be), or null when there is none. With one,
+	 * detected, or null when there is none or it is not ready yet (it must not
+	 * wait on the network: no download runs inside a chunk, see SttManager). With one,
 	 * the words are re-timed on it before their phrase edges go on the speech
 	 * (ctcAlign.ts); any failure there keeps whisper's own times.
 	 */

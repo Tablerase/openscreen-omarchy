@@ -2,7 +2,13 @@ import path from "node:path";
 import { app, type IpcMain } from "electron";
 import { planChunks } from "./chunking";
 import { extractMono16kPcm } from "./extractAudio";
-import { ensureAligner, ensureModels, modelPaths } from "./modelManager";
+import {
+	alignerPath,
+	cachedAligner,
+	ensureAligner,
+	ensureModels,
+	modelPaths,
+} from "./modelManager";
 import type {
 	SttPhraseSegment,
 	SttStatusEvent,
@@ -106,36 +112,58 @@ export class SttManager {
 	private cancelEpoch = 0;
 
 	/**
-	 * The word aligner per language (ctcAlign.ts), resolved once per session: its
-	 * file is hashed on the way in, and that is not free at 350 MB. A language
-	 * whose download failed is left out for the rest of the run rather than
-	 * retried per chunk, and tried again on the next one.
+	 * The word aligner per language (ctcAlign.ts). A chunk never waits for a
+	 * download: it is an improvement, and a 350 MB fetch inside a chunk would hold
+	 * the helper's queue for as long as the network takes, past any request
+	 * ceiling and out of Cancel's reach. So:
+	 * - a copy already on disk is verified in place the first time a language is
+	 *   asked for in a session (a local read, no network), then reused;
+	 * - otherwise the download starts in the background and the chunks keep
+	 *   whisper's times until it lands; later chunks and transcriptions use it;
+	 * - Cancel and quit abort it, and so does a stall (`ensureAligner`). A failed
+	 *   one is not retried for the rest of the run, only on the next transcription.
 	 */
-	private readonly aligners = new Map<string, Promise<string | null>>();
+	private readonly alignersReady = new Map<string, string>();
+	private readonly alignersChecked = new Set<string>();
+	private readonly alignerDownloads = new Map<string, AbortController>();
 	private readonly alignersFailed = new Set<string>();
 
-	private readonly alignerFor = (language: string): Promise<string | null> => {
-		if (this.alignersFailed.has(language)) return Promise.resolve(null);
-		let resolved = this.aligners.get(language);
-		if (!resolved) {
-			resolved = ensureAligner({
-				baseDir: this.getModelsDir(),
-				language,
-				onProgress: (downloadedBytes, totalBytes) =>
-					this.emit({ phase: "model", model: "ctc-aligner", downloadedBytes, totalBytes }),
-			}).catch((error: unknown) => {
+	private readonly alignerFor = async (language: string): Promise<string | null> => {
+		const ready = this.alignersReady.get(language);
+		if (ready) return ready;
+		if (!alignerPath(this.getModelsDir(), language)) return null;
+		if (!this.alignersChecked.has(language)) {
+			this.alignersChecked.add(language);
+			const cached = await cachedAligner(this.getModelsDir(), language);
+			if (cached) {
+				this.alignersReady.set(language, cached);
+				return cached;
+			}
+		}
+		if (!this.alignersFailed.has(language) && !this.alignerDownloads.has(language)) {
+			this.downloadAligner(language);
+		}
+		return null;
+	};
+
+	private downloadAligner(language: string): void {
+		const controller = new AbortController();
+		this.alignerDownloads.set(language, controller);
+		console.info(`[stt] downloading the "${language}" word aligner in the background`);
+		ensureAligner({ baseDir: this.getModelsDir(), language, signal: controller.signal })
+			.then((file) => {
+				if (file) this.alignersReady.set(language, file);
+				console.info(`[stt] "${language}" word aligner ready`);
+			})
+			.catch((error: unknown) => {
+				this.alignersFailed.add(language);
 				console.warn(
 					`[stt] no word aligner for "${language}", keeping whisper's word times: ` +
 						`${error instanceof Error ? error.message : String(error)}`,
 				);
-				this.alignersFailed.add(language);
-				this.aligners.delete(language);
-				return null;
-			});
-			this.aligners.set(language, resolved);
-		}
-		return resolved;
-	};
+			})
+			.finally(() => this.alignerDownloads.delete(language));
+	}
 
 	/**
 	 * The extraction in flight, if any. `cancelEpoch` alone stops the CHUNK loop, which is
@@ -176,6 +204,7 @@ export class SttManager {
 	cancel(): void {
 		this.cancelEpoch++;
 		this.extraction?.abort();
+		for (const download of this.alignerDownloads.values()) download.abort(cancelledError());
 	}
 
 	/**
@@ -470,7 +499,7 @@ export class SttManager {
 	async shutdown(): Promise<void> {
 		if (this.shuttingDown) return;
 		this.shuttingDown = true;
-		this.cancelEpoch++;
+		this.cancel();
 		await this.server.shutdown();
 	}
 }

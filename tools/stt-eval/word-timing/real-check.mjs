@@ -66,8 +66,11 @@ const raw = json.segments
 	.filter((w) => w.word);
 const speech = json.speech.map((s) => ({ startSec: s.start, endSec: s.end }));
 const post = anchorWordsOnSpeech(raw, speech);
-const aligned = emissions
-	? anchorWordsOnSpeech(alignWordsOnEmissions(raw, speech, parseEmissions(emissions)), speech)
+const parsed = emissions ? parseEmissions(emissions) : null;
+if (emissions && !parsed)
+	throw new Error("/emissions answered something that is not letter scores (vocab/regions/sizes)");
+const aligned = parsed
+	? anchorWordsOnSpeech(alignWordsOnEmissions(raw, speech, parsed), speech)
 	: null;
 mkdirSync(RESULTS, { recursive: true });
 writeFileSync(

@@ -112,10 +112,9 @@ renderer imposes a timeout that a slow download could trip: the preload does a
 bare `ipcRenderer.invoke`, `fetchWithRetry` has no per-request deadline, and
 whisper-server's 30 s readiness budget only starts once the download resolved.
 
-The word aligner (§ Word-level alignment, step 5) is the exception to "first
-run only": it is fetched the first time a transcription detects English or
-French (109 or 348 MB), in the middle of that run, which then simply takes
-longer once more.
+The word aligner (§ Word-level alignment, step 5) is not part of that phase: it
+is fetched in the background the first time a transcription detects English or
+French (109 or 348 MB), and no chunk ever waits for it.
 
 Three edges make that promise hold, and each is load-bearing:
 
@@ -288,9 +287,9 @@ it verbatim in the response.
      midpoint. Next to a pause (a gap of 100 ms or more between letters) the
      edges move further out, 60 ms before and 150 ms after, both capped at
      mid-pause: early there is silence, late is an audible attack.
-   - **Fallback.** No aligner for the language, a download that failed, a
-     helper without `/emissions`, a stretch whose letters do not fit in its
-     frames: the words keep the times of step 4. Step 6 runs either way.
+   - **Fallback.** No aligner for the language, a download not landed yet or
+     failed, a helper without `/emissions`, a stretch whose letters do not fit in
+     its frames: the words keep the times of step 4. Step 6 runs either way.
 6. **Anchor phrase edges on the speech** —
    [`electron/stt/snapWordBoundaries.ts`](../../electron/stt/snapWordBoundaries.ts)
    leaves boundaries inside a phrase alone: they are within ~16 ms of the audio
@@ -390,10 +389,13 @@ digest an invariant. Bumping the model therefore means bumping the revision
 and the digest together.
 
 **The word aligners** (step 5) are fetched only for a language that has one,
-the first time a transcription detects it, inside the same run (`phase:
-"model"`, `model: "ctc-aligner"`), into `stt-models/ctc-aligner/`. A failed
-download keeps whisper's times for the rest of the run and is retried on the
-next one.
+into `stt-models/ctc-aligner/`, and never inside a chunk. The first time a
+session meets a language, a copy already on disk is verified in place (a local
+read). Without one, the download starts in the background
+(`SttManager.alignerFor`): the chunks that run before it lands keep whisper's
+times, the later ones and later transcriptions use it. A download stalled for
+30 s, cancelled with the transcription, or interrupted by quitting is
+abandoned, and retried on the next transcription rather than per chunk.
 
 | Language | Model | Download |
 |---|---|---|
@@ -463,7 +465,11 @@ timings present, the DTW guardrail passed, `backend` reporting GPU offload on a
 GPU-capable host, `detected_language` resolved rather than echoed, word times
 monotonic and inside the clip, and WER against a reference. On macOS it
 synthesizes its own clip with `say`, so it needs no fixture; elsewhere pass
-`--wav <file>` (and optionally `--ref "<expected text>"`). This is the check
+`--wav <file>` (and optionally `--ref "<expected text>"`). When the detected
+language's aligner is cached (or `OPENSCREEN_ALIGNER_MODEL` names one), it also
+calls `/emissions` and checks that the answer is well-formed log-probabilities,
+computed on the GPU on a GPU-capable host, decoding to roughly what whisper
+heard (letter error rate), with the aligned words still ordered. This is the check
 that the unit tests structurally cannot make: they mock `fetch`, so they assert
 against a hand-written fixture rather than the binary.
 

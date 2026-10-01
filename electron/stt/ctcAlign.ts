@@ -198,8 +198,11 @@ export function alignWordsOnEmissions<W extends AlignableWord>(
 		const until = Math.min(offset + TAIL_SEC, speech[i + 1]?.startSec ?? Number.POSITIVE_INFINITY);
 		const owned: number[] = [];
 		for (; k < out.length && words[k].anchorSec < until; k++) owned.push(k);
+		// A region's frames stop up to one receptive field (25 ms) short of the audio
+		// it was cut from, so a stretch that runs to the end of the upload ends
+		// past them; two frames of slack keep it. `hi` below stays on the frames.
 		const region = emissions.regions.find(
-			(r) => r.startSec <= onset && r.startSec + r.frames * strideSec >= offset,
+			(r) => r.startSec <= onset && r.startSec + (r.frames + 2) * strideSec >= offset,
 		);
 		if (!region || owned.length === 0) continue;
 		// The frames of this stretch: its margin, stopping at the neighbours' speech.
