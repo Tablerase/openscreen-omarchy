@@ -350,13 +350,20 @@ clean; 20 and 12 ms on LibriSpeech), against 19 and 24 ms with phase 2 alone.
 The misses left on phrase-initial starts are mostly the reference's: the French
 TTS voices start a word on its silent stop closure, which no aligner hears.
 
-On a real French take (25 s, no reference) read on its spectrogram, the
-aligner is not uniformly better than phase 2: it moved "c'est" onto the onset
-of its /s/ (phase 2 was 90 ms early), but put "quoi" after "c'est" 70 to 80 ms
-early twice, inside the vowel of *c'est*, where phase 2 had it on the /k/
-closure. French silent final letters are the likely cause: the model was
-trained on spelling, and the `t` of *c'est* has no sound to sit on (phase 2
-drops such letters before aligning; this pass does not yet).
+On a real French take (25 s, no reference), every boundary the aligner moved
+by 40 ms or more was checked against the audio's energy and zero crossings at
+10 ms: each now sits on the acoustic boundary. "c'est" starts on its /s/
+(phase 2 was 90 ms early, in the end of the word before); "quoi" starts where
+the /k/ closure begins, after the vowel of *c'est* (phase 2 was on the burst,
+70 to 80 ms later, which is also a clean cut since the closure is silent);
+in "en fait on va" the aligner is on the /f/, the dip before *on* and the /v/,
+where phase 2 was 30 to 50 ms off each.
+
+Dropping French silent final consonants before aligning, as step 2 does, was
+tried and left out: it changed none of the take's boundaries by more than
+15 ms, and on the corpus it traded 3 points of French clean cuts for 1 to 2
+points of French phrase deletes (a phrase-final *fois* and *Windows* lost the
+letter that held their end).
 
 A +15 ms calibration offset on every boundary gained 4 points of inner
 boundaries within 50 ms but dropped noisy phrase deletes to 82%, so it is not
@@ -918,6 +925,3 @@ it deletes data
 - **The aligner is GPU-only.** On the CPU fallback (16 threads, Ryzen 7 5800X)
   it would add 29% in English and 58% in French: the French model is a 24-layer
   wav2vec2 large, about half of whisper-small's cost on its own.
-- **French silent letters.** The aligner spells *c'est* with its `t`, which
-  has no sound; on a real take that put the next word 70 to 80 ms early.
-  Dropping silent final consonants before aligning, as step 2 does, is untried.
