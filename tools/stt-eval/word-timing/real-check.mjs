@@ -110,7 +110,10 @@ if (aligned) {
 	});
 	moved.sort((x, y) => x - y);
 	const m = (p) => (moved[Math.floor(moved.length * p)] * 1000).toFixed(0);
+	const spread = moved.length
+		? `median ${m(0.5)} ms, p90 ${m(0.9)} ms`
+		: "no word to compare (punctuation only)";
 	console.log(
-		`\naligner vs DTW, |moved| per boundary: median ${m(0.5)} ms, p90 ${m(0.9)} ms (${emissions.elapsed_s.toFixed(2)} s on ${emissions.device})`,
+		`\naligner vs DTW, |moved| per boundary: ${spread} (${emissions.elapsed_s.toFixed(2)} s on ${emissions.device})`,
 	);
 }
