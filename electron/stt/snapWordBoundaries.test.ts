@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { anchorWordsOnSpeech, type HelperWord } from "./snapWordBoundaries";
+import { anchorWordsOnSpeech, type HelperWord, ownWords } from "./snapWordBoundaries";
 import type { SttWordSegment } from "./transcriptionContract";
 
 /** A helper word; its anchor defaults to its start, as for a request's first word. */
@@ -94,5 +94,84 @@ describe("anchorWordsOnSpeech", () => {
 			["c", 3, 3.5],
 			["d", 3.5, 4],
 		]);
+	});
+
+	// Issue #948, measured on a Zira TTS clip: "…as if nothing happened. The
+	// transcript…" with speech stopping at 30.59 and resuming at 31.33. DTW
+	// anchored "happened." at 30.69, past the first stretch's tail.
+	const pause = [
+		{ startSec: 28.13, endSec: 30.59 },
+		{ startSec: 31.33, endSec: 35.23 },
+	];
+
+	it("keeps a sentence's last word in the stretch it closes when DTW anchors it in the pause", () => {
+		const words = [
+			word("and", 27.97, 28.35, 28.35),
+			word("nothing", 29.65, 30.03, 30.03),
+			word("happened.", 30.03, 30.69, 30.69),
+			word("The", 30.69, 31.47, 31.47),
+			word("transcript", 31.47, 32.13, 32.13),
+		];
+		expect(times(anchorWordsOnSpeech(words, pause))).toEqual([
+			["and", 28.13, 28.35],
+			["nothing", 29.65, 30.03],
+			["happened.", 30.03, 30.59],
+			["The", 31.33, 31.47],
+			["transcript", 31.47, 32.13],
+		]);
+		expect(ownWords(words, pause)).toEqual([
+			[0, 3],
+			[3, 5],
+		]);
+	});
+
+	it("keeps the punctuation whisper split off a sentence's last word with it", () => {
+		const words = [
+			word("et", 28.2, 28.4, 28.4),
+			word("vraiment", 28.4, 30.69, 30.69),
+			word("?", 30.69, 30.7, 30.7),
+			word("Oui", 30.7, 31.6, 31.5),
+		];
+		expect(ownWords(words, pause)).toEqual([
+			[0, 3],
+			[3, 4],
+		]);
+	});
+
+	it("lets a one-word sentence open a stretch when it is anchored in its speech", () => {
+		const words = [
+			word("Agreed?", 28.13, 30.5, 30.4),
+			word("Yes.", 30.5, 31.6, 31.5),
+			word("Good", 31.6, 32, 32),
+		];
+		expect(ownWords(words, pause)).toEqual([
+			[0, 1],
+			[1, 3],
+		]);
+	});
+
+	it("gives a sentence's last word to the next stretch when the one before has no words", () => {
+		const words = [word("Done.", 31, 31.6, 31.2), word("Next", 31.6, 32, 32)];
+		expect(ownWords(words, pause)).toEqual([
+			[0, 0],
+			[0, 2],
+		]);
+	});
+
+	it("puts the words in order, none inverted, whatever stretch owns them", () => {
+		// The aligner-on shape of the report, as the aligner left it when the next
+		// stretch owned "happened": a 20 ms word after the pause and "The" earlier.
+		const aligned = [
+			word("nothing", 29.68, 30.59, 30.03),
+			word("happened", 31.33, 31.35, 30.69),
+			word("The", 30.69, 31.48, 31.47),
+			word("transcript", 31.48, 32.12, 32.13),
+		];
+		const out = anchorWordsOnSpeech(aligned, pause);
+		for (const [j, w] of out.entries()) {
+			expect(w.endSec).toBeGreaterThanOrEqual(w.startSec);
+			if (j > 0) expect(w.startSec).toBeGreaterThanOrEqual(out[j - 1].startSec);
+		}
+		expect(out.map((w) => w.word)).toEqual(["nothing", "happened", "The", "transcript"]);
 	});
 });

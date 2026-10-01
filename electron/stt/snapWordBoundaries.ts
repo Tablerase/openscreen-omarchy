@@ -49,6 +49,61 @@ const TAIL_SEC = 0.1;
 /** French puts a space before `!`, `?`, `:` and `;`, so whisper emits them as words. */
 const isPunctuation = (word: string) => /^[\p{P}\p{S}]+$/u.test(word);
 
+/** `.`, `!`, `?`, `…` or a full-width form, maybe inside a closing quote or bracket. */
+const endsSentence = (text: string) => /[.!?…。！？．｡][\p{Pe}\p{Pf}"']*$/u.test(text);
+
+/** End of the audio the helper kept for stretch `i`: its speech, plus a tail short of the next. */
+const keptUntil = (speech: SttVadSegment[], i: number) =>
+	Math.min(speech[i].endSec + TAIL_SEC, speech[i + 1]?.startSec ?? Number.POSITIVE_INFINITY);
+
+/**
+ * The words each speech stretch owns, as `[from, to)` ranges of `words`: those
+ * anchored before the end of the audio the helper kept for it. Both the aligner
+ * (ctcAlign.ts) and the edge anchoring below read this, so a word is aligned in
+ * the stretch whose edges it is put on.
+ *
+ * One exception. DTW can anchor a sentence's last word in the pause after it,
+ * past the kept tail: the next stretch then put it on its onset, after the
+ * words that follow it, and the aligner looked for it in the wrong audio (issue
+ * #948). So a word that ends a sentence and is anchored in the pause, before the
+ * next stretch's speech, closes the stretch before it, with its punctuation,
+ * when that stretch has words. One anchored inside the next speech still opens
+ * it: on LibriSpeech, nine one-word sentences ("Heaven!", "What?") open a
+ * stretch that way, and giving them to the stretch before cost phrase deletes.
+ */
+export function ownWords(
+	words: ReadonlyArray<{ word: string; anchorSec: number }>,
+	speech: SttVadSegment[],
+): Array<[number, number]> {
+	const out: Array<[number, number]> = [];
+	let k = 0;
+	for (let i = 0; i < speech.length; i++) {
+		const from = k;
+		const until = keptUntil(speech, i);
+		while (k < words.length && words[k].anchorSec < until) k++;
+		// The word that would open the next stretch, and the punctuation after it.
+		let first = k;
+		while (first < words.length && isPunctuation(words[first].word)) first++;
+		let end = first + 1;
+		while (end < words.length && isPunctuation(words[end].word)) end++;
+		if (
+			i + 1 < speech.length &&
+			first < words.length &&
+			words[first].anchorSec < speech[i + 1].startSec &&
+			words.slice(from, k).some((w) => !isPunctuation(w.word)) &&
+			endsSentence(
+				words
+					.slice(first, end)
+					.map((w) => w.word)
+					.join(""),
+			)
+		)
+			k = end;
+		out.push([from, k]);
+	}
+	return out;
+}
+
 /**
  * Put the first and last word of every speech stretch on the stretch's edges.
  * The onset already carries the VAD's 30 ms pad, so a cut there lands just
@@ -65,16 +120,25 @@ export function anchorWordsOnSpeech(
 		...w,
 		endSec: Math.max(w.endSec, w.startSec + MIN_WORD_SEC),
 	}));
-	if (!speech) return out;
-	let k = 0;
+	if (speech) anchorEdges(out, words, speech);
+	// Whatever the stretches did, words come out in order and never inverted. A
+	// start past the next word's comes back to it rather than pushing the next
+	// one: the onset clamp is what overshoots (a word whisper invented, put on
+	// the onset after the real one the aligner found earlier).
+	for (let j = out.length - 1; j >= 0; j--) {
+		if (j + 1 < out.length) out[j].startSec = Math.min(out[j].startSec, out[j + 1].startSec);
+		out[j].endSec = Math.max(out[j].endSec, out[j].startSec);
+	}
+	return out;
+}
+
+function anchorEdges(out: SttWordSegment[], words: HelperWord[], speech: SttVadSegment[]) {
+	const owned = ownWords(words, speech);
 	for (let i = 0; i < speech.length; i++) {
 		const { startSec: onset, endSec: offset } = speech[i];
-		// A stretch owns the words anchored before the end of the audio the helper
-		// kept for it: its speech, plus a tail that stops short of the next one.
-		const tail = Math.min(offset + TAIL_SEC, speech[i + 1]?.startSec ?? Number.POSITIVE_INFINITY);
 		let first = -1;
 		let last = -1;
-		for (; k < out.length && words[k].anchorSec < tail; k++) {
+		for (let k = owned[i][0]; k < owned[i][1]; k++) {
 			if (isPunctuation(out[k].word)) continue;
 			if (first < 0) first = k;
 			last = k;
@@ -95,5 +159,4 @@ export function anchorWordsOnSpeech(
 			out[j].endSec = out[last].endSec;
 		}
 	}
-	return out;
 }

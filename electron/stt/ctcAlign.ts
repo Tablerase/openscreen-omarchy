@@ -18,6 +18,7 @@
 // Self-contained on purpose: tools/stt-eval/word-timing imports this file
 // straight into Node, which resolves no extensionless import.
 
+import { ownWords } from "./snapWordBoundaries.ts";
 import type { SttVadSegment } from "./transcriptionContract";
 
 /** What `/emissions` answers, decoded. */
@@ -58,7 +59,7 @@ export const PAUSE_END_OFFSET_SEC = 0.15;
 /** Audio kept on each side of a stretch of speech, so its first and last letters have context. */
 export const REGION_MARGIN_SEC = 0.3;
 
-/** As in snapWordBoundaries.ts: a stretch owns the words anchored before its end plus this tail. */
+/** As in snapWordBoundaries.ts: the audio the helper keeps past each speech offset. */
 const TAIL_SEC = 0.1;
 
 const WILDCARD = -1;
@@ -175,8 +176,8 @@ export function ctcViterbi(
 }
 
 /**
- * Re-time `words` on `emissions`. Each speech stretch owns the words anchored
- * in it (the rule of snapWordBoundaries.ts); they are aligned on the frames
+ * Re-time `words` on `emissions`. Each speech stretch owns the words
+ * `ownWords` (snapWordBoundaries.ts) gives it; they are aligned on the frames
  * between the neighbouring stretches, with the vocabulary's word delimiter
  * between words when it has one. Words outside every stretch, stretches the
  * model cannot fit, and a vocabulary with no word in it keep the helper's
@@ -192,12 +193,11 @@ export function alignWordsOnEmissions<W extends AlignableWord>(
 	const delimiter = index.get("|");
 	const V = emissions.vocab.length;
 	const { strideSec } = emissions;
-	let k = 0;
+	const ranges = ownWords(words, speech);
 	for (let i = 0; i < speech.length; i++) {
 		const { startSec: onset, endSec: offset } = speech[i];
-		const until = Math.min(offset + TAIL_SEC, speech[i + 1]?.startSec ?? Number.POSITIVE_INFINITY);
-		const owned: number[] = [];
-		for (; k < out.length && words[k].anchorSec < until; k++) owned.push(k);
+		const [from, to] = ranges[i];
+		const owned = Array.from({ length: to - from }, (_, n) => from + n);
 		// A region's frames stop up to one receptive field (25 ms) short of the audio
 		// it was cut from, so a stretch that runs to the end of the upload ends
 		// past them; two frames of slack keep it. `hi` below stays on the frames.

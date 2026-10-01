@@ -185,6 +185,22 @@ describe("alignWordsOnEmissions", () => {
 		expect(r(out[0].startSec)).toBe(r(30 * STRIDE + PAUSE_START_OFFSET_SEC));
 	});
 
+	it("aligns a sentence's last word in the stretch it closes, even anchored in the pause", () => {
+		// "b." is said on frame 25 (0.5 s), but DTW anchored it at 0.75 s, past the
+		// first stretch's tail (issue #948). It is aligned there, not in "c"'s audio.
+		const tokens = [...gap(15), "a", "|", ...gap(8), "b", ...gap(49), "c", ...gap(24)];
+		const out = alignWordsOnEmissions(
+			[word("a", 0.25, 0.35, 0.3), word("b.", 0.35, 0.75, 0.75), word("c", 0.75, 1.6, 1.55)],
+			[
+				{ startSec: 0.2, endSec: 0.6 },
+				{ startSec: 1.4, endSec: 1.8 },
+			],
+			emissions(tokens),
+		);
+		expect(r(out[1].startSec)).toBe(r(25 * STRIDE + PAUSE_START_OFFSET_SEC));
+		expect(r(out[2].startSec)).toBe(r(75 * STRIDE + PAUSE_START_OFFSET_SEC));
+	});
+
 	it("keeps the helper's times where it cannot align", () => {
 		const words = [word("ab", 0.3, 0.5, 0.35), word("c", 1.5, 1.7, 1.6)];
 		// The second word is outside every stretch; the first one's letters do not fit.

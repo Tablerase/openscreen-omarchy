@@ -309,7 +309,17 @@ it verbatim in the response.
    - its last real word ends on the offset, and the punctuation closing the
      phrase collapses to a point there;
    - a stretch owns the words whose `anchor` falls in it or in the 0.1 s tail
-     the helper keeps past its offset.
+     the helper keeps past its offset (`ownWords`, which step 5 reads too);
+   - except a word that ends a sentence (`.`, `!`, `?`, `…`, full-width forms
+     included) anchored in the pause, before the next stretch's speech: it
+     closes the stretch before it, with its punctuation. DTW put "happened."
+     of "…as if nothing happened. The transcript…" there on an rc.6 take, so
+     the next stretch put it on its onset, after "The", as a 20 ms word, and
+     the aligner looked for it in "The"'s audio (issue #948). A one-word
+     sentence anchored inside the next speech ("Heaven!") still opens it;
+     moving those too cost phrase deletes on LibriSpeech;
+   - last, starts are made monotonic and no word ends before it starts: a
+     start past the next word's comes back to it.
 
    Words own the speech, never the pause: deleting a phrase's last word keeps
    the pause after it. `MAX_ANCHOR_SEC` bounds the stretching only: a word more
