@@ -37,7 +37,8 @@ node evaluate.mjs <tag> [--snap <post-pass.ts>] [--out <name>]
 node summarize.mjs "Before=<baseline>" "After=<name>"
 ```
 
-- `run-helper.mjs` starts its own helper on a port in 20500-20599 with the
+- `run-helper.mjs` starts its own helper on a port in 20500-20599 (or the
+  100 ports from `OSC_WORD_TIMING_PORT`, to run beside another agent) with the
   app's models (`%APPDATA%/openscreen/stt-models/whisper-ggml`: `ggml-small-q8_0.bin`
   and `ggml-silero-v6.2.0.bin`), sends every clip like the app does, and stops
   it. Vulkan takes about 2 min for the 55 min of audio, CPU about 17.

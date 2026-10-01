@@ -212,6 +212,29 @@ it verbatim in the response.
    `flash_attn=false`, which together are the prerequisites for DTW to
    actually run). `t_dtw == -1` is the DTW-inactive guardrail: the helper
    fails the request rather than emit zero-quality timestamps.
+   **The DTW pass is ours, not upstream's.** whisper.cpp teacher-forces the
+   decoded BPE tokens a second time and aligns their cross-attention on the
+   audio. [`whisper-patches/char-dtw.cpp`](../../electron/native/whisper-stt/whisper-patches/char-dtw.cpp)
+   replaces that pass and feeds the text back **one character per decoder
+   row** instead ("Whisper Has an Internal Word Aligner", arXiv 2509.09987),
+   so a boundary falls on the row of the space or letter where the next word
+   starts, not on the edge of a multi-letter token. `CMakeLists.txt` splices it
+   into a build-tree copy of `whisper.cpp`; the fetched source is never edited,
+   and bumping `WHISPER_REF` fails the configure if the code it replaces moved.
+   What it does differently, each measured on the harness below:
+   - the heads' attention is averaged and each audio frame scaled to unit L2
+     norm, as in the paper. Upstream's z-score and median filter do worse on
+     characters, and the median filter was most of the pass's CPU time;
+   - French drops one silent final consonant per word (*vais*, *vous*,
+     *plaît*) before aligning. Its row otherwise holds the start of the next
+     word: +60 to +140 ms on the word after it;
+   - the decoder has 448 positions. A window too long as characters is
+     aligned in several passes, each with one stretch as characters and the
+     rest of the window as BPE tokens;
+   - the alignment heads stay `WHISPER_AHEADS_SMALL`. Picking the ten heads
+     with the most concentrated attention per window out of all 144, as the
+     paper does, chose nearly the same ten every time and scored worse
+     (inner median 24 ms, phrase starts 82% within 50 ms).
 3. **Word grouping** — BPE tokens join into a single word whenever the
    detokenized text begins with a space, or at the first token of the
    segment.
@@ -235,7 +258,7 @@ it verbatim in the response.
    **end** (`tools/stt-eval/whispercpp-dtw-poc/REPORT.md`).
 5. **Anchor phrase edges on the speech** —
    [`electron/stt/snapWordBoundaries.ts`](../../electron/stt/snapWordBoundaries.ts)
-   leaves boundaries inside a phrase alone: they are within ~30 ms of the audio
+   leaves boundaries inside a phrase alone: they are within ~16 ms of the audio
    already, and an energy snap on top of them drags correct boundaries early.
    The edges of a phrase are different. The token before a phrase's first word
    is the previous phrase's last one, so that word starts in the pause, as
@@ -269,6 +292,10 @@ one word or one phrase. Issue #948 has the method, the baseline and the plan.
 |---|---|---|---|---|
 | First-token start + 150 ms RMS snap + VAD edges (before #948) | 105 / 275 ms / 32% | 83% | 5% | 84% |
 | Previous-token start + two-way VAD edges | 31 / 125 ms / 64% | 89% | 19% | 88% |
+| Same, character-level DTW | 16 / 60 ms / 86% | 89% | 39% | 93% |
+
+Per language, character-level DTW gives French 19 ms median and 83% within
+50 ms (was 26 ms, 70%) and English 15 ms and 89% (was 40 ms, 57%).
 
 A +15 ms calibration offset on every boundary gained 4 points of inner
 boundaries within 50 ms but dropped noisy phrase deletes to 82%, so it is not
@@ -793,6 +820,7 @@ it deletes data
   runtime.
 - **Word timing inside a phrase.** Phrase edges sit on the VAD (step 5), but
   a word in the middle of continuous speech is only as good as whisper-small's
-  DTW: about 30 ms median and 125 ms P90, so one single-word delete in five is
-  clean. Character-level DTW, then a CTC forced aligner, are the upgrade path
-  (issue #948 Phases 2 and 3); `tools/stt-eval/word-timing` measures them.
+  character-level DTW: about 16 ms median and 60 ms P90 on synthetic speech,
+  so about two single-word deletes in five are clean. A CTC forced aligner is
+  the upgrade path (issue #948 Phase 3); `tools/stt-eval/word-timing`
+  measures it.

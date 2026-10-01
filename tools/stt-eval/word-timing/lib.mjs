@@ -24,10 +24,10 @@ export const SR = 16000;
 
 /**
  * Starts whisper-stt-server with the app's models on a random port in
- * 20500-20599 and waits until it answers. The process is killed on exit.
+ * 20500-20599 (OSC_WORD_TIMING_PORT moves the range) and waits until it answers. The process is killed on exit.
  */
 export async function startHelper(exe, { cpu = false, env = process.env } = {}) {
-	const port = 20500 + Math.floor(Math.random() * 100);
+	const port = Number(process.env.OSC_WORD_TIMING_PORT ?? 20500) + Math.floor(Math.random() * 100);
 	const args = [
 		"--model",
 		path.join(MODELS, "ggml-small-q8_0.bin"),
