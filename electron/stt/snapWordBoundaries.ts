@@ -49,6 +49,9 @@ const TAIL_SEC = 0.1;
 /** French puts a space before `!`, `?`, `:` and `;`, so whisper emits them as words. */
 const isPunctuation = (word: string) => /^[\p{P}\p{S}]+$/u.test(word);
 
+/** An opening bracket or quote starts what follows, so it never closes a sentence. */
+const opens = (word: string) => /^[\p{Ps}\p{Pi}]+$/u.test(word);
+
 /** `.`, `!`, `?`, `…` or a full-width form, maybe inside a closing quote or bracket. */
 const endsSentence = (text: string) => /[.!?…。！？．｡][\p{Pe}\p{Pf}"']*$/u.test(text);
 
@@ -85,7 +88,7 @@ export function ownWords(
 		let first = k;
 		while (first < words.length && isPunctuation(words[first].word)) first++;
 		let end = first + 1;
-		while (end < words.length && isPunctuation(words[end].word)) end++;
+		while (end < words.length && isPunctuation(words[end].word) && !opens(words[end].word)) end++;
 		if (
 			i + 1 < speech.length &&
 			first < words.length &&

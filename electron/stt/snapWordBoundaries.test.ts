@@ -138,6 +138,21 @@ describe("anchorWordsOnSpeech", () => {
 		]);
 	});
 
+	it("does not read an opening bracket after a sentence's last word as part of its end", () => {
+		// "b." is anchored in the pause, then whisper split "(" off the next word:
+		// "b.(" is no sentence end, so "b." would have opened the next stretch.
+		const words = [
+			word("a", 28.2, 30.03, 30.03),
+			word("b.", 30.03, 30.69, 30.69),
+			word("(", 30.69, 31.4, 31.4),
+			word("c)", 31.4, 32, 32),
+		];
+		expect(ownWords(words, pause)).toEqual([
+			[0, 2],
+			[2, 4],
+		]);
+	});
+
 	it("lets a one-word sentence open a stretch when it is anchored in its speech", () => {
 		const words = [
 			word("Agreed?", 28.13, 30.5, 30.4),
