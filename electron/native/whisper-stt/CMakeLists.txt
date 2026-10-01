@@ -174,6 +174,9 @@ configure_file("${CMAKE_CURRENT_BINARY_DIR}/whisper-patched/whisper.cpp.tmp"
   "${CMAKE_CURRENT_BINARY_DIR}/whisper-patched/whisper.cpp" COPYONLY)
 get_target_property(osc_whisper_srcs whisper SOURCES)
 list(TRANSFORM osc_whisper_srcs REPLACE "^whisper\\.cpp$" "${CMAKE_CURRENT_BINARY_DIR}/whisper-patched/whisper.cpp")
+if(NOT "${CMAKE_CURRENT_BINARY_DIR}/whisper-patched/whisper.cpp" IN_LIST osc_whisper_srcs)
+  message(FATAL_ERROR "char-dtw: the whisper target does not list whisper.cpp as expected (${osc_whisper_srcs})")
+endif()
 set_property(TARGET whisper PROPERTY SOURCES ${osc_whisper_srcs})
 
 add_executable(whisper-stt-server src/main.cpp)
