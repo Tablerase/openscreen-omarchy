@@ -12,7 +12,7 @@
 // where the path reaches the row that predicts the space or the letter after
 // it, not wherever a multi-letter token happens to start. On the word-timing
 // harness (tools/stt-eval/word-timing) it takes the inner-boundary median from
-// 31 to about 17 ms.
+// 31 to 16 ms.
 //
 // t_dtw keeps its upstream meaning: the time the path enters the row that
 // predicts whatever follows the token, i.e. the END of the token.
@@ -20,7 +20,7 @@
 // Departures from upstream, all measured on the harness:
 // - the attention of the heads is averaged and each audio frame's column is
 //   scaled to unit L2 norm, as in the paper. Upstream's z-score + median filter
-//   does worse on characters (+8 ms median);
+//   does worse on characters (+7 ms median);
 // - French drops one silent final consonant per word before aligning (vais,
 //   vous, plaît): its row otherwise eats the start of the next word, +60 to
 //   +140 ms on the words after it;
