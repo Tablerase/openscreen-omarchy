@@ -33,7 +33,9 @@ node validate-ref.mjs    # checks the reference against the audio's energy
 
 ```sh
 node run-helper.mjs <tag> <path/to/whisper-stt-server.exe> [--cpu]
-node evaluate.mjs <tag> [--snap <post-pass.ts>] [--out <name>]
+node run-align.mjs <tag> <tag>-ctc <path/to/whisper-stt-server.exe> \
+  --model en=<w2v-en-base-q8_0.gguf> --model fr=<w2v-fr-large-q8_0.gguf> [--cpu]
+node evaluate.mjs <tag>-ctc [--snap <post-pass.ts>] [--ctc <ctcAlign.ts>] [--out <name>]
 node summarize.mjs "Before=<baseline>" "After=<name>"
 ```
 
@@ -45,20 +47,43 @@ node summarize.mjs "Before=<baseline>" "After=<name>"
 - `evaluate.mjs` parses the responses as `whisperServer.ts` does and runs the
   post-pass: the repo's `electron/stt/snapWordBoundaries.ts` by default, or the
   file given with `--snap`. It reports three stages: `raw`, `post` (no speech
-  intervals) and `post+vad` (what the app ships).
+  intervals) and `post+vad` (what the app ships without an aligner).
+- `run-align.mjs` adds the CTC aligner's letter scores (`/emissions`) to saved
+  responses, without running whisper again, for the language each clip was
+  detected in. On those, `evaluate.mjs` adds `ctc` (the aligner,
+  `electron/stt/ctcAlign.ts` or `--ctc`) and `ctc+vad` (what the app ships with
+  an aligner), and the aligner's share of the runtime.
+- The aligner GGUFs come from `scripts/convert-wav2vec2-gguf.mjs` (sources in
+  its header), or from the app's cache: `stt-models/ctc-aligner/`.
 - A baseline is the same two commands on an older helper and post-pass:
   build the helper at that revision, and pass
   `git show <rev>:electron/stt/snapWordBoundaries.ts` saved to a file as `--snap`.
 
 ## Real speech
 
+**LibriSpeech, against forced-aligned word times** (English read speech; the
+Montreal Forced Aligner reference is itself 10 to 20 ms from a human's):
+
 ```sh
-node real-check.mjs <whisper-stt-server.exe> take.wav   # 16 kHz mono s16
+# test-clean.tar.gz from https://www.openslr.org/12, librispeech_alignments.zip
+# from https://zenodo.org/records/2619474 (both CC-BY-4.0, dev-time only)
+export OSC_WORD_TIMING_DATA=<another data dir>
+node make-librispeech.mjs <LibriSpeech/test-clean> <alignments/test-clean>   # 2 clips x 40 speakers, ~46 min
+node run-helper.mjs ls <exe> --condition clean
+node run-align.mjs ls ls-ctc <exe> --model en=<w2v-en-base-q8_0.gguf>
+node evaluate.mjs ls-ctc
 ```
 
-No ground truth there: it prints how far each word's first-token time lies after
-its start, and where each phrase's first word lands against the VAD onset, raw
-and after the post-pass.
+**A take of your own**, with no ground truth:
+
+```sh
+node real-check.mjs <whisper-stt-server.exe> take.wav [--align <aligner.gguf>]   # 16 kHz mono s16
+```
+
+It prints how far each word's first-token time lies after its start, and where
+each phrase's first word lands against the VAD onset, raw and after the
+post-pass. With `--align`, every word is listed with its phase-1 and aligner
+times, so the boundaries that moved can be checked by ear or on a spectrogram.
 
 ## Reading the numbers
 
@@ -68,3 +93,6 @@ and after the post-pass.
   at most 20 ms of its neighbours is cut.
 - Synthetic speech flatters every method. Use the harness to rank approaches,
   and check a winner on real speech.
+- The aligner's calibration (`START_OFFSET_SEC` and the others in
+  `ctcAlign.ts`) was fitted on the TTS corpus and checked on LibriSpeech; refit
+  both before changing a model.

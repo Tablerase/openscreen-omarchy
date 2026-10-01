@@ -22,7 +22,9 @@ import { pipeline } from "node:stream/promises";
  *
  * Word timestamps come from whisper.cpp's native DTW token timestamps. The
  * Silero VAD model only decides which audio whisper decodes, and gives the
- * speech edges phrases are anchored on. See `technical-documentation/architecture/transcription-and-captions.md`.
+ * speech edges phrases are anchored on. The CTC aligners (`CTC_ALIGNERS`) re-time
+ * the words for the languages that have one, and are fetched only when a
+ * transcription detects such a language. See `technical-documentation/architecture/transcription-and-captions.md`.
  */
 
 export type SttModelId = "whisper" | "silero-vad";
@@ -93,6 +95,71 @@ export const STT_MODELS: Record<SttModelId, SttModelDescriptor> = {
 		],
 	},
 };
+
+/**
+ * The CTC aligners that re-time whisper's words (electron/stt/ctcAlign.ts), per
+ * language whisper reports. A language missing here keeps whisper's DTW times.
+ *
+ * Each file is a wav2vec2 CTC model converted to GGUF by
+ * `scripts/convert-wav2vec2-gguf.mjs` (deterministic: re-running it on the source
+ * named in `source` reproduces the digest below), then published under a `v0.0.0-*`
+ * release tag like the other binaries that need a permanent URL but are not a
+ * product version (see scripts/fetch-onnxruntime.mjs). Apache-2.0, both of them.
+ */
+const ALIGNER_RELEASE =
+	"https://github.com/getopenscreen/openscreen/releases/download/v0.0.0-ctc-aligners-1";
+
+export interface CtcAlignerFile extends SttModelFile {
+	/** HuggingFace repo and revision the file was converted from. */
+	source: string;
+}
+
+export const CTC_ALIGNERS: Record<string, CtcAlignerFile> = {
+	en: {
+		name: "w2v-en-base-q8_0.gguf",
+		url: `${ALIGNER_RELEASE}/w2v-en-base-q8_0.gguf`,
+		expectedSha256: "b7f21a97208f368d3505bd9a7bc9ff3795b1169d8e3b036028082eb25eb464ae",
+		approximateBytes: 109_040_064,
+		source: "facebook/wav2vec2-base-960h@22aad52d435eb6dbaf354bdad9b0da84ce7d6156",
+	},
+	fr: {
+		name: "w2v-fr-large-q8_0.gguf",
+		url: `${ALIGNER_RELEASE}/w2v-fr-large-q8_0.gguf`,
+		expectedSha256: "e3c284da3e27564db07ac226bf6402a4d7856b806455b3e0f5283f29f9495f48",
+		approximateBytes: 348_037_120,
+		// The repo's safetensors conversion PR: main only has pytorch_model.bin.
+		source: "jonatasgrosman/wav2vec2-large-xlsr-53-french@70db24a266633ffcc8edce4e72f3a5cb69d602d6",
+	},
+};
+
+const ALIGNER_DIR = "ctc-aligner";
+
+/** Where the aligner for `language` lives, or null when there is none for it. */
+export function alignerPath(baseDir: string, language: string): string | null {
+	const file = Object.keys(CTC_ALIGNERS).includes(language) ? CTC_ALIGNERS[language] : null;
+	return file ? path.join(baseDir, ALIGNER_DIR, file.name) : null;
+}
+
+/**
+ * Make sure the aligner for `language` is on disk, downloading and verifying it
+ * like the whisper model. Null when the language has none; throws when the
+ * download fails, which the caller turns into "keep whisper's times".
+ */
+export async function ensureAligner(opts: {
+	baseDir: string;
+	language: string;
+	onProgress?: (downloadedBytes: number, totalBytes: number) => void;
+	fetcher?: typeof fetch;
+}): Promise<string | null> {
+	const filePath = alignerPath(opts.baseDir, opts.language);
+	if (!filePath) return null;
+	const file = CTC_ALIGNERS[opts.language];
+	await ensureFile(filePath, file.url, file.expectedSha256, {
+		onProgress: (bytes) => opts.onProgress?.(bytes, file.approximateBytes),
+		fetcher: opts.fetcher,
+	});
+	return filePath;
+}
 
 export function modelPaths(baseDir: string): Record<SttModelId, string> {
 	return {

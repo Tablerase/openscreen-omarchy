@@ -21,12 +21,20 @@
 //   OPENSCREEN_WHISPER_MODEL       GGML model    (default: the userData cache location)
 //   OPENSCREEN_VAD_MODEL           Silero VAD model (default: next to the GGML model;
 //                                  the speech checks run only when it is there, as in the app)
+//   OPENSCREEN_ALIGNER_MODEL       CTC word aligner (default: the cached one for the detected
+//                                  language; the aligner checks run only when it is there)
 
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+	alignWordsOnEmissions,
+	emissionRegions,
+	parseEmissions,
+} from "../electron/stt/ctcAlign.ts";
+import { CTC_ALIGNERS } from "../electron/stt/modelManager.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, "..");
@@ -244,6 +252,8 @@ async function main() {
 	});
 
 	let json;
+	let emissions = null;
+	let alignerModel = null;
 	try {
 		await waitForReady(`http://127.0.0.1:${port}/`);
 		const form = new FormData();
@@ -256,6 +266,26 @@ async function main() {
 		});
 		if (!res.ok) throw new Error(`/inference returned ${res.status}: ${await res.text()}`);
 		json = await res.json();
+		// The word aligner's acoustic pass, on the same helper, as SttManager runs it.
+		const cached = CTC_ALIGNERS[json.detected_language];
+		alignerModel =
+			process.env.OPENSCREEN_ALIGNER_MODEL ??
+			(cached ? path.join(path.dirname(path.dirname(MODEL)), "ctc-aligner", cached.name) : null);
+		if (WITH_VAD && alignerModel && fs.existsSync(alignerModel)) {
+			const speech = (json.speech ?? []).map((x) => ({ startSec: x.start, endSec: x.end }));
+			const aform = new FormData();
+			aform.append("file", new Blob([fs.readFileSync(wavPath)]), path.basename(wavPath));
+			aform.append("model", alignerModel);
+			aform.append("regions", JSON.stringify(emissionRegions(speech, meta.durationSec)));
+			const ares = await fetch(`http://127.0.0.1:${port}/emissions`, {
+				method: "POST",
+				body: aform,
+			});
+			if (!ares.ok) throw new Error(`/emissions returned ${ares.status}: ${await ares.text()}`);
+			emissions = await ares.json();
+		} else {
+			alignerModel = null;
+		}
 	} finally {
 		child.kill();
 		cleanup();
@@ -359,6 +389,76 @@ async function main() {
 	if (refText) {
 		const rate = wer(refText, text);
 		check(rate <= 0.15, "WER within tolerance", `${rate.toFixed(4)}`);
+	}
+
+	// The aligner (electron/stt/ctcAlign.ts) only gets letter scores from the
+	// helper; a forward pass gone wrong on a backend (a missing op, a wrong
+	// layout) still answers 200 with well-formed garbage. Reading its best letter
+	// per frame back as text is what tells the two apart.
+	if (emissions) {
+		const parsed = parseEmissions(emissions);
+		check(parsed !== null, "aligner answers well-formed letter scores", alignerModel);
+		if (parsed) {
+			const V = parsed.vocab.length;
+			let worst = 0;
+			let greedy = "";
+			for (const r of parsed.regions) {
+				let prev = -1;
+				for (let t = 0; t < r.frames; t++) {
+					let sum = 0;
+					let best = 0;
+					for (let v = 0; v < V; v++) {
+						sum += Math.exp(r.logprobs[t * V + v]);
+						if (r.logprobs[t * V + v] > r.logprobs[t * V + best]) best = v;
+					}
+					worst = Math.max(worst, Math.abs(sum - 1));
+					if (best !== prev && best !== parsed.blank)
+						greedy += parsed.vocab[best] === "|" ? " " : parsed.vocab[best];
+					prev = best;
+				}
+				greedy += " ";
+			}
+			check(
+				worst < 1e-3,
+				"aligner frames are log-probabilities",
+				`max |sum - 1| = ${worst.toExponential(1)}`,
+			);
+			if (gpuExpected) {
+				check(
+					emissions.device !== "CPU",
+					"aligner runs on the GPU on a GPU-capable host",
+					emissions.device,
+				);
+			}
+			// Letters, not words: the aligner spells "OpenScreen" as it hears it.
+			// Measured: 0.31 on a real French take, 0.11 on English TTS; a forward
+			// pass gone wrong decodes to noise, near 1.
+			const letters = (x) => normalize(x).join("").split("").join(" ");
+			const heard = wer(letters(text), letters(greedy));
+			console.log(`\naligner: ${greedy.trim().slice(0, 200)}`);
+			check(
+				heard <= 0.5,
+				"aligner hears what whisper heard",
+				`letter error rate ${heard.toFixed(2)} on ${emissions.device}`,
+			);
+			const speech = (json.speech ?? []).map((x) => ({ startSec: x.start, endSec: x.end }));
+			const plain = words.map((w) => ({
+				word: w.word.trim(),
+				startSec: w.start,
+				endSec: w.end,
+				anchorSec: w.anchor ?? w.start,
+			}));
+			const aligned = alignWordsOnEmissions(plain, speech, parsed);
+			check(
+				aligned.every(
+					(w, i) => w.endSec >= w.startSec && (i === 0 || w.startSec >= aligned[i - 1].startSec),
+				),
+				"aligned words stay ordered and non-empty",
+			);
+			console.log(`aligner: ${emissions.elapsed_s.toFixed(2)}s on ${emissions.device}`);
+		}
+	} else {
+		console.log("\n(no aligner for this language in the cache: aligner checks skipped)");
 	}
 
 	if (json.timing) {

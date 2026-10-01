@@ -2,7 +2,7 @@ import path from "node:path";
 import { app, type IpcMain } from "electron";
 import { planChunks } from "./chunking";
 import { extractMono16kPcm } from "./extractAudio";
-import { ensureModels, modelPaths } from "./modelManager";
+import { ensureAligner, ensureModels, modelPaths } from "./modelManager";
 import type {
 	SttPhraseSegment,
 	SttStatusEvent,
@@ -104,6 +104,38 @@ export class SttManager {
 	 * kill that new run.
 	 */
 	private cancelEpoch = 0;
+
+	/**
+	 * The word aligner per language (ctcAlign.ts), resolved once per session: its
+	 * file is hashed on the way in, and that is not free at 350 MB. A language
+	 * whose download failed is left out for the rest of the run rather than
+	 * retried per chunk, and tried again on the next one.
+	 */
+	private readonly aligners = new Map<string, Promise<string | null>>();
+	private readonly alignersFailed = new Set<string>();
+
+	private readonly alignerFor = (language: string): Promise<string | null> => {
+		if (this.alignersFailed.has(language)) return Promise.resolve(null);
+		let resolved = this.aligners.get(language);
+		if (!resolved) {
+			resolved = ensureAligner({
+				baseDir: this.getModelsDir(),
+				language,
+				onProgress: (downloadedBytes, totalBytes) =>
+					this.emit({ phase: "model", model: "ctc-aligner", downloadedBytes, totalBytes }),
+			}).catch((error: unknown) => {
+				console.warn(
+					`[stt] no word aligner for "${language}", keeping whisper's word times: ` +
+						`${error instanceof Error ? error.message : String(error)}`,
+				);
+				this.alignersFailed.add(language);
+				this.aligners.delete(language);
+				return null;
+			});
+			this.aligners.set(language, resolved);
+		}
+		return resolved;
+	};
 
 	/**
 	 * The extraction in flight, if any. `cancelEpoch` alone stops the CHUNK loop, which is
@@ -235,7 +267,7 @@ export class SttManager {
 		for (let attempt = 1; attempt <= CHUNK_ATTEMPTS; attempt++) {
 			if (this.shuttingDown) throw cancelledError();
 			try {
-				return await this.server.transcribe({ samples, language });
+				return await this.server.transcribe({ samples, language, alignerFor: this.alignerFor });
 			} catch (error) {
 				lastError = error;
 				if (this.shuttingDown) throw cancelledError();
@@ -273,6 +305,7 @@ export class SttManager {
 		await this.init();
 
 		const epoch = this.cancelEpoch;
+		this.alignersFailed.clear();
 		// Extraction is part of the run, and on a long file it is the part the user used
 		// to watch the editor freeze through. Doing it here means the renderer hands over
 		// a path and gets segments back, holding none of the audio. No new status phase:

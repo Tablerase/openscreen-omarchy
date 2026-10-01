@@ -112,6 +112,11 @@ renderer imposes a timeout that a slow download could trip: the preload does a
 bare `ipcRenderer.invoke`, `fetchWithRetry` has no per-request deadline, and
 whisper-server's 30 s readiness budget only starts once the download resolved.
 
+The word aligner (§ Word-level alignment, step 5) is the exception to "first
+run only": it is fetched the first time a transcription detects English or
+French (109 or 348 MB), in the middle of that run, which then simply takes
+longer once more.
+
 Three edges make that promise hold, and each is load-bearing:
 
 - **A failed setup is not cached.** `SttManager.init` used to memoise the
@@ -184,14 +189,14 @@ it verbatim in the response.
 > `ggml_backend_dev_type()` being GPU/IGPU, which also drops ggml-blas
 > (Accelerate on macOS, device type ACCEL) from consideration.
 
-### Word-level alignment (DTW token timestamps)
+### Word-level alignment (DTW token timestamps, then a CTC aligner)
 
 0. **Speech only** — when the Silero VAD model is on disk (`ggml-silero-v6.2.0.bin`,
    downloaded next to the whisper model), the helper cuts the silence out of
    the upload before whisper sees it, the way whisper.cpp's own VAD does: each
    speech stretch plus 0.1 s of tail, 0.1 s of silence between stretches. It
    keeps the map, and every time below goes back through it onto the upload's
-   clock. The stretches are returned as `speech` for step 5.
+   clock. The stretches are returned as `speech` for steps 5 and 6.
    > **Not whisper_full's `vad` param.** whisper.cpp 1.9.1 maps its *segment*
    > times back onto the original audio but not its token times, `t_dtw`
    > included, so every word came back early by all the silence removed before
@@ -248,7 +253,7 @@ it verbatim in the response.
      first word has none and falls back to its own first token.
    - `word.end` = `t_dtw` of the word's **last** token.
    - `word.anchor` = `t_dtw` of the word's first token. It always lies inside
-     the word, and only decides which stretch of speech owns it (step 5).
+     the word, and only decides which stretch of speech owns it (steps 5 and 6).
 
    The result is a monotonic, gap-free timeline of word ranges on the upload's
    clock. Taking the first token's `t_dtw` as the start, as the helper did
@@ -256,7 +261,37 @@ it verbatim in the response.
    below, and a median 200 ms on a real French take. The repo's DTW POC saw
    the same thing as whisper.cpp's `t_dtw` matching faster-whisper's word
    **end** (`tools/stt-eval/whispercpp-dtw-poc/REPORT.md`).
-5. **Anchor phrase edges on the speech** —
+5. **Re-time the words on a CTC aligner** (issue #948, phase 3) — when the
+   language whisper detected has one, a wav2vec2 model fine-tuned for CTC scores
+   every 20 ms frame of the speech against every letter, and
+   [`electron/stt/ctcAlign.ts`](../../electron/stt/ctcAlign.ts) forces
+   whisper's own words through those scores:
+   - **The helper only scores.** `POST /emissions` (same WAV, the aligner's
+     GGUF path, the regions to score: each stretch of speech ±0.3 s, merged)
+     answers the log-probabilities per frame
+     ([`ctc_aligner.cpp`](../../electron/native/whisper-stt/src/ctc_aligner.cpp),
+     a wav2vec2 forward pass on ggml, on the GPU whisper uses). It is a
+     separate request so the stage stays separate: it reads whisper's words,
+     whatever produced their times.
+   - **Spelling.** Each word is lowercased (uppercased for the English model),
+     its apostrophes normalised, its punctuation dropped, and an accent the
+     vocabulary lacks falls back to the base letter. A word that cannot be
+     spelled (digits, `€`, another script) becomes one wildcard token that
+     scores as the frame's best letter, so it holds its place and its
+     neighbours stay aligned. The vocabulary's word delimiter `|` goes between
+     words.
+   - **Viterbi** over the frames of each stretch (the one that owns the words
+     by `anchor`, as in step 6), then calibration: CTC is sure of a letter a
+     little after the sound starts and before it ends, so a word starts 45 ms
+     before its first letter's frame and ends 25 ms after its last one. Where
+     the two estimates cross inside continuous speech, the boundary is their
+     midpoint. Next to a pause (a gap of 100 ms or more between letters) the
+     edges move further out, 60 ms before and 150 ms after, both capped at
+     mid-pause: early there is silence, late is an audible attack.
+   - **Fallback.** No aligner for the language, a download that failed, a
+     helper without `/emissions`, a stretch whose letters do not fit in its
+     frames: the words keep the times of step 4. Step 6 runs either way.
+6. **Anchor phrase edges on the speech** —
    [`electron/stt/snapWordBoundaries.ts`](../../electron/stt/snapWordBoundaries.ts)
    leaves boundaries inside a phrase alone: they are within ~16 ms of the audio
    already, and an energy snap on top of them drags correct boundaries early.
@@ -287,15 +322,29 @@ scores the helper and this post-pass against a Windows-TTS corpus with exact
 word times (27 min of French and English narration, clean and noisy):
 boundary error by position, and the audible residue and clipping of deleting
 one word or one phrase. Issue #948 has the method, the baseline and the plan.
+The same harness scores real read speech: 46 min of LibriSpeech test-clean
+(40 speakers, English) against Montreal Forced Aligner word times, which are
+themselves about 10 to 20 ms from a human's.
 
-| Pipeline (clean + noisy) | Inner start: median / P90 / within 50 ms | Phrase-initial start within 50 ms | One-word delete: clean cuts | Phrase delete: clean |
+| Pipeline | Inner start: median / P90 / within 50 ms | Phrase-initial start within 50 ms | One-word delete: clean cuts | Phrase delete: clean |
 |---|---|---|---|---|
-| First-token start + 150 ms RMS snap + VAD edges (before #948) | 105 / 275 ms / 32% | 83% | 5% | 84% |
-| Previous-token start + two-way VAD edges | 31 / 125 ms / 64% | 89% | 19% | 88% |
-| Same, character-level DTW | 16 / 60 ms / 86% | 89% | 39% | 93% |
+| First-token start + 150 ms RMS snap + VAD edges (before #948), TTS | 105 / 275 ms / 32% | 83% | 5% | 84% |
+| Previous-token start + two-way VAD edges (phase 1), TTS | 31 / 125 ms / 64% | 89% | 19% | 88% |
+| + CTC aligner (phase 3), TTS clean | 14 / 35 ms / 96% | 95% | 50% | 96% |
+| + CTC aligner (phase 3), TTS noisy | 15 / 39 ms / 95% | 93% | 48% | 93% |
+| Phase 1, LibriSpeech | 40 / 145 ms / 55% | 67% | 14% | 71% |
+| + CTC aligner (phase 3), LibriSpeech | 15 / 45 ms / 92% | 73% | 44% | 82% |
 
-Per language, character-level DTW gives French 19 ms median and 83% within
-50 ms (was 26 ms, 70%) and English 15 ms and 89% (was 40 ms, 57%).
+With the aligner, deleting one word leaves on average 17 ms of it audible and
+cuts 15 ms into its neighbours (TTS clean; 20 and 13 ms on LibriSpeech), against
+40 and 44 ms before. The misses left on phrase-initial starts are mostly the
+reference's: the French TTS voices start a word on its silent stop closure,
+which no aligner hears. On a real French take (25 s, no reference) checked on
+its spectrogram, the aligner moved six boundaries by more than 40 ms: three
+onto a visible boundary that phase 1 had missed by 65 to 250 ms (e.g.
+"montrer | ça" from inside `montrer` to the onset of the /s/), one the right
+way but still about 150 ms early (a drawn-out "Bah… voilà"), and two between
+vowels, where the spectrogram cannot tell.
 
 A +15 ms calibration offset on every boundary gained 4 points of inner
 boundaries within 50 ms but dropped noisy phrase deletes to 82%, so it is not
@@ -340,6 +389,26 @@ once instead of merely breaking new installs; pinning makes the recorded
 digest an invariant. Bumping the model therefore means bumping the revision
 and the digest together.
 
+**The word aligners** (step 5) are fetched only for a language that has one,
+the first time a transcription detects it, inside the same run (`phase:
+"model"`, `model: "ctc-aligner"`), into `stt-models/ctc-aligner/`. A failed
+download keeps whisper's times for the rest of the run and is retried on the
+next one.
+
+| Language | Model | Download |
+|---|---|---|
+| English | `facebook/wav2vec2-base-960h` (12 layers, letters) | 109 MB |
+| French | `jonatasgrosman/wav2vec2-large-xlsr-53-french` (24 layers, letters and accents) | 348 MB |
+
+Both are Apache-2.0. `scripts/convert-wav2vec2-gguf.mjs` turns the upstream
+`model.safetensors` into the GGUF the helper loads: linear weights Q8_0 (which
+is what keeps the French model under 350 MB), convolutions F16, the positional
+convolution's weight norm folded. The conversion is deterministic, so the
+SHA-256 pinned in `CTC_ALIGNERS` (`electron/stt/modelManager.ts`) can be
+reproduced from the upstream revision it names. The files are served from a
+`v0.0.0-ctc-aligners-1` release, the convention this repo uses for binaries
+that need a permanent URL but are not a product version.
+
 > The HuggingFace identifier is intentionally `ggerganov/whisper.cpp`,
 > **not** `ggml-org/whisper.cpp`. The latter matches the GitHub org the
 > engine itself now lives under, but on HuggingFace it is a separate,
@@ -352,13 +421,15 @@ and the digest together.
 | Module | Role |
 |---|---|
 | `electron/stt/whisperServer.ts` | Server lifecycle; `POST /inference` client; verbose_json parser. |
-| `electron/stt/snapWordBoundaries.ts` | Anchors phrase edges on the VAD's speech (see step 5 above). |
+| `electron/stt/ctcAlign.ts` | Re-times words on the CTC aligner's letter scores (step 5): spelling, Viterbi, calibration, fallback. |
+| `electron/stt/snapWordBoundaries.ts` | Anchors phrase edges on the VAD's speech (see step 6 above). |
 | `electron/stt/wav.ts` | WAV write + temp-file cleanup helpers. |
 | `electron/stt/gpuDetector.ts` | Per-platform binary resolver (no GPU probing). |
-| `electron/stt/modelManager.ts` | Single GGML file download, SHA-256 verify, atomic write. |
+| `electron/stt/modelManager.ts` | Model downloads (whisper, Silero VAD, the per-language aligners), SHA-256 verify, atomic write. |
 | `electron/stt/transcriptionContract.ts` | Shared IPC types (`SttBackend`, `SttWordSegment`, `SttPhraseSegment`, `SttStatusEvent`). |
 | `electron/stt/index.ts` | `SttManager` — IPC entry point; wires the pieces together. |
-| `electron/native/whisper-stt/src/main.cpp` | httplib HTTP server; cuts the silence out with Silero VAD and maps times back (step 0); calls `whisper_full()` with DTW; reports the device it bound via `ggml_backend_dev_name()`. |
+| `electron/native/whisper-stt/src/main.cpp` | httplib HTTP server; cuts the silence out with Silero VAD and maps times back (step 0); calls `whisper_full()` with DTW; reports the device it bound via `ggml_backend_dev_name()`; `POST /emissions` for the aligner. |
+| `electron/native/whisper-stt/src/ctc_aligner.cpp` | wav2vec2-for-CTC forward pass on ggml (base and large layouts), in 20 s windows; loads the GGUF written by `scripts/convert-wav2vec2-gguf.mjs`. |
 | `electron/native/whisper-stt/CMakeLists.txt` | Pulls whisper.cpp via FetchContent; enables Metal (macOS arm64), Vulkan (Windows/Linux x64), CPU fallback everywhere; static backend linking into `whisper.dll`/`ggml.dll`. |
 
 The helper is one executable per platform; backends are baked in at build
@@ -818,9 +889,13 @@ it deletes data
 - **No C++ unit tests.** The WAV reader and the DTW-inactive guardrail
   in `electron/native/whisper-stt/src/main.cpp` are exercised only at
   runtime.
-- **Word timing inside a phrase.** Phrase edges sit on the VAD (step 5), but
-  a word in the middle of continuous speech is only as good as whisper-small's
-  character-level DTW: about 16 ms median and 60 ms P90 on synthetic speech,
-  so about two single-word deletes in five are clean. A CTC forced aligner is
-  the upgrade path (issue #948 Phase 3); `tools/stt-eval/word-timing`
-  measures it.
+- **Word timing without an aligner.** Phrase edges sit on the VAD (step 6),
+  and English and French words are re-timed on a CTC aligner (step 5). Every
+  other language keeps whisper-small's DTW: about 30 ms median and 125 ms P90
+  inside a phrase, so one single-word delete in five is clean. A multilingual
+  CTC model (`facebook/omniASR-CTC-300M`) would cover them, at a cost per
+  language family nobody has measured yet (issue #948).
+- **The aligner on the CPU.** On the GPU it adds about 10% to a transcription.
+  On the CPU fallback (16 threads, Ryzen 7 5800X) it adds 28% in English and
+  42 to 61% in French: the French model is a 24-layer wav2vec2 large, and its
+  forward pass costs about half of whisper-small's.

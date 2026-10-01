@@ -179,9 +179,10 @@ if(NOT "${CMAKE_CURRENT_BINARY_DIR}/whisper-patched/whisper.cpp" IN_LIST osc_whi
 endif()
 set_property(TARGET whisper PROPERTY SOURCES ${osc_whisper_srcs})
 
-add_executable(whisper-stt-server src/main.cpp)
+add_executable(whisper-stt-server src/main.cpp src/ctc_aligner.cpp)
 target_link_libraries(whisper-stt-server PRIVATE
   whisper
+  ggml
   httplib::httplib
   nlohmann_json::nlohmann_json
 )

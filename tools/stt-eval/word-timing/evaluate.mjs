@@ -1,11 +1,13 @@
 // Scores helper output against the TTS reference, for each pipeline stage.
-// Usage: node evaluate.mjs <tag> [--snap <post-pass.ts>] [--out <name>] [--quiet]
+// Usage: node evaluate.mjs <tag> [--snap <post-pass.ts>] [--ctc <ctcAlign.ts>] [--out <name>] [--quiet]
 //   reads <data>/results/raw/<tag>/*.json, writes <data>/results/<out>.json and
 //   <out>.txt, and prints the table.
 // Stages:
 //   raw      helper words, parsed as whisperServer.ts transcribeImpl does
 //   post     the post-pass without speech intervals
 //   post+vad the post-pass with the helper's `speech`, as the app runs it
+//   ctc      the CTC aligner's times (when run-align.mjs saved emissions)
+//   ctc+vad  ctc, then the post-pass with `speech`, as the app runs it with an aligner
 // `--snap` swaps the post-pass (default: the repo's snapWordBoundaries.ts), so a
 // candidate is scored exactly like the shipped code. It takes the current
 // `anchorWordsOnSpeech(words, speech)` or the pre-#948
@@ -24,6 +26,8 @@ const flag = (name, dflt) => {
 const snapPath = path.resolve(
 	flag("--snap", path.join(REPO, "electron/stt/snapWordBoundaries.ts")),
 );
+const ctcPath = path.resolve(flag("--ctc", path.join(REPO, "electron/stt/ctcAlign.ts")));
+const ctc = await import(pathToFileURL(ctcPath).href);
 const outName = flag("--out", tag);
 const quiet = rest.includes("--quiet");
 const mod = await import(pathToFileURL(snapPath).href);
@@ -96,7 +100,7 @@ const inside = (env, r0, r1, c0, c1) => {
 	return b > a ? { sec: b - a, aud: audible(env, a, b) } : { sec: 0, aud: 0 };
 };
 
-const STAGES = ["raw", "post", "post+vad"];
+let STAGES = ["raw", "post", "post+vad"];
 const acc = {};
 const push = (k, v) => {
 	acc[k] ??= [];
@@ -105,6 +109,7 @@ const push = (k, v) => {
 const counts = {};
 const inc = (k, v = 1) => (counts[k] = (counts[k] ?? 0) + v);
 const perClip = [];
+let ctcMs = 0;
 
 const rawDir = path.join(RESULTS, "raw", tag);
 for (const file of readdirSync(rawDir)
@@ -121,6 +126,14 @@ for (const file of readdirSync(rawDir)
 	const full = postPass(rawWords, samples, speech);
 	const tsMs = performance.now() - t0;
 	const variants = { raw: rawWords, post, "post+vad": full };
+	if (json.emissions && speech) {
+		const t1 = performance.now();
+		const aligned = ctc.alignWordsOnEmissions(rawWords, speech, ctc.parseEmissions(json.emissions));
+		variants.ctc = aligned;
+		variants["ctc+vad"] = postPass(aligned, samples, speech);
+		ctcMs += performance.now() - t1;
+		STAGES = ["raw", "post", "post+vad", "ctc", "ctc+vad"];
+	}
 
 	const R = ref.words.map((w, i) => ({ ...w, i, n: norm(w.text) })).filter((w) => w.n);
 	const H = rawWords.map((w, j) => ({ j, n: norm(w.word) })).filter((w) => w.n);
@@ -143,6 +156,7 @@ for (const file of readdirSync(rawDir)
 		audioSec: ref.durationSec,
 		helperSec: json.timing?.elapsed_s,
 		wallMs: json.wallMs,
+		alignSec: json.emissions?.elapsed_s,
 		tsMs,
 		refWords: R.length,
 		matched: pairs.length,
@@ -291,11 +305,15 @@ const rt = perClip.reduce(
 		helper: a.helper + (c.helperSec ?? 0),
 		wall: a.wall + c.wallMs / MS,
 		ts: a.ts + c.tsMs / MS,
+		align: a.align + (c.alignSec ?? 0),
 	}),
-	{ audio: 0, helper: 0, wall: 0, ts: 0 },
+	{ audio: 0, helper: 0, wall: 0, ts: 0, align: 0 },
 );
 lines.push(
-	`\nruntime: ${perClip.length} clips, ${(rt.audio / 60).toFixed(1)} min audio; helper ${rt.helper.toFixed(1)} s (RTF ${(rt.helper / rt.audio).toFixed(3)}), per clip mean ${(rt.helper / perClip.length).toFixed(2)} s; TS post-pass ${(rt.ts * MS).toFixed(0)} ms total (${((rt.ts * MS) / perClip.length).toFixed(1)} ms/clip, both stages)`,
+	`\nruntime: ${perClip.length} clips, ${(rt.audio / 60).toFixed(1)} min audio; helper ${rt.helper.toFixed(1)} s (RTF ${(rt.helper / rt.audio).toFixed(3)}), per clip mean ${(rt.helper / perClip.length).toFixed(2)} s; TS post-pass ${(rt.ts * MS).toFixed(0)} ms total (${((rt.ts * MS) / perClip.length).toFixed(1)} ms/clip, both stages)` +
+		(rt.align
+			? `; aligner emissions ${rt.align.toFixed(1)} s (+${((100 * rt.align) / rt.helper).toFixed(0)}% of the helper), CTC Viterbi ${ctcMs.toFixed(0)} ms`
+			: ""),
 );
 writeFileSync(path.join(RESULTS, `${outName}.txt`), lines.join("\n") + "\n");
 if (!quiet) console.log(lines.join("\n"));

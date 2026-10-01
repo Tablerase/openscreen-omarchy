@@ -4,7 +4,15 @@ import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { areModelsPresent, ensureModels, modelPaths, STT_MODELS } from "./modelManager";
+import {
+	alignerPath,
+	areModelsPresent,
+	CTC_ALIGNERS,
+	ensureAligner,
+	ensureModels,
+	modelPaths,
+	STT_MODELS,
+} from "./modelManager";
 
 describe("modelManager", () => {
 	let dir: string;
@@ -253,5 +261,53 @@ describe("modelManager", () => {
 		} finally {
 			STT_MODELS.whisper.files[0].expectedSha256 = originalSha;
 		}
+	});
+
+	describe("CTC aligners", () => {
+		it("pins every aligner to a digest and names its upstream revision", () => {
+			for (const file of Object.values(CTC_ALIGNERS)) {
+				expect(file.expectedSha256).toMatch(/^[0-9a-f]{64}$/);
+				expect(file.source).toMatch(/@[0-9a-f]{40}$/);
+				// Hosted under a `v0.0.0-*` release tag, never a moving one.
+				expect(file.url).toMatch(/\/releases\/download\/v0\.0\.0-[^/]+\//);
+			}
+		});
+
+		it("has none for a language it does not cover, prototype keys included", async () => {
+			expect(alignerPath(dir, "de")).toBeNull();
+			expect(alignerPath(dir, "constructor")).toBeNull();
+			expect(await ensureAligner({ baseDir: dir, language: "de" })).toBeNull();
+		});
+
+		it("downloads, verifies and returns the aligner of a covered language", async () => {
+			const bytes = Buffer.from("gguf weights");
+			const original = CTC_ALIGNERS.fr.expectedSha256;
+			CTC_ALIGNERS.fr.expectedSha256 = createHash("sha256").update(bytes).digest("hex");
+			const progress: number[] = [];
+			try {
+				const file = await ensureAligner({
+					baseDir: dir,
+					language: "fr",
+					fetcher: async () => new Response(bytes, { status: 200 }),
+					onProgress: (done) => progress.push(done),
+				});
+				expect(file).toBe(alignerPath(dir, "fr"));
+				expect(await readFile(file as string)).toEqual(bytes);
+				expect(progress[progress.length - 1]).toBe(bytes.length);
+			} finally {
+				CTC_ALIGNERS.fr.expectedSha256 = original;
+			}
+		});
+
+		it("refuses a download whose digest does not match", async () => {
+			await expect(
+				ensureAligner({
+					baseDir: dir,
+					language: "en",
+					fetcher: async () => new Response("tampered", { status: 200 }),
+				}),
+			).rejects.toThrow(/SHA-256 mismatch/);
+			expect(existsSync(alignerPath(dir, "en") as string)).toBe(false);
+		});
 	});
 });

@@ -34,6 +34,7 @@ vi.mock("./whisperServer", () => {
 
 vi.mock("./modelManager", () => ({
 	ensureModels: vi.fn(async () => undefined),
+	ensureAligner: vi.fn(async ({ language }: { language: string }) => `/fake/${language}.gguf`),
 	modelPaths: (base: string) => ({
 		whisper: `${base}/whisper-ggml/ggml-small-q8_0.bin`,
 	}),
@@ -468,6 +469,41 @@ describe("SttManager", () => {
 
 		expect(mocked).toHaveBeenCalledTimes(2);
 		expect(fakeWhisperServer.start).toHaveBeenCalledOnce();
+	});
+
+	it("hands the chunks an aligner, tried once per run when its download fails", async () => {
+		const { ensureAligner } = await import("./modelManager");
+		const mocked = vi.mocked(ensureAligner);
+		mocked.mockClear();
+		mocked.mockRejectedValueOnce(new Error("offline"));
+		// Each chunk asks for the aligner of the language it detected, as the helper does.
+		const asked: Array<string | null> = [];
+		fakeWhisperServer.transcribe.mockImplementation(
+			async (opts: { alignerFor?: (language: string) => Promise<string | null> }) => {
+				asked.push((await opts.alignerFor?.("fr")) ?? null);
+				return {
+					segments: [],
+					wordSegments: [],
+					detectedLanguage: "fr",
+					backend: "whispercpp-cpu" as const,
+				};
+			},
+		);
+		const mgr = new SttManager();
+		await mgr.init({ modelsBaseDir: "/tmp/fake-stt-models" });
+		const long = new Float32Array(16_000 * 400);
+		await mgr.transcribe({ samples: long, language: "fr" });
+		// Failed once: the rest of the run keeps whisper's times without retrying.
+		expect(asked.length).toBeGreaterThan(1);
+		expect(asked.every((x) => x === null)).toBe(true);
+		expect(mocked).toHaveBeenCalledOnce();
+
+		// The next run tries again, and a success is kept for the session.
+		asked.length = 0;
+		await mgr.transcribe({ samples: long, language: "fr" });
+		await mgr.transcribe({ samples: new Float32Array(16_000), language: "fr" });
+		expect(asked.every((x) => x === "/fake/fr.gguf")).toBe(true);
+		expect(mocked).toHaveBeenCalledTimes(2);
 	});
 
 	it("fans status out to every sink, and detaching one leaves the others", async () => {

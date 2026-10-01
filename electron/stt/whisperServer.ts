@@ -6,6 +6,12 @@ import os from "node:os";
 import path from "node:path";
 import type { Readable } from "node:stream";
 
+import {
+	alignWordsOnEmissions,
+	type EmissionsJson,
+	emissionRegions,
+	parseEmissions,
+} from "./ctcAlign";
 import { resolveBinaryPath } from "./gpuDetector";
 import { anchorWordsOnSpeech } from "./snapWordBoundaries";
 import type {
@@ -74,6 +80,13 @@ export interface WhisperServerStatus {
 	backend: SttBackend | null;
 	startedAtMs: number | null;
 	lastError: string | null;
+}
+
+export interface TranscribeOptions {
+	samples: Float32Array;
+	language?: string;
+	/** The aligner model for a language, or null for none (see `transcribe`). */
+	alignerFor?: (language: string) => Promise<string | null>;
 }
 
 /** Per-word entry inside a whisper-stt-server `/inference` JSON segment. */
@@ -441,6 +454,33 @@ export class WhisperServerManager {
 		}
 	}
 
+	/**
+	 * The CTC aligner's letter scores for `regions` of the same upload
+	 * (`/emissions`, see ctcAlign.ts). Throws on any failure, including a helper
+	 * built before the endpoint existed (404): the caller keeps whisper's times.
+	 */
+	private async runEmissions(opts: {
+		wavPath: string;
+		modelPath: string;
+		regions: Array<[number, number]>;
+	}): Promise<EmissionsJson> {
+		const form = new FormData();
+		const fileBuffer = await readFile(opts.wavPath);
+		form.set("file", new Blob([fileBuffer], { type: "audio/wav" }), path.basename(opts.wavPath));
+		form.set("model", opts.modelPath);
+		form.set("regions", JSON.stringify(opts.regions));
+		const res = await fetch(`${this.baseUrl()}/emissions`, {
+			method: "POST",
+			body: form,
+			signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+		});
+		if (!res.ok) {
+			const text = await res.text().catch(() => "");
+			throw new Error(`whisper-stt-server /emissions HTTP ${res.status}: ${text.slice(0, 512)}`);
+		}
+		return (await res.json()) as EmissionsJson;
+	}
+
 	private async runMultipartInfer(opts: {
 		wavPath: string;
 		language?: string;
@@ -541,8 +581,15 @@ export class WhisperServerManager {
 		return { elapsedSec, audioSec, rtf };
 	}
 
-	/** Run one transcription; serializes concurrent callers. */
-	async transcribe(opts: { samples: Float32Array; language?: string }): Promise<{
+	/**
+	 * Run one transcription; serializes concurrent callers.
+	 *
+	 * `alignerFor` resolves the CTC aligner model for the language whisper
+	 * detected (downloading it if need be), or null when there is none. With one,
+	 * the words are re-timed on it before their phrase edges go on the speech
+	 * (ctcAlign.ts); any failure there keeps whisper's own times.
+	 */
+	async transcribe(opts: TranscribeOptions): Promise<{
 		segments: SttPhraseSegment[];
 		wordSegments: SttWordSegment[];
 		detectedLanguage: string;
@@ -555,7 +602,7 @@ export class WhisperServerManager {
 		return task;
 	}
 
-	private async transcribeImpl(opts: { samples: Float32Array; language?: string }): Promise<{
+	private async transcribeImpl(opts: TranscribeOptions): Promise<{
 		segments: SttPhraseSegment[];
 		wordSegments: SttWordSegment[];
 		detectedLanguage: string;
@@ -578,33 +625,57 @@ export class WhisperServerManager {
 				startSec: this.toSec(s.start, 0),
 				endSec: this.toSec(s.end, 0),
 			}));
-			// The helper's word times are right inside a phrase but not on its edges,
-			// which the transcript editor turns into imprecise trims: put those on the
-			// helper's speech intervals (see snapWordBoundaries.ts).
-			const wordSegments: SttWordSegment[] = anchorWordsOnSpeech(
-				raw
-					.flatMap((seg) =>
-						(seg.words ?? []).map((w) => {
-							const word = (w.word ?? "").trim();
-							const startSec = this.toSec(w.start, 0);
-							const endSec = this.toSec(w.end, startSec + 0.05);
-							const anchorSec = this.toSec(w.anchor, startSec);
-							const confidence = typeof w.probability === "number" ? w.probability : undefined;
-							return {
-								word,
-								startSec,
-								endSec: Math.max(startSec + 0.02, endSec),
-								anchorSec,
-								confidence,
-							};
-						}),
-					)
-					.filter((w) => w.word.length > 0),
-				speech,
-			);
 			const detectedLanguage = json.detected_language ?? json.language ?? "auto";
+			let words = raw
+				.flatMap((seg) =>
+					(seg.words ?? []).map((w) => {
+						const word = (w.word ?? "").trim();
+						const startSec = this.toSec(w.start, 0);
+						const endSec = this.toSec(w.end, startSec + 0.05);
+						const anchorSec = this.toSec(w.anchor, startSec);
+						const confidence = typeof w.probability === "number" ? w.probability : undefined;
+						return {
+							word,
+							startSec,
+							endSec: Math.max(startSec + 0.02, endSec),
+							anchorSec,
+							confidence,
+						};
+					}),
+				)
+				.filter((w) => w.word.length > 0);
+			let alignSec = 0;
+			if (speech?.length && words.length && opts.alignerFor) {
+				try {
+					const modelPath = await opts.alignerFor(detectedLanguage);
+					if (modelPath) {
+						const reply = await this.runEmissions({
+							wavPath,
+							modelPath,
+							regions: emissionRegions(speech, opts.samples.length / 16_000),
+						});
+						const emissions = parseEmissions(reply);
+						if (!emissions) throw new Error("unreadable /emissions reply");
+						words = alignWordsOnEmissions(words, speech, emissions);
+						alignSec = this.toSec(reply.elapsed_s, 0);
+					}
+				} catch (error) {
+					console.warn(
+						`[stt] word aligner failed, keeping whisper's word times: ${error instanceof Error ? error.message : String(error)}`,
+					);
+				}
+			}
+			// Phrase edges go on the helper's speech intervals, aligner or not: the
+			// VAD is the better judge of where speech starts after a pause (see
+			// snapWordBoundaries.ts).
+			const wordSegments: SttWordSegment[] = anchorWordsOnSpeech(words, speech);
 			const backend = this.toBackend(json.backend);
 			const timing = this.toTiming(json.timing);
+			// The aligner is part of what this chunk cost.
+			if (timing && alignSec > 0) {
+				timing.elapsedSec += alignSec;
+				timing.rtf = timing.elapsedSec / timing.audioSec;
+			}
 			return { segments, wordSegments, detectedLanguage, backend, timing };
 		} finally {
 			await cleanupWav(wavPath);
