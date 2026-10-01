@@ -422,11 +422,11 @@ describe("WhisperServerManager", () => {
 			],
 		};
 
-		async function run(emissionsReply: Response) {
+		async function run(emissionsReply: Response, reply: object = inference) {
 			const fetchMock = vi.fn(async (url: string, _init?: RequestInit) =>
 				url.endsWith("/emissions")
 					? emissionsReply
-					: new Response(JSON.stringify(inference), { status: 200 }),
+					: new Response(JSON.stringify(reply), { status: 200 }),
 			);
 			vi.stubGlobal("fetch", fetchMock);
 			try {
@@ -460,6 +460,19 @@ describe("WhisperServerManager", () => {
 			]);
 			expect(result.timing?.elapsedSec).toBeCloseTo(0.6);
 			expect(result.timing?.rtf).toBeCloseTo(0.3);
+		});
+
+		it("leaves the aligner out on the CPU, without even asking for it", async () => {
+			const { result, alignerFor, fetchMock } = await run(
+				new Response(JSON.stringify(emissions), { status: 200 }),
+				{ ...inference, backend: "whispercpp-cpu" },
+			);
+			expect(alignerFor).not.toHaveBeenCalled();
+			expect(fetchMock).toHaveBeenCalledOnce();
+			expect(result.wordSegments.map((w) => [w.word, w.startSec, w.endSec])).toEqual([
+				["ab", 0.2, 0.5],
+				["ba", 0.5, 1],
+			]);
 		});
 
 		it("keeps whisper's times when the aligner fails", async () => {

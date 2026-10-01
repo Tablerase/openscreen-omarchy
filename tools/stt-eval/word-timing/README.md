@@ -82,7 +82,7 @@ node real-check.mjs <whisper-stt-server.exe> take.wav [--align <aligner.gguf>]  
 
 It prints how far each word's first-token time lies after its start, and where
 each phrase's first word lands against the VAD onset, raw and after the
-post-pass. With `--align`, every word is listed with its phase-1 and aligner
+post-pass. With `--align`, every word is listed with its DTW and aligner
 times, so the boundaries that moved can be checked by ear or on a spectrogram.
 
 ## Reading the numbers

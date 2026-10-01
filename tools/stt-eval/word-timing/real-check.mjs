@@ -99,7 +99,7 @@ for (const [i, s] of speech.entries()) {
 }
 if (aligned) {
 	const moved = [];
-	console.log("\nword                 phase 1 (s)        aligner (s)        start / end moved");
+	console.log("\nword                 DTW (s)            aligner (s)        start / end moved");
 	raw.forEach((w, j) => {
 		const a = post[j];
 		const b = aligned[j];
@@ -111,6 +111,6 @@ if (aligned) {
 	moved.sort((x, y) => x - y);
 	const m = (p) => (moved[Math.floor(moved.length * p)] * 1000).toFixed(0);
 	console.log(
-		`\naligner vs phase 1, |moved| per boundary: median ${m(0.5)} ms, p90 ${m(0.9)} ms (${emissions.elapsed_s.toFixed(2)} s on ${emissions.device})`,
+		`\naligner vs DTW, |moved| per boundary: median ${m(0.5)} ms, p90 ${m(0.9)} ms (${emissions.elapsed_s.toFixed(2)} s on ${emissions.device})`,
 	);
 }

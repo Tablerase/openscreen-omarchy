@@ -646,7 +646,13 @@ export class WhisperServerManager {
 				)
 				.filter((w) => w.word.length > 0);
 			let alignSec = 0;
-			if (speech?.length && words.length && opts.alignerFor) {
+			const backend = this.toBackend(json.backend);
+			// GPU only. On the CPU the aligner's forward pass costs +29% (English) to
+			// +58% (French) of a transcription, against +9% to +14% on Vulkan, and
+			// character-level DTW alone is already within 16 ms median there
+			// (tools/stt-eval/word-timing, issue #948). Not asking also means a
+			// CPU-only machine never downloads the model.
+			if (speech?.length && words.length && opts.alignerFor && backend !== "whispercpp-cpu") {
 				try {
 					const modelPath = await opts.alignerFor(detectedLanguage);
 					if (modelPath) {
@@ -670,7 +676,6 @@ export class WhisperServerManager {
 			// VAD is the better judge of where speech starts after a pause (see
 			// snapWordBoundaries.ts).
 			const wordSegments: SttWordSegment[] = anchorWordsOnSpeech(words, speech);
-			const backend = this.toBackend(json.backend);
 			const timing = this.toTiming(json.timing);
 			// The aligner is part of what this chunk cost.
 			if (timing && alignSec > 0) {
