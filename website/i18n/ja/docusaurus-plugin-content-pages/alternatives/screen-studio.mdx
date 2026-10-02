@@ -9,6 +9,9 @@ keywords:
   - Screen Studio 代替 オープンソース
 ---
 
+import DemoLoop from "@site/src/components/DemoLoop";
+import DemoLoopPair from "@site/src/components/DemoLoop/Pair";
+
 # 無料・オープンソースの Screen Studio 代替
 
 OpenScreen は、Windows・macOS・Linux 向けの無料の MIT ライセンスの Screen Studio 代替です。Screen Studio と同じように、クリックした場所にズームし、テイク後にカーソルのスタイルを変更し、背景と端末上の字幕を追加し、MP4 または GIF を出力します。macOS でしか動かず、エクスポートに有料プランが必要な Screen Studio と違い、OpenScreen は無料で、アカウントも不要です。コメント付きのホスティングされたリンクで録画を共有する場合や、iPhone や iPad を録画する場合は、Screen Studio のほうが今も適しています。
@@ -49,6 +52,11 @@ OpenScreen は、Windows・macOS・Linux 向けの無料の MIT ライセンス�
 - **録画中のメモ。** どちらもスピーカーノートを備えています。Windows と macOS では、OpenScreen のノートウィンドウにテレプロンプターモードもあります。
 - **ローカル処理。** Screen Studio は、録画に関するデータを自社サーバーに送信することはないとしています。OpenScreen にはアカウントも、独自サーバーも、分析機能もありません。それでも行われるわずかな通信は[よくある質問](/docs/faq/#does-openscreen-work-offline)に一覧しています。
 
+<DemoLoopPair>
+  <DemoLoop name="background-picker" />
+  <DemoLoop name="sensitive-data-mask" />
+</DemoLoopPair>
+
 ## OpenScreen が異なる点 {#where-openscreen-differs}
 
 ### 価格、ライセンス、対応プラットフォーム {#price-license-and-platforms}
@@ -62,6 +70,11 @@ OpenScreen は、Windows・macOS・Linux 向けの無料の MIT ライセンス�
 - **1 つのプロジェクトに複数のクリップ。** 録画済みの動画や既存の動画（MP4、MOV、MKV など）をインポートし、並べ替え、クリップごとにイン点・アウト点とクロップを設定できます。Screen Studio は既存の動画 1 本からプロジェクトを開始でき、ロードマップには複数の録画を 1 つのプロジェクトに統合する機能が計画中として掲載されています。[メディアライブラリ](/docs/media-library/)を参照してください。
 - **注釈。** 6 種類のアニメーション付きテキスト、8 方向の矢印、画像、ぼかし領域。Screen Studio のロードマップには、クリックの視覚的・文章的な説明とされる「注釈」が保留中として掲載されています。[編集とタイムライン](/docs/editing-timeline/)を参照してください。
 - **ウェブカメラの背景。** 安定版で、グリーンスクリーンなしにカメラの背景を削除・ぼかし・置き換えできます。Screen Studio はカメラ背景の削除をベータ機能として挙げています。
+
+<DemoLoopPair>
+  <DemoLoop name="every-layout" />
+  <DemoLoop name="camera-cutout" />
+</DemoLoopPair>
 
 ### エクスポートと自動化 {#export-and-automation}
 

@@ -770,5 +770,83 @@
   },
   "download.started.cta": {
     "message": "Dar una estrella en GitHub"
+  },
+  "demoLoop.pause": {
+    "message": "Pausar el vídeo"
+  },
+  "demoLoop.play": {
+    "message": "Reproducir el vídeo"
+  },
+  "demoLoop.classic-zoom": {
+    "message": "Un tablero de tareas grabado en OpenScreen. La vista hace zoom sobre un elemento de una lista y un botón Ship cuando se hace clic en ellos, y luego se aleja hasta mostrar todo el tablero.",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.3d-camera": {
+    "message": "La misma grabación vista con la cámara 3D, que inclina la pantalla y gira a su alrededor mientras sigue el cursor.",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.3d-cursors": {
+    "message": "Un mismo puntero grabado, redibujado en cinco estilos de cursor uno tras otro mientras la grabación sigue reproduciéndose.",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.automatic-subtitles": {
+    "message": "Una grabación narrada con subtítulos debajo, que pasan del inglés al francés, al español y al coreano.",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.caption-styles": {
+    "message": "Un mismo subtítulo en cinco estilos: uno sencillo, uno amarillo en negrita, uno manuscrito, uno monoespaciado y uno resaltado palabra por palabra.",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.edit-by-transcript": {
+    "message": "En la transcripción del editor se selecciona y elimina una frase, y el corte correspondiente aparece en la línea de tiempo.",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.tighten-pauses": {
+    "message": "Dos clics en los marcadores de silencio de la transcripción, y ambas pausas se cortan de la línea de tiempo.",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.background-picker": {
+    "message": "El selector de fondo del editor recorre fondos de pantalla, un degradado y un color sólido, y después activa el fondo animado Aurora.",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.every-format": {
+    "message": "La misma grabación exportada en 16:9, luego cuadrada y luego vertical, con el encuadre siguiendo el cursor.",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.sensitive-data-mask": {
+    "message": "Un formulario de inicio de sesión mientras se rellena. Los campos de correo y contraseña siguen difuminados mientras se escriben.",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.camera-cutout": {
+    "message": "Una burbuja de webcam sobre una grabación de pantalla. Después se elimina su fondo y la persona queda delante de la pantalla.",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.every-layout": {
+    "message": "Una grabación con webcam que recorre los diseños: imagen en imagen, lado a lado, apilado, cámara completa y, por último, solo pantalla.",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.device-frames": {
+    "message": "La misma grabación, en reproducción, enmarcada sucesivamente como ventana de navegador, teléfono, portátil y monitor de escritorio.",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.animated-backgrounds": {
+    "message": "Una grabación sobre un fondo liso y después sobre una foto difuminada que se mueve lentamente detrás de ella.",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.beautiful-by-default": {
+    "message": "Una captura de pantalla sin editar, luego la misma toma tal como la abre OpenScreen, ya con zoom, encuadrada y con el cursor rediseñado, y después con varios estilos.",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.simpler-editor": {
+    "message": "El editor de OpenScreen. Un clic en la miniatura de un fondo cambia el estilo de todo el vídeo y luego el panel lateral pasa a la transcripción.",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.edit-like-a-doc": {
+    "message": "El texto seleccionado en la transcripción se elimina como en un documento, y el vídeo se corta en consecuencia.",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.ask-the-agent": {
+    "message": "Una petición escrita en el panel de chat del editor, y los cambios del agente apareciendo en la línea de tiempo.",
+    "description": "Describes a short silent video loop of the app for screen readers."
   }
 }

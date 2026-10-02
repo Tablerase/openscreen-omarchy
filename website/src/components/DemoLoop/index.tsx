@@ -1,0 +1,146 @@
+/**
+ * A short silent loop of the app, in the style the category's own sites use:
+ * no words in the picture, the page around it carries them.
+ *
+ * `<video>` has no `loading="lazy"`, so every part of the laziness is done here:
+ *
+ *   - Nothing but an empty 16:9 box is in the server HTML. The sources and the
+ *     poster are attached when the box comes within a screen of the viewport,
+ *     so a reader who never scrolls to a loop downloads none of it, poster
+ *     included (a `poster` attribute in the markup is fetched eagerly).
+ *   - Which file is decided at that moment, from the box's real width: 720p for
+ *     a phone column or a 1× display, 1080p when the pixels are there to show
+ *     it. HEVC first, H.264 for engines that cannot decode it.
+ *   - It plays only while at least half of it is on screen, and pauses when it
+ *     leaves, so a page with ten loops decodes one or two at a time.
+ *   - No autoplay for a reader who asked for reduced motion or for Save-Data:
+ *     they get the poster and a play button, and the file only on that click.
+ *   - A visible pause button on every loop. A loop runs past five seconds and
+ *     never stops, which WCAG 2.2.2 does not allow without one.
+ *
+ * The files carry no audio track: WebKit only autoplays without a gesture when
+ * there is none, `muted` alone is not enough on iOS.
+ */
+
+import { translate } from "@docusaurus/Translate";
+import { Pause, Play } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+
+import {
+	type LoopHeight,
+	type LoopName,
+	loopPoster,
+	loopSources,
+	pickHeight,
+} from "../../lib/demo-loop";
+import { loopLabel } from "./labels";
+import styles from "./styles.module.css";
+
+type Props = { name: LoopName };
+
+/** Far enough ahead that the poster is there before the box is. */
+const NEAR = "100% 0px";
+
+function motionAllowed(): boolean {
+	try {
+		const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+		const saveData = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection
+			?.saveData;
+		return !reduced && !saveData;
+	} catch {
+		return true;
+	}
+}
+
+export default function DemoLoop({ name }: Props) {
+	const box = useRef<HTMLDivElement>(null);
+	const video = useRef<HTMLVideoElement>(null);
+	const [height, setHeight] = useState<LoopHeight | null>(null);
+	const [playing, setPlaying] = useState(false);
+	// null until the reader decides; then their choice beats visibility.
+	const [wanted, setWanted] = useState<boolean | null>(null);
+	const visible = useRef(false);
+	const auto = useRef(true);
+
+	// Attach the sources once the box is near.
+	useEffect(() => {
+		const el = box.current;
+		if (!el) return;
+		auto.current = motionAllowed();
+		const io = new IntersectionObserver(
+			(entries) => {
+				if (!entries.some((e) => e.isIntersecting)) return;
+				io.disconnect();
+				setHeight(pickHeight(el.clientWidth, window.devicePixelRatio));
+			},
+			{ rootMargin: NEAR },
+		);
+		io.observe(el);
+		return () => io.disconnect();
+	}, []);
+
+	// Play while on screen, unless the reader said otherwise.
+	useEffect(() => {
+		const el = box.current;
+		const v = video.current;
+		if (!el || !v || height === null) return;
+		const sync = () => {
+			const go = wanted ?? (auto.current && visible.current);
+			if (go && visible.current) {
+				v.play().catch(() => setPlaying(false));
+			} else {
+				v.pause();
+			}
+		};
+		const io = new IntersectionObserver(
+			(entries) => {
+				visible.current = entries[entries.length - 1].intersectionRatio >= 0.5;
+				sync();
+			},
+			{ threshold: [0, 0.5] },
+		);
+		io.observe(el);
+		sync();
+		return () => io.disconnect();
+	}, [height, wanted]);
+
+	const label = loopLabel(name);
+	const toggle = playing
+		? translate({ id: "demoLoop.pause", message: "Pause video" })
+		: translate({ id: "demoLoop.play", message: "Play video" });
+
+	return (
+		<figure className={styles.figure}>
+			<div ref={box} className={styles.box}>
+				<video
+					ref={video}
+					className={styles.video}
+					aria-label={label}
+					poster={height ? loopPoster(name) : undefined}
+					muted
+					loop
+					playsInline
+					preload={height && auto.current ? "auto" : "none"}
+					disablePictureInPicture
+					disableRemotePlayback
+					onPlay={() => setPlaying(true)}
+					onPause={() => setPlaying(false)}
+				>
+					{height &&
+						loopSources(name, height).map((s) => <source key={s.src} src={s.src} type={s.type} />)}
+				</video>
+				{height && (
+					<button
+						type="button"
+						className={`${styles.toggle} ${playing ? "" : styles.toggleIdle}`}
+						aria-label={toggle}
+						title={toggle}
+						onClick={() => setWanted(!playing)}
+					>
+						{playing ? <Pause size={16} /> : <Play size={16} />}
+					</button>
+				)}
+			</div>
+		</figure>
+	);
+}

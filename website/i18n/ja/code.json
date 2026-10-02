@@ -770,5 +770,83 @@
   },
   "download.started.cta": {
     "message": "GitHub でスターを付ける"
+  },
+  "demoLoop.pause": {
+    "message": "動画を一時停止"
+  },
+  "demoLoop.play": {
+    "message": "動画を再生"
+  },
+  "demoLoop.classic-zoom": {
+    "message": "OpenScreen で録画したタスクボード。チェックリストの項目と Ship ボタンがクリックされると画面がズームインし、その後ボード全体までズームアウトします。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.3d-camera": {
+    "message": "同じ録画を 3D カメラで見たもの。カーソルを追いながら画面を傾け、その周りを回ります。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.3d-cursors": {
+    "message": "録画した 1 つのポインターを、録画を再生したまま 5 つのカーソルスタイルで順に描き直します。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.automatic-subtitles": {
+    "message": "ナレーション付きの録画の下に字幕が表示され、英語からフランス語、スペイン語、韓国語へと切り替わります。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.caption-styles": {
+    "message": "同じ字幕を 5 つのスタイルで表示します。シンプルな字幕、太字の黄色、手書き風、等幅、そして単語ごとのハイライトです。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.edit-by-transcript": {
+    "message": "エディターの文字起こしで文を選択して削除すると、対応するカットがタイムラインに現れます。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.tighten-pauses": {
+    "message": "文字起こしの無音マーカーを 2 回クリックすると、2 つの間がタイムラインからカットされます。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.background-picker": {
+    "message": "エディターの背景ピッカーで壁紙、グラデーション、単色を順に選び、最後にアニメーション背景 Aurora をオンにします。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.every-format": {
+    "message": "同じ録画を 16:9、正方形、縦長の順に書き出し、構図はカーソルを追います。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.sensitive-data-mask": {
+    "message": "ログインフォームへの入力中。メールアドレスとパスワードの欄は、入力している間ぼかされたままです。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.camera-cutout": {
+    "message": "画面録画の上に重なったウェブカメラのバブル。その後背景が取り除かれ、話し手が画面の前に立って見えます。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.every-layout": {
+    "message": "ウェブカメラ付きの 1 つの録画で、レイアウトを順に切り替えます。ピクチャーインピクチャー、横並び、縦並び、カメラ全画面、最後に画面のみ。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.device-frames": {
+    "message": "再生中の同じ録画を、ブラウザーウィンドウ、スマートフォン、ノートパソコン、デスクトップモニターの順にフレームで囲みます。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.animated-backgrounds": {
+    "message": "無地の背景の上の録画が、背後でゆっくり動くぼかした写真の背景に変わります。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.beautiful-by-default": {
+    "message": "加工前の画面キャプチャー、次に OpenScreen が開いたときの同じテイク。すでにズーム、フレーミング、カーソルのスタイル変更が済んでおり、その後いくつかの見た目に切り替わります。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.simpler-editor": {
+    "message": "OpenScreen のエディター。背景のサムネイルを 1 回クリックすると動画全体の見た目が変わり、その後サイドパネルが文字起こしに切り替わります。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.edit-like-a-doc": {
+    "message": "文字起こしで選択したテキストをドキュメントのように削除すると、動画もそれに合わせてカットされます。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.ask-the-agent": {
+    "message": "エディターのチャットパネルに入力した依頼と、エージェントによる編集がタイムラインに現れる様子。",
+    "description": "Describes a short silent video loop of the app for screen readers."
   }
 }

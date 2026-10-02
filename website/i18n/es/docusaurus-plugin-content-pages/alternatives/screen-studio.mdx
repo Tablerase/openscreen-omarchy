@@ -9,6 +9,9 @@ keywords:
   - alternativa de código abierto a screen studio
 ---
 
+import DemoLoop from "@site/src/components/DemoLoop";
+import DemoLoopPair from "@site/src/components/DemoLoop/Pair";
+
 # Una alternativa gratis y de código abierto a Screen Studio
 
 OpenScreen es una alternativa a Screen Studio gratis, con licencia MIT, para Windows, macOS y Linux. Igual que Screen Studio, hace zoom donde haces clic, permite cambiar el estilo del cursor después de la toma, agrega fondos y subtítulos generados en tu equipo, y exporta MP4 o GIF. A diferencia de Screen Studio, que solo funciona en macOS y necesita un plan de pago para exportar, no cuesta nada y no necesita cuenta. Screen Studio sigue siendo la mejor opción si compartes tus grabaciones como enlaces alojados con comentarios, o si grabas un iPhone o un iPad.
@@ -49,6 +52,11 @@ Ambas apps cubren lo siguiente. Nada de esto es exclusivo de una sola.
 - **Notas mientras grabas.** Las dos tienen notas para el presentador. En Windows y macOS, la ventana de notas de OpenScreen también tiene modo teleprompter.
 - **Procesamiento local.** Screen Studio dice que nunca envía datos de tus grabaciones a sus servidores. OpenScreen no tiene cuenta, ni servidor propio, ni analíticas. Las [preguntas frecuentes](/docs/faq/#does-openscreen-work-offline) enumeran las pocas conexiones que sigue haciendo.
 
+<DemoLoopPair>
+  <DemoLoop name="background-picker" />
+  <DemoLoop name="sensitive-data-mask" />
+</DemoLoopPair>
+
 ## En qué se diferencia OpenScreen {#where-openscreen-differs}
 
 ### Precio, licencia y plataformas {#price-license-and-platforms}
@@ -62,6 +70,11 @@ Ambas apps cubren lo siguiente. Nada de esto es exclusivo de una sola.
 - **Varios clips en un proyecto.** Importa grabaciones o videos existentes (MP4, MOV, MKV y otros), reordénalos, y define puntos de entrada y salida y un recorte para cada clip. Screen Studio puede iniciar un proyecto desde un video existente, y su hoja de ruta enumera como planeado unir varias grabaciones en un solo proyecto. Consulta [Biblioteca multimedia](/docs/media-library/).
 - **Anotaciones.** Texto con seis animaciones, flechas en ocho direcciones, imágenes y regiones de desenfoque. La hoja de ruta de Screen Studio enumera "Anotaciones", descritas como descripciones visuales o textuales de los clics, como en pausa. Consulta [Edición y línea de tiempo](/docs/editing-timeline/).
 - **Fondo de la cámara web.** Quita, desenfoca o reemplaza el fondo de la cámara sin pantalla verde, en la versión estable. Screen Studio enumera la eliminación del fondo de cámara como función beta.
+
+<DemoLoopPair>
+  <DemoLoop name="every-layout" />
+  <DemoLoop name="camera-cutout" />
+</DemoLoopPair>
 
 ### Exportación y automatización {#export-and-automation}
 

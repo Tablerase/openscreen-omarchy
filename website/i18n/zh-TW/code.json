@@ -770,5 +770,83 @@
   "theme.tags.tagsPageTitle": {
     "message": "標籤",
     "description": "The title of the tag list page"
+  },
+  "demoLoop.pause": {
+    "message": "暫停影片"
+  },
+  "demoLoop.play": {
+    "message": "播放影片"
+  },
+  "demoLoop.classic-zoom": {
+    "message": "在 OpenScreen 中錄製的任務看板。點擊清單項目和 Ship 按鈕時畫面隨之放大，接著拉遠到整個看板。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.3d-camera": {
+    "message": "透過 3D 攝影機觀看的同一段錄製，它傾斜螢幕並繞著螢幕環繞，同時跟隨游標。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.3d-cursors": {
+    "message": "同一個錄製的指標，在錄製持續播放的同時，依序以五種游標樣式重新繪製。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.automatic-subtitles": {
+    "message": "一段有旁白的錄製，下方顯示字幕，從英文依序切換到法文、西班牙文和韓文。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.caption-styles": {
+    "message": "同一則字幕的五種樣式：一般字幕、黃色粗體、手寫體、等寬字型，以及逐字醒目標示。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.edit-by-transcript": {
+    "message": "在編輯器的逐字稿中選取並刪除一句話，時間軸上隨即出現對應的剪輯。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.tighten-pauses": {
+    "message": "在逐字稿中點擊兩次靜音標記，兩處停頓就從時間軸上剪掉了。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.background-picker": {
+    "message": "編輯器的背景選擇器依序切換桌布、漸層和純色，接著開啟動態背景 Aurora。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.every-format": {
+    "message": "同一段錄製依序匯出為 16:9、方形和直式，構圖跟隨游標。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.sensitive-data-mask": {
+    "message": "正在填寫的登入表單。輸入時，電子郵件和密碼欄位始終保持模糊。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.camera-cutout": {
+    "message": "螢幕錄製上方的網路攝影機泡泡。接著其背景被移除，人物出現在螢幕前方。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.every-layout": {
+    "message": "一段含網路攝影機的錄製依序切換版面配置：子母畫面、左右並排、上下堆疊、攝影機全螢幕，最後僅顯示螢幕。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.device-frames": {
+    "message": "同一段正在播放的錄製，依序套上瀏覽器視窗、手機、筆記型電腦和桌上型螢幕的外框。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.animated-backgrounds": {
+    "message": "一段錄製先在純色背景上，接著換到在其後方緩慢移動的模糊相片背景上。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.beautiful-by-default": {
+    "message": "一段原始螢幕錄製，接著是 OpenScreen 開啟時的同一段素材，已自動縮放、完成構圖並換了游標樣式，之後再切換幾種外觀。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.simpler-editor": {
+    "message": "OpenScreen 編輯器。點擊一次背景縮圖即可改變整部影片的外觀，接著側邊面板切換到逐字稿。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.edit-like-a-doc": {
+    "message": "在逐字稿中選取的文字像文件裡一樣被刪除，影片也隨之剪輯。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "demoLoop.ask-the-agent": {
+    "message": "在編輯器聊天面板中輸入的請求，以及代理所做的編輯出現在時間軸上。",
+    "description": "Describes a short silent video loop of the app for screen readers."
   }
 }

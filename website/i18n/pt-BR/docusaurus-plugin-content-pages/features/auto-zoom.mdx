@@ -8,11 +8,15 @@ keywords:
   - zoom automático gravação de tela windows
 ---
 
+import DemoLoop from "@site/src/components/DemoLoop";
+
 # Um gravador de tela grátis com zoom automático
 
 O OpenScreen é um gravador de tela gratuito, com licença MIT, com zoom automático para Windows, macOS e Linux. Depois de cada gravação, ele lê os cliques que gravou e dá zoom neles, sem chamada de rede e sem modelo de IA. Screen Studio, Cap e Camtasia também dão zoom automaticamente; o OpenScreen faz isso de graça, nos três sistemas.
 
 Esta página é publicada pelo projeto OpenScreen. Os dados sobre Screen Studio, Cap e Camtasia vêm de screen.studio, cap.so e techsmith.com e foram verificados em setembro de 2026. As fontes estão listadas no final.
+
+<DemoLoop name="classic-zoom" />
 
 ## Resumo rápido {#at-a-glance}
 
@@ -68,11 +72,15 @@ Os zooms automáticos são um ponto de partida. As mesmas regiões de zoom podem
 
 Um zoom manual com foco manual não precisa de dados de cursor, então também funciona em um vídeo importado de outra ferramenta. Veja [Regiões de zoom](/docs/editing-timeline/#zoom-regions) para o inspetor de zoom.
 
+<DemoLoop name="3d-camera" />
+
 ## O cursor depois da gravação {#the-cursor-after-the-take}
 
 O mesmo movimento gravado conduz o cursor na exportação. A aba Cursor mostra ou oculta o cursor e define tamanho, suavização, desfoque de movimento, rebote de clique e impacto do clique. O caminho do cursor é suavizado da mesma forma na pré-visualização e na exportação, então a pré-visualização corresponde ao arquivo.
 
 O rebote de clique precisa de cliques gravados. No macOS isso exige a permissão de Acessibilidade, e no Linux seu usuário precisa estar no grupo `input`. [Gravação](/docs/recording/) lista o que cada plataforma captura.
+
+<DemoLoop name="3d-cursors" />
 
 ## Pela linha de comando {#from-the-command-line}
 
