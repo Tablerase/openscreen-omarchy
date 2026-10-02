@@ -182,15 +182,46 @@ The contract, with the invariant on the consumer side:
    a mismatch would corrupt the image silently. The consumer never assumes a
    size — every draw is preceded by a resize of the canvas's drawing buffer to
    the packet's declared `width`/`height`.
-5. **Pull loop cadence.** The renderer pulls on every other rAF tick (`PULL_LOOP_TICK_DIVISOR = 2`,
-   [`useNativeCompositorView.ts:70`](../../src/native/hooks/useNativeCompositorView.ts:70)),
-   so IPC + GPU readback + `putImageData` run at roughly 30 fps on 60/120 Hz
-   displays without changing perceived smoothness.
+5. **Pull loop cadence.** Read-back frames are pulled on every other rAF tick
+   (`PULL_LOOP_TICK_DIVISOR = 2`), shared-texture frames (below) on every tick. Each
+   read-back frame is a GPU readback, a structured clone across IPC and a canvas upload,
+   and the tick counter does not advance while a read is in flight: an 8 MB frame whose
+   round trip passes 16.7 ms is pulled one tick in three, about 20 fps.
 
 The renderer-side wrapper mirrors this verbatim in the Electron main process
-([`compositorViewService.ts:339`](../../electron/native-bridge/services/compositorViewService.ts:339)),
+([`compositorViewService.ts`](../../electron/native-bridge/services/compositorViewService.ts)),
 so when the addon is absent the IPC layer returns `null` too — the renderer
 never has to special-case "addon missing".
+
+### Shared textures (Windows)
+
+On Windows' hardware backend the pixels never leave the GPU. Copying them through RAM
+was the preview's bottleneck, not the compositor: at the same ~57 composed frames per
+second, read-back reached the canvas at 20-26 fps and kept 54-57 % of the renderer's main
+thread busy (measurements in
+[engineering/rendering-performance.md](../engineering/rendering-performance.md#preview-transport--2026-10-02)).
+
+- **Native side.** The render thread copies each composed frame into one of four shared
+  D3D11 textures (`shared_frames.rs`, NT handles, no keyed mutex), waits for the GPU to
+  finish the copy, and publishes `{ gen, slot, handle }`. `SlotBook` tracks which slot
+  holds the ready frame and which ones Chromium still holds; a frame nobody took gives
+  its slot back. A held slot is never rewritten, since Chromium may still read it: when
+  every slot is held and one has waited 1 s for its release, the view falls back to
+  read-back.
+- **Main process.** `readFrame` takes the frame (`readSharedFrame`), imports it with
+  `sharedTexture.importSharedTexture`, sends it with `sharedTexture.sendSharedTexture` to
+  the frame that asked, drops its own reference and answers with a receipt
+  (`{ …meta, shared: true }`, no pixels). `allReferencesReleased` returns the slot
+  (`releaseSharedFrame(id, slot, gen)`) once Chromium is done with it in every process.
+- **Renderer.** The preload's `setSharedTextureReceiver` hands the frame to
+  `electronAPI.onCompositorFrame`, ahead of the receipt; the hook draws the `VideoFrame`
+  with `drawImage` and closes it. The pixels are byte-identical to read-back.
+- **Fallbacks, all to read-back.** Not Windows, the software backend, Chromium without GPU
+  compositing, or `OPENSCREEN_PREVIEW_READBACK=1` never enable it. A failed import or send
+  turns it off for the view, and so does a first frame that lands transparent (a texture
+  Chromium could not open, e.g. on another adapter): the composed frame is cleared opaque,
+  so a transparent pixel can only be that. The render thread republishes the current
+  frame on every switch, so the canvas never waits for something to move.
 
 ## Playback sync
 
@@ -214,12 +245,18 @@ a new clip). The mapping sits in
   `clipIndex` + source time. Without this bridge a RAW playhead against a
   compressed clip list pointed at the wrong clip after a trim — wrong camera,
   misaligned screen.
-- **Drift re-anchor.** During free-run the two clocks can drift; once the
-  additive error exceeds 100 ms (`Math.abs(sourceTimeSec - expectedSourceTimeSec) > 0.1`,
-  [`useNativePlaybackSync.ts:94`](../../src/native/useNativePlaybackSync.ts:94))
-  the hook re-issues `setNativeTime`. `useNativePlaybackSync:18` calls this a
-  known limitation acceptable for the ~6 s fixture it's measured on; a pause
-  resets the drift by construction.
+- **Drift, measured rather than guessed.** Every frame carries where the view was when it
+  composed it (`clipIndex`, `sourceTimeSec`, both transports), and
+  `NativeCompositorOverlay` compares that with the playhead on the one timeline both share:
+  programme time, the trim-compressed one, where a cut is no jump
+  ([`nativeSync.ts`](../../src/native/nativeSync.ts)). The gap is counted in seconds of
+  playback, so a speed region divides it by its speed, and the last frame is aged by the
+  time since it arrived, at most 250 ms, past which the view counts as stalled. A gap over
+  150 ms that holds for 100 ms re-anchors the view with `setActiveClip`, at most every
+  500 ms. That covers a stall of the render thread and a jump by the user while playing.
+  It replaced a guess from the wall clock at 1× speed, which inside a 2× speed region
+  re-seeked the view ten times a second; `useNativePlaybackSync` still makes that guess
+  for an addon that reports no position.
 
 The overlay's rect is kept aligned with the DOM via the same primitives used
 elsewhere in the renderer:
@@ -241,12 +278,21 @@ elsewhere in the renderer:
 Clip changes across the playhead boundary are atomic at the
 `setActiveClip(viewId, screenPath, webcamPath, webcamOffsetSec, clipIndex, sourceTimeSec)`
 RPC
-([`compositorViewClient.ts:93`](../../src/native/compositorViewClient.ts:93)):
-when the playhead crosses into a clip whose `assetId` / `webcamPath` differs
-from the previous one, `NativeCompositorOverlay.tsx:175-203` pauses native across
-the decoder swap, awaits `setActiveClip`, and re-reads the live transport *now*
-(not from a captured `isPlaying`) before resuming — so a user pause that lands
-in the middle of a clip transition is honoured, not silently undone.
+([`compositorViewClient.ts`](../../src/native/compositorViewClient.ts)), and who sends it
+depends on the transport:
+
+- **Paused** (scrub, step): `NativeCompositorOverlay` sends it whenever the playhead enters
+  another clip.
+- **Playing**: the render thread crosses into the next clip by itself, preloading it ahead
+  of the cut. The overlay used to send the clip again at every cut, which made the view
+  seek back to a place it had just left, or drop the clip it had preloaded: a hitch at
+  every cut of an edited take. It now only sends it when the view is elsewhere — a jump
+  (a click on the timeline, followed at once) or a gap the drift watch above catches.
+  On a pause it also brings back a view left on another clip, before `setNativeTime`
+  seeks in it.
+- **An addon that reports no position** is driven as before: native is paused across the
+  decoder swap, and the live transport is re-read *now* (not from a captured `isPlaying`)
+  before resuming, so a user pause that lands mid-transition is honoured.
 
 ## When the decode clock fails
 
@@ -310,14 +356,12 @@ was thrown away.
   path and not for the live view. Editing playback is therefore silent against
   the exported file; users hear audio only when the export runs. There is no
   flag in this branch that re-routes live audio.
-- **Long-recording scrub drift.** `useNativePlaybackSync:18` documents the
-  accepted-at-fixture-time drift between the app's rAF playhead and the addon's
-  free-run clock as a known limitation; a pause re-aligns them. A scrub further
-  than 100 ms past expected position triggers an explicit re-anchor; below that
-  the two clocks run independently until something forces a sync. Long recordings
-  measured at the bench in
-  [engineering/rendering-performance.md](../engineering/rendering-performance.md)
-  stay below the threshold in practice, but no systematic measurement exists.
+- **Drift under 150 ms is left alone.** The view and the app's clock run independently
+  inside the drift watch's tolerance, and a correction is a seek, not a change of pace: a
+  view drifting slowly is re-anchored with a visible step rather than eased back.
+- **Shared textures are Windows-only.** macOS (an `IOSurface`-backed Metal texture) and
+  Linux (a dmabuf exported from Vulkan) still read back: `sharedTexture` imports both, the
+  native halves are not written.
 - **Add-on absent = blank frame.** When `compositor_view.node` is missing
   (development with the addon not yet built, or a packaged build for an
   unsupported architecture) the overlay renders no pixels: only the DOM/CSS
