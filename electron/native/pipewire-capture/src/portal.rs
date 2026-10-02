@@ -192,11 +192,20 @@ pub async fn negotiate(cursor_mode: CursorMode) -> Result<PortalStream, PortalEr
         .available_cursor_modes()
         .await
         .map_err(|error| failed("AvailableCursorModes", error))?;
+    let portal_cursor_mode = if cursor_mode == CursorMode::Metadata
+        && !cursor_modes.contains(PortalCursorMode::Metadata)
+        && crate::hyprland::is_active()
+    {
+        PortalCursorMode::Hidden
+    } else {
+        cursor_mode.to_portal()
+    };
+
     // Only METADATA is treated as mandatory, and only when it was asked for.
     // EMBEDDED is in the portal spec's baseline and every compositor implements
     // it; refusing to start because a mode we are not using is missing would be
     // the Stage 1 check applied where it no longer belongs.
-    if !cursor_modes.contains(cursor_mode.to_portal()) {
+    if !cursor_modes.contains(portal_cursor_mode) {
         return Err(match cursor_mode {
             CursorMode::Metadata => PortalError::CursorMetadataUnsupported,
             other => PortalError::Failed(format!(
@@ -216,7 +225,7 @@ pub async fn negotiate(cursor_mode: CursorMode) -> Result<PortalStream, PortalEr
     proxy
         .select_sources(
             &session,
-            cursor_mode.to_portal(),
+            portal_cursor_mode,
             types,
             false,
             // NO RESTORE TOKEN, AND NOTHING TO PERSIST. This used to replay a

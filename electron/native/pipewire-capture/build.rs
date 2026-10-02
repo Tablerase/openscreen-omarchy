@@ -193,6 +193,8 @@ fn link_ffmpeg(root: &Path) {
         .allowlist_function("sws_.*")
         .allowlist_function("swr_.*")
         .allowlist_type("AV.*")
+        .blocklist_type("AVFormatContext")
+        .allowlist_type("av_.*")
         .allowlist_type("Sws.*")
         .allowlist_type("SwrContext")
         .allowlist_var("AV_.*")

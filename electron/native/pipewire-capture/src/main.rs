@@ -33,6 +33,7 @@ mod dmabuf_import;
 mod encoder;
 mod events;
 mod ffmpeg;
+mod hyprland;
 mod input;
 mod portal;
 mod shim;
@@ -41,7 +42,7 @@ use std::collections::HashSet;
 use std::io::{BufRead, Write};
 use std::path::PathBuf;
 use std::sync::mpsc::{self, RecvTimeoutError, Sender};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use serde::Deserialize;
@@ -200,7 +201,11 @@ impl Request {
                 label: "microphone",
                 target: audio.microphone.device_name.clone(),
                 capture_sink: false,
-                gain: audio.microphone.gain.filter(|gain| *gain > 0.0).unwrap_or(1.0),
+                gain: audio
+                    .microphone
+                    .gain
+                    .filter(|gain| *gain > 0.0)
+                    .unwrap_or(1.0),
                 bitrate: DEFAULT_AUDIO_BITRATE,
             });
         }
@@ -286,7 +291,9 @@ fn main() {
         Ok(supported) => supported,
         Err(error) => fail(&mut emitter, error.code(), &error.message()),
     };
-    if !cursor_metadata_supported && cursor_mode.reports_cursor() {
+    let hyprland_active = hyprland::is_active();
+    let cursor_telemetry_supported = cursor_metadata_supported || hyprland_active;
+    if !cursor_telemetry_supported && cursor_mode.reports_cursor() {
         let error = portal::PortalError::CursorMetadataUnsupported;
         fail(&mut emitter, error.code(), &error.message());
     }
@@ -294,7 +301,7 @@ fn main() {
     let _ = emitter.emit(&Event::Ready {
         timestamp_ms: timestamp_ms(),
         pipewire_version: shim::library_version(),
-        cursor_metadata_supported,
+        cursor_metadata_supported: cursor_telemetry_supported,
     });
 
     if request.probe_only {
@@ -332,6 +339,9 @@ fn main() {
         cursor_mode,
         audio: request.audio_sources(),
         defer_start: request.defer_start,
+        hyprland_cursor: cursor_mode.reports_cursor()
+            && !cursor_metadata_supported
+            && hyprland_active,
     };
     let exit_code = run(&mut emitter, receiver, sender, session);
     std::process::exit(exit_code);
@@ -353,6 +363,8 @@ struct RunConfig {
     /// Wait for `record` on stdin before connecting to PipeWire. See
     /// [`Request::defer_start`].
     defer_start: bool,
+    /// Whether to sample cursor telemetry via Hyprland IPC socket.
+    hyprland_cursor: bool,
 }
 
 /// Opens every requested audio stream, returning the live sessions (which must
@@ -547,7 +559,13 @@ fn begin_stream<W: Write>(
 ) -> Result<(), ()> {
     // The fd is consumed by libpipewire; the rest is kept for the
     // `stream-started` event, emitted once the format is negotiated.
-    let portal::PortalStream { fd, node_id, position, source_kind, .. } = stream;
+    let portal::PortalStream {
+        fd,
+        node_id,
+        position,
+        source_kind,
+        ..
+    } = stream;
     let forward = sender.clone();
     match shim::Session::start(
         fd,
@@ -561,7 +579,11 @@ fn begin_stream<W: Write>(
         Ok(started) => {
             *session = Some(started);
             *granted_kind = source_kind;
-            *portal_stream = Some(StreamInfo { node_id, position, source_kind });
+            *portal_stream = Some(StreamInfo {
+                node_id,
+                position,
+                source_kind,
+            });
             Ok(())
         }
         Err(message) => {
@@ -593,6 +615,18 @@ fn run<W: Write>(
     let mut session: Option<shim::Session> = None;
     let mut portal_stream: Option<StreamInfo> = None;
     let mut size: Option<(i32, i32)> = None;
+    let hyprland_position = Arc::new(Mutex::new(None));
+    let hyprland_size = Arc::new(Mutex::new(None));
+    let _hyprland_sampler = if config.hyprland_cursor {
+        Some(hyprland::HyprlandSampler::spawn(
+            sender.clone(),
+            config.tick,
+            Arc::clone(&hyprland_position),
+            Arc::clone(&hyprland_size),
+        ))
+    } else {
+        None
+    };
     // What the portal granted, kept past the `StreamInfo` that is consumed at
     // Format: only a window stream is expected to carry a crop.
     let mut granted_kind: Option<portal::SourceKind> = None;
@@ -712,7 +746,13 @@ fn run<W: Write>(
             // its message is delivered after the stream-state one.
             Ok(Message::PointerButton(press_ms)) => {
                 if streaming_since.is_some_and(|since| press_ms >= since) {
-                    emit_sample(emitter, &cursor, content_rect(&capture, size), &mut pending_asset, Some(press_ms));
+                    emit_sample(
+                        emitter,
+                        &cursor,
+                        content_rect(&capture, size),
+                        &mut pending_asset,
+                        Some(press_ms),
+                    );
                 }
             }
 
@@ -978,6 +1018,8 @@ fn run<W: Write>(
 
             Ok(Message::Portal(result)) => match *result {
                 Ok(stream) => {
+                    *hyprland_position.lock().unwrap() = stream.position;
+                    *hyprland_size.lock().unwrap() = stream.size;
                     // The portal's size is in the compositor's coordinate space
                     // and can differ from the negotiated pixel size on a scaled
                     // display. Logged rather than used: cursor positions arrive
@@ -1046,6 +1088,7 @@ fn run<W: Write>(
 
             Ok(Message::Stream(StreamEvent::Format(format))) => {
                 size = Some((format.width, format.height));
+                *hyprland_size.lock().unwrap() = Some((format.width, format.height));
                 let _ = emitter.emit(&Event::Debug {
                     code: "format".to_owned(),
                     data: json_map([
@@ -1062,9 +1105,7 @@ fn run<W: Write>(
                         height: format.height,
                         position_x: stream.position.map(|(x, _)| x),
                         position_y: stream.position.map(|(_, y)| y),
-                        source_kind: stream
-                            .source_kind
-                            .map(|kind| kind.as_str().to_owned()),
+                        source_kind: stream.source_kind.map(|kind| kind.as_str().to_owned()),
                     });
                 }
 
@@ -1115,7 +1156,10 @@ fn run<W: Write>(
                         ("metas", metas.clone().into()),
                     ]),
                 });
-                if !has_cursor_meta && config.cursor_mode.reports_cursor() {
+                if !has_cursor_meta
+                    && config.cursor_mode.reports_cursor()
+                    && !config.hyprland_cursor
+                {
                     let _ = emitter.emit(&Event::Warning {
                         code: "no-cursor-metadata".to_owned(),
                         message: format!(
@@ -1169,7 +1213,9 @@ fn run<W: Write>(
                 if let Some(error) = error {
                     let _ = emitter.emit(&Event::Warning {
                         code: "stream-error".to_owned(),
-                        message: format!("PipeWire stream reported an error in state {state}: {error}"),
+                        message: format!(
+                            "PipeWire stream reported an error in state {state}: {error}"
+                        ),
                     });
                 }
                 if state == "unconnected" && session.is_some() {
@@ -1253,14 +1299,26 @@ fn run<W: Write>(
                 // A new sprite ships immediately; positions respect the sample
                 // interval so a 120fps compositor cannot flood stdout.
                 if asset_is_new || last_emit.elapsed() >= config.sample_interval {
-                    emit_sample(emitter, &cursor, content_rect(&capture, size), &mut pending_asset, None);
+                    emit_sample(
+                        emitter,
+                        &cursor,
+                        content_rect(&capture, size),
+                        &mut pending_asset,
+                        None,
+                    );
                     last_emit = Instant::now();
                 }
             }
 
             Err(RecvTimeoutError::Timeout) => {
                 if cursor.is_some() && last_emit.elapsed() >= config.sample_interval {
-                    emit_sample(emitter, &cursor, content_rect(&capture, size), &mut pending_asset, None);
+                    emit_sample(
+                        emitter,
+                        &cursor,
+                        content_rect(&capture, size),
+                        &mut pending_asset,
+                        None,
+                    );
                     last_emit = Instant::now();
                 }
                 // No advance here: a timeout means a tick has passed, so the
@@ -1331,7 +1389,9 @@ fn finish_capture<W: Write>(
                         "the recorded video timeline is {} ms but the recording ran {} ms of \
                          wall-clock time (off by {} ms); the screen track may be out of sync \
                          with audio, webcam and the cursor overlay. See issue #511.",
-                        summary.duration_ms, summary.wall_clock_ms, skew.abs()
+                        summary.duration_ms,
+                        summary.wall_clock_ms,
+                        skew.abs()
                     ),
                 });
             }
@@ -1370,7 +1430,12 @@ fn heartbeat_due(last_advance: Instant, now: Instant, tick: Duration) -> bool {
 fn content_rect(capture: &Option<Capture>, size: Option<(i32, i32)>) -> Option<shim::CropRect> {
     match capture {
         Some(capture) if capture.started() => Some(capture.content_rect()),
-        _ => size.map(|(width, height)| shim::CropRect { x: 0, y: 0, width, height }),
+        _ => size.map(|(width, height)| shim::CropRect {
+            x: 0,
+            y: 0,
+            width,
+            height,
+        }),
     }
 }
 
@@ -1445,7 +1510,6 @@ fn json_map<const N: usize>(
         .collect()
 }
 
-
 /// Resolves the microphone the user picked in the app to a PipeWire `node.name`.
 ///
 /// WHY A MATCH AND NOT A LOOKUP. The picker lists Chromium `MediaDeviceInfo`,
@@ -1469,7 +1533,10 @@ fn resolve_microphone_node(label: &str, sources: &[shim::AudioSourceInfo]) -> Op
         return Some(exact.name.clone());
     }
     let folded = wanted.to_lowercase();
-    if let Some(exact) = sources.iter().find(|s| s.description.to_lowercase() == folded) {
+    if let Some(exact) = sources
+        .iter()
+        .find(|s| s.description.to_lowercase() == folded)
+    {
         return Some(exact.name.clone());
     }
     // Chromium decorates labels ("Digital Microphone (Family 17h/19h ...)"),
@@ -1497,7 +1564,11 @@ mod cursor_sample_tests {
         let mut emitter = Emitter::new(&mut buffer, false);
         emit_sample(
             &mut emitter,
-            &Some(CursorState { x: cursor.0, y: cursor.1, asset_id: None }),
+            &Some(CursorState {
+                x: cursor.0,
+                y: cursor.1,
+                asset_id: None,
+            }),
             content,
             &mut None,
             None,
@@ -1512,7 +1583,12 @@ mod cursor_sample_tests {
     fn a_full_screen_capture_reports_stream_coordinates() {
         let value = sample_json(
             (960, 540),
-            Some(shim::CropRect { x: 0, y: 0, width: 1920, height: 1080 }),
+            Some(shim::CropRect {
+                x: 0,
+                y: 0,
+                width: 1920,
+                height: 1080,
+            }),
         );
         assert_eq!(value["x"], 960);
         assert_eq!(value["y"], 540);
@@ -1534,11 +1610,22 @@ mod cursor_sample_tests {
         // one quarter into the window.
         let value = sample_json(
             (260, 170),
-            Some(shim::CropRect { x: 100, y: 50, width: 640, height: 480 }),
+            Some(shim::CropRect {
+                x: 100,
+                y: 50,
+                width: 640,
+                height: 480,
+            }),
         );
-        assert_eq!(value["x"], 160, "the crop origin has to come off the position");
+        assert_eq!(
+            value["x"], 160,
+            "the crop origin has to come off the position"
+        );
         assert_eq!(value["y"], 120);
-        assert_eq!(value["width"], 640, "the consumer normalises against what it is told");
+        assert_eq!(
+            value["width"], 640,
+            "the consumer normalises against what it is told"
+        );
         assert_eq!(value["height"], 480);
         assert_eq!(value["visible"], true);
     }
@@ -1551,7 +1638,12 @@ mod cursor_sample_tests {
     fn a_pointer_outside_the_window_is_reported_invisible() {
         let outside = sample_json(
             (1500, 900),
-            Some(shim::CropRect { x: 100, y: 50, width: 640, height: 480 }),
+            Some(shim::CropRect {
+                x: 100,
+                y: 50,
+                width: 640,
+                height: 480,
+            }),
         );
         assert_eq!(outside["visible"], false);
 
@@ -1559,7 +1651,12 @@ mod cursor_sample_tests {
         // past the far edge.
         let before = sample_json(
             (10, 10),
-            Some(shim::CropRect { x: 100, y: 50, width: 640, height: 480 }),
+            Some(shim::CropRect {
+                x: 100,
+                y: 50,
+                width: 640,
+                height: 480,
+            }),
         );
         assert_eq!(before["visible"], false);
     }
@@ -1573,12 +1670,20 @@ mod cursor_sample_tests {
         let mut emitter = Emitter::new(&mut buffer, false);
         emit_sample(
             &mut emitter,
-            &Some(CursorState { x: 10, y: 10, asset_id: None }),
+            &Some(CursorState {
+                x: 10,
+                y: 10,
+                asset_id: None,
+            }),
             None,
             &mut None,
             None,
         );
-        assert!(buffer.is_empty(), "emitted {}", String::from_utf8_lossy(&buffer));
+        assert!(
+            buffer.is_empty(),
+            "emitted {}",
+            String::from_utf8_lossy(&buffer)
+        );
     }
 
     /// #936: messages arriving faster than the tick must not hold the heartbeat
@@ -1599,8 +1704,15 @@ mod cursor_sample_tests {
             }
         }
         // Every 21 ms at worst (three 7 ms passes): about 47 a second, never zero.
-        assert!(advances >= 1000 / 21, "{advances} advances in a second of cursor traffic");
-        assert!(!heartbeat_due(start, start + Duration::from_millis(15), tick));
+        assert!(
+            advances >= 1000 / 21,
+            "{advances} advances in a second of cursor traffic"
+        );
+        assert!(!heartbeat_due(
+            start,
+            start + Duration::from_millis(15),
+            tick
+        ));
     }
 
     /// A cursor-only session opens no encoder, so it falls back to the whole
@@ -1611,7 +1723,12 @@ mod cursor_sample_tests {
         // negotiated stream, or nothing when the format is still unknown.
         assert_eq!(
             content_rect(&None, Some((1920, 1080))),
-            Some(shim::CropRect { x: 0, y: 0, width: 1920, height: 1080 })
+            Some(shim::CropRect {
+                x: 0,
+                y: 0,
+                width: 1920,
+                height: 1080
+            })
         );
         assert_eq!(content_rect(&None, None), None);
 
@@ -1640,14 +1757,24 @@ mod cursor_sample_tests {
                 height: 1080,
                 video_format: shim::constants().video_format_bgrx,
                 pts_ns: -1,
-                crop: shim::CropRect { x: 100, y: 50, width: 320, height: 240 },
+                crop: shim::CropRect {
+                    x: 100,
+                    y: 50,
+                    width: 320,
+                    height: 240,
+                },
                 has_crop: true,
                 dmabuf: None,
             })
             .expect("stage");
         assert_eq!(
             content_rect(&Some(capture), Some((1920, 1080))),
-            Some(shim::CropRect { x: 100, y: 50, width: 320, height: 240 }),
+            Some(shim::CropRect {
+                x: 100,
+                y: 50,
+                width: 320,
+                height: 240
+            }),
             "a started encoder reports the window it read, not the monitor stream"
         );
         let _ = std::fs::remove_file(&output);
@@ -1682,7 +1809,10 @@ mod microphone_resolution_tests {
             "Family 17h/19h HD Audio Controller Digital Microphone",
             &sources(),
         );
-        assert_eq!(node.as_deref(), Some("alsa_input.pci-0000_03_00.6.HiFi__hw_acp6x__source"));
+        assert_eq!(
+            node.as_deref(),
+            Some("alsa_input.pci-0000_03_00.6.HiFi__hw_acp6x__source")
+        );
     }
 
     #[test]
@@ -1697,7 +1827,10 @@ mod microphone_resolution_tests {
     #[test]
     fn a_node_name_passes_straight_through() {
         let name = "alsa_input.pci-0000_03_00.6.HiFi__hw_Generic_1__source";
-        assert_eq!(resolve_microphone_node(name, &sources()).as_deref(), Some(name));
+        assert_eq!(
+            resolve_microphone_node(name, &sources()).as_deref(),
+            Some(name)
+        );
     }
 
     #[test]

@@ -57,7 +57,7 @@ cc = "1"
 # Same generator the compositor uses on its copy of these headers. Hand-writing
 # AVCodecContext/AVFrame layouts is the one thing guaranteed to break silently on
 # an ffmpeg bump, so the layouts are always generated, never typed out.
-bindgen = "0.70"
+bindgen = "0.71"
 
 [profile.release]
 opt-level = 2

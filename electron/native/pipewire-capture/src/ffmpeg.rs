@@ -10,7 +10,12 @@
 //! Every value here is therefore derived, with the derivation shown, and pinned
 //! by a test at the bottom of the file rather than trusted.
 
-#![allow(non_upper_case_globals, non_camel_case_types, non_snake_case, dead_code)]
+#![allow(
+    non_upper_case_globals,
+    non_camel_case_types,
+    non_snake_case,
+    dead_code
+)]
 
 include!(concat!(env!("OUT_DIR"), "/ffmpeg_sys.rs"));
 
@@ -39,6 +44,21 @@ pub const AVERROR_ENOMEM: i32 = -12;
 /// `AVIO_FLAG_WRITE` from libavformat/avio.h:618. A plain `#define` in a block
 /// bindgen skips, unlike the `SWS_*` flags below.
 pub const AVIO_FLAG_WRITE: i32 = 2;
+
+/// Hand-written prefix of `AVFormatContext`. The full struct is opaque/unstable
+/// across minor versions, but libavformat guarantees the prefix fields are fixed.
+/// `encoder.rs` only accesses `pb` and `streams`.
+#[repr(C)]
+pub struct AVFormatContext {
+    pub av_class: *const AVClass,
+    pub iformat: *const AVInputFormat,
+    pub oformat: *const AVOutputFormat,
+    pub priv_data: *mut std::ffi::c_void,
+    pub pb: *mut AVIOContext,
+    pub ctx_flags: std::ffi::c_int,
+    pub nb_streams: std::ffi::c_uint,
+    pub streams: *mut *mut AVStream,
+}
 
 // The `SWS_*` rescaler flags are NOT redeclared here. They used to need it — the
 // compositor still carries its own copies (crates/compositor/src/linux_frames.rs)
@@ -76,7 +96,10 @@ mod tests {
         // hardcoded numbers, it checks them against the linked libavutil. A
         // wrong FourCC derivation shows up here as a mismatched message.
         assert_eq!(err_to_string(AVERROR_EOF), "End of file");
-        assert_eq!(err_to_string(AVERROR_INVALIDDATA), "Invalid data found when processing input");
+        assert_eq!(
+            err_to_string(AVERROR_INVALIDDATA),
+            "Invalid data found when processing input"
+        );
         assert_eq!(AVERROR_EAGAIN, -11);
     }
 
