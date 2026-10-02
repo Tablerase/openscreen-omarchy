@@ -11,7 +11,7 @@
 
 import { translate } from "@docusaurus/Translate";
 import Heading from "@theme/Heading";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
 
 import DemoLoop from "../DemoLoop";
 import { type Block, getBlocks, getPair } from "./content";
@@ -23,6 +23,9 @@ function Stage({ block }: { block: Block }) {
 	const [prev, setPrev] = useState<number | null>(null);
 	const [fading, setFading] = useState(false);
 	const bars = useRef<(HTMLSpanElement | null)[]>([]);
+	const tabs = useRef<(HTMLButtonElement | null)[]>([]);
+	const panel = useRef<HTMLDivElement>(null);
+	const tablist = useRef<HTMLDivElement>(null);
 	const many = block.tabs.length > 1;
 
 	// Straight to the DOM: a state update per frame would re-render the block.
@@ -38,6 +41,40 @@ function Stage({ block }: { block: Block }) {
 		setIndex(i);
 	};
 
+	// A clip that ends hands over to the next. If focus was inside it (its pause
+	// button, which is about to fade out and unmount), it moves to the tab now
+	// selected rather than falling back to the page.
+	const advance = () => {
+		const next = (index + 1) % block.tabs.length;
+		// On a tab too: the selection moves, so the one Tab stop moves with it.
+		const hadFocus =
+			(panel.current?.contains(document.activeElement) ||
+				tablist.current?.contains(document.activeElement)) ??
+			false;
+		go(next);
+		if (hadFocus) requestAnimationFrame(() => tabs.current[next]?.focus());
+	};
+
+	// The WAI-ARIA tabs pattern: one Tab stop for the whole list (the selected
+	// tab), arrows and Home/End to move, selection following focus.
+	const onKeyDown = (e: KeyboardEvent) => {
+		const n = block.tabs.length;
+		const to =
+			e.key === "ArrowRight"
+				? (index + 1) % n
+				: e.key === "ArrowLeft"
+					? (index - 1 + n) % n
+					: e.key === "Home"
+						? 0
+						: e.key === "End"
+							? n - 1
+							: null;
+		if (to === null) return;
+		e.preventDefault();
+		go(to);
+		tabs.current[to]?.focus();
+	};
+
 	// Without a first frame (reduced motion fetches nothing until play), fade anyway.
 	useEffect(() => {
 		if (prev === null) return;
@@ -48,11 +85,17 @@ function Stage({ block }: { block: Block }) {
 	// Drop the outgoing layer once its fade (0.6 s in the CSS) is over. A timer,
 	// not transitionend: the layer's descendants transition too, and an event
 	// from any of them ended the fade early.
+	// Focus left inside it (a pause button) would fall back to the page with
+	// it, so it moves to the selected tab first.
 	useEffect(() => {
 		if (!fading || prev === null) return;
-		const t = window.setTimeout(() => setPrev(null), 700);
+		const t = window.setTimeout(() => {
+			const out = panel.current?.querySelector("[data-outgoing]");
+			if (out?.contains(document.activeElement)) tabs.current[index]?.focus();
+			setPrev(null);
+		}, 700);
 		return () => window.clearTimeout(t);
-	}, [fading, prev]);
+	}, [fading, prev, index]);
 
 	// Both layers are keyed by their loop, so the outgoing one keeps its last
 	// frame instead of remounting from the start.
@@ -65,7 +108,13 @@ function Stage({ block }: { block: Block }) {
 		<div className={styles.stage}>
 			<span className={styles.glow} />
 			{many && (
-				<div className={styles.tabs} role="tablist" aria-label={block.title}>
+				<div
+					ref={tablist}
+					className={styles.tabs}
+					role="tablist"
+					aria-label={block.title}
+					onKeyDown={onKeyDown}
+				>
 					{block.tabs.map((tab, i) => (
 						<button
 							key={tab.loop}
@@ -74,6 +123,10 @@ function Stage({ block }: { block: Block }) {
 							id={`${block.id}-tab-${i}`}
 							aria-selected={i === index}
 							aria-controls={`${block.id}-panel`}
+							tabIndex={i === index ? 0 : -1}
+							ref={(el) => {
+								tabs.current[i] = el;
+							}}
 							className={styles.tab}
 							onClick={() => go(i)}
 						>
@@ -90,6 +143,7 @@ function Stage({ block }: { block: Block }) {
 				</div>
 			)}
 			<div
+				ref={panel}
 				className={`${styles.frame} ${styles.layers}`}
 				id={`${block.id}-panel`}
 				role={many ? "tabpanel" : undefined}
@@ -100,12 +154,13 @@ function Stage({ block }: { block: Block }) {
 						key={block.tabs[i].loop}
 						className={`${styles.layer} ${out ? styles.outgoing : ""} ${out && fading ? styles.gone : ""}`}
 						aria-hidden={out || undefined}
+						data-outgoing={out || undefined}
 					>
 						<DemoLoop
 							name={block.tabs[i].loop}
 							loop={!many}
 							onProgress={!out && many ? onProgress : undefined}
-							onEnded={!out && many ? () => go((index + 1) % block.tabs.length) : undefined}
+							onEnded={!out && many ? advance : undefined}
 							onReady={!out ? () => setFading(true) : undefined}
 						/>
 					</div>

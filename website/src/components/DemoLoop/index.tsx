@@ -14,7 +14,9 @@
  *   - It plays only while at least half of it is on screen, and pauses when it
  *     leaves, so a page with ten loops decodes one or two at a time.
  *   - No autoplay for a reader who asked for reduced motion or for Save-Data:
- *     they get the poster and a play button, and the file only on that click.
+ *     they get the poster and a play button, and the sources are not even in
+ *     the DOM before that click. Turning reduced motion on while the page is
+ *     open stops a loop that was playing.
  *   - A visible pause button on every loop. A loop runs past five seconds and
  *     never stops, which WCAG 2.2.2 does not allow without one.
  *
@@ -48,9 +50,6 @@ type Props = {
 	onReady?: () => void;
 };
 
-/** Far enough ahead that the poster is there before the box is. */
-const NEAR = "100% 0px";
-
 function motionAllowed(): boolean {
 	try {
 		const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -70,20 +69,37 @@ export default function DemoLoop({ name, loop = true, onEnded, onProgress, onRea
 	// null until the reader decides; then their choice beats visibility.
 	const [wanted, setWanted] = useState<boolean | null>(null);
 	const visible = useRef(false);
-	const auto = useRef(true);
+	// State, not a ref: it decides whether the sources are in the DOM at all.
+	const [auto, setAuto] = useState(true);
 
-	// Attach the sources once the box is near.
+	// Follow the reader's motion setting, including a change made while the
+	// page is open: turning on reduced motion stops a loop that is playing.
+	useEffect(() => {
+		setAuto(motionAllowed());
+		let mq: MediaQueryList;
+		try {
+			mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+		} catch {
+			return;
+		}
+		const onChange = () => setAuto(motionAllowed());
+		mq.addEventListener("change", onChange);
+		return () => mq.removeEventListener("change", onChange);
+	}, []);
+
+	// Attach the poster (and pick the file) once the box is within one screen
+	// height. In pixels: a percentage rootMargin resolves against the root's
+	// width, which on a portrait phone is well under a screen of lead.
 	useEffect(() => {
 		const el = box.current;
 		if (!el) return;
-		auto.current = motionAllowed();
 		const io = new IntersectionObserver(
 			(entries) => {
 				if (!entries.some((e) => e.isIntersecting)) return;
 				io.disconnect();
 				setHeight(pickHeight(el.clientWidth, window.devicePixelRatio));
 			},
-			{ rootMargin: NEAR },
+			{ rootMargin: `${Math.round(window.innerHeight)}px 0px` },
 		);
 		io.observe(el);
 		return () => io.disconnect();
@@ -95,7 +111,7 @@ export default function DemoLoop({ name, loop = true, onEnded, onProgress, onRea
 		const v = video.current;
 		if (!el || !v || height === null) return;
 		const sync = () => {
-			const go = wanted ?? (auto.current && visible.current);
+			const go = wanted ?? (auto && visible.current);
 			if (go && visible.current) {
 				v.play().catch(() => setPlaying(false));
 			} else {
@@ -119,7 +135,7 @@ export default function DemoLoop({ name, loop = true, onEnded, onProgress, onRea
 			io.disconnect();
 			v.removeEventListener("loadeddata", sync);
 		};
-	}, [height, wanted]);
+	}, [height, wanted, auto]);
 
 	// Progress for a stage's tab bar, per frame rather than per `timeupdate`,
 	// which fires four times a second and would step the bar visibly.
@@ -151,7 +167,7 @@ export default function DemoLoop({ name, loop = true, onEnded, onProgress, onRea
 					muted
 					loop={loop}
 					playsInline
-					preload={height && auto.current ? "auto" : "none"}
+					preload={height && auto ? "auto" : "none"}
 					disablePictureInPicture
 					disableRemotePlayback
 					onPlay={() => setPlaying(true)}
@@ -159,7 +175,11 @@ export default function DemoLoop({ name, loop = true, onEnded, onProgress, onRea
 					onEnded={onEnded}
 					onLoadedData={onReady}
 				>
+					{/* Without autoplay (reduced motion, Save-Data) the sources wait for
+					    the play button: `preload="none"` is only a hint, and some engines
+					    fetch anyway once a source is there. */}
 					{height &&
+						(auto || wanted === true) &&
 						loopSources(name, height).map((s) => <source key={s.src} src={s.src} type={s.type} />)}
 				</video>
 				{height && (
