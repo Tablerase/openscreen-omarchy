@@ -8,6 +8,7 @@ import { Apple, AppWindow, ArrowDown, CircleCheck, Download, TerminalSquare } fr
 
 import AppLanguages from "../components/AppLanguages";
 import Editor from "../components/Editor";
+import Films from "../components/Films";
 import LocaleLink from "../components/LocaleLink";
 import Showcase from "../components/Showcase";
 import type { AppLanguage } from "../lib/release";
@@ -117,6 +118,9 @@ export default function Home() {
 
 			{/* The argument, immediately after the hero. */}
 			<Editor />
+
+			{/* What the editor above does not reach, filmed from the app. */}
+			<Films />
 
 			{/* The claims the editor cannot make on its own. */}
 			<Showcase />

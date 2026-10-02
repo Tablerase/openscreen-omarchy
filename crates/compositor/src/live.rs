@@ -155,7 +155,7 @@ unsafe fn open_and_seek_clip(
     let source_time_sec = source_time_sec.max(0.0);
     let mut sdec = Decoder::open(screen_path, gpu)?;
     let (mut wdec, webcam_decoder_is_real) = open_webcam_or_stand_in(screen_path, webcam_path, gpu)?;
-    let sf = sdec.seek_to(source_time_sec)?;
+    let sf = sdec.seek_to_or_last(source_time_sec)?;
     let mut wf = wdec.seek_to(webcam_seek_time(source_time_sec, webcam_offset_sec))?;
     if wf.is_null() {
         wf = wdec.seek_to(0.0)?;
@@ -195,7 +195,7 @@ unsafe fn seek_pair(
     source_time_sec: f64,
     webcam_offset_sec: f64,
 ) -> Result<bool> {
-    let sf = sdec.seek_to(source_time_sec)?;
+    let sf = sdec.seek_to_or_last(source_time_sec)?;
     if sf.is_null() {
         return Ok(false);
     }
@@ -601,10 +601,12 @@ impl Player {
     /// aucun raccourci keyframe pour les seeks avant lointains (lent ET, combiné au bug de
     /// `set_time`, incorrect au-delà de 6s sur un enregistrement réel).
     pub unsafe fn present_frame(&mut self, comp: &Compositor, cfg: &Cfg, target_sec: f64) -> Result<bool> {
-        let sf = self.sdec.seek_to(target_sec)?;
+        let sf = self.sdec.seek_to_or_last(target_sec)?;
+        // La webcam aussi : sans caméra, `wdec` rouvre le fichier écran, et une cible au-delà de
+        // sa dernière image laisserait la frame sans webcam, donc non composée.
         let wf = self
             .wdec
-            .seek_to(webcam_seek_time(target_sec, self.webcam_offset_sec))?;
+            .seek_to_or_last(webcam_seek_time(target_sec, self.webcam_offset_sec))?;
         if sf.is_null() || wf.is_null() {
             self.has_current_frame = false;
             return Ok(false);

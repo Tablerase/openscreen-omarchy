@@ -8,11 +8,15 @@ keywords:
   - auto zoom screen recording windows
 ---
 
+import DemoLoop from "@site/src/components/DemoLoop";
+
 # A free screen recorder with auto zoom
 
 OpenScreen is a free, MIT-licensed screen recorder with auto zoom for Windows, macOS and Linux. After each take, it reads the clicks it recorded and zooms in on them, with no network call and no AI model. Screen Studio, Cap and Camtasia also zoom automatically; OpenScreen does it for free, on all three systems.
 
 This page is published by the OpenScreen project. The Screen Studio, Cap and Camtasia details come from screen.studio, cap.so and techsmith.com and were checked in September 2026. The sources are listed at the end.
+
+<DemoLoop name="classic-zoom" />
 
 ## At a glance
 
@@ -68,11 +72,15 @@ Automatic zooms are a starting point. The same zoom regions can be placed and tu
 
 A manual zoom with a manual focus needs no cursor data, so it also works on a video imported from another tool. See [Zoom regions](/docs/editing-timeline/#zoom-regions) for the zoom inspector.
 
+<DemoLoop name="3d-camera" />
+
 ## The cursor after the take
 
 The same recorded movement drives the cursor in the export. The Cursor facet shows or hides it and sets its size, smoothing, motion blur, click bounce and click impact. The cursor path is smoothed the same way for the preview and the export, so the preview matches the file.
 
 Click bounce needs recorded clicks. On macOS that takes the Accessibility permission, and on Linux your user must be in the `input` group. [Recording](/docs/recording/) lists what each platform captures.
+
+<DemoLoop name="3d-cursors" />
 
 ## From the command line
 

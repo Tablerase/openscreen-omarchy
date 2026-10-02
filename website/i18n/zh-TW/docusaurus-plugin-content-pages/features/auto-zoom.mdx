@@ -8,11 +8,15 @@ keywords:
   - Windows 自動縮放螢幕錄影
 ---
 
+import DemoLoop from "@site/src/components/DemoLoop";
+
 # 免費、內建自動縮放的螢幕錄影軟體
 
 OpenScreen 是一款免費、MIT 授權、支援 Windows、macOS 與 Linux 的螢幕錄影軟體，內建自動縮放。每次錄完之後，OpenScreen 會讀取它錄下的點擊，並在這些點擊處放大，不需要連線，也不需要 AI 模型。Screen Studio、Cap 與 Camtasia 也都有自動縮放；OpenScreen 在三個平台上都免費提供這項功能。
 
 本頁由 OpenScreen 專案發布。Screen Studio、Cap 與 Camtasia 的資訊來自 screen.studio、cap.so 與 techsmith.com，於 2026 年 9 月確認。資料來源列於文末。
+
+<DemoLoop name="classic-zoom" />
 
 ## 概覽 {#at-a-glance}
 
@@ -68,11 +72,15 @@ OpenScreen 是一款免費、MIT 授權、支援 Windows、macOS 與 Linux 的�
 
 手動對焦的手動縮放不需要游標資料，所以也能用在從其他工具匯入的影片上。縮放檢查器詳見[縮放區域](/docs/editing-timeline/#zoom-regions)。
 
+<DemoLoop name="3d-camera" />
+
 ## 錄影結束後的游標 {#the-cursor-after-the-take}
 
 同樣錄下的移動資料也會驅動匯出檔案中的游標。「游標」面板可以顯示或隱藏游標，並設定大小、平滑度、動態模糊、點擊彈跳與點擊按壓效果。游標路徑在預覽與匯出時使用相同的平滑方式，所以預覽畫面就是最終匯出的結果。
 
 點擊彈跳需要錄下點擊資料。在 macOS 上這需要「輔助使用」權限，在 Linux 上則需要你的使用者屬於 `input` 群組。各平台會擷取哪些內容，列於[錄影](/docs/recording/)頁面。
+
+<DemoLoop name="3d-cursors" />
 
 ## 從命令列使用 {#from-the-command-line}
 
