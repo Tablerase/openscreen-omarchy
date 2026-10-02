@@ -101,7 +101,14 @@ export default function DemoLoop({ name }: Props) {
 		);
 		io.observe(el);
 		sync();
-		return () => io.disconnect();
+		// A loop already on screen when its sources attach gets its play() while
+		// the browser is still choosing a source, which aborts it, and no
+		// threshold is crossed afterwards to ask again. Ask once there is a frame.
+		v.addEventListener("loadeddata", sync);
+		return () => {
+			io.disconnect();
+			v.removeEventListener("loadeddata", sync);
+		};
 	}, [height, wanted]);
 
 	const label = loopLabel(name);

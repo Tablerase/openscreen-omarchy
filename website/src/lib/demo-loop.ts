@@ -4,7 +4,7 @@
  * The loops are served from Cloudflare R2, not from website/static/. Everything
  * under static/ is committed to git for good (scripts/check-media-budget.mjs
  * says why), and eighteen 1080p60 clips in two codecs and two sizes are about
- * 50 MB per cut. The bucket holds them outside the repository; the folder name
+ * 75 MB per cut. The bucket holds them outside the repository; the folder name
  * is the cut, so a re-encode goes to a new folder and the old files can keep
  * their `immutable` cache header.
  */
@@ -52,7 +52,9 @@ export function pickHeight(cssWidth: number, devicePixelRatio: number): LoopHeig
  * The codec strings are the encoder's real profile and level (ffprobe on the
  * files), not the bare "hvc1": an engine that can decode HEVC Main only up to a
  * lower level should say no here and take the H.264 file, rather than say yes
- * and stall. HEVC is listed first: about 40% smaller at the same VMAF.
+ * and stall. HEVC is listed first because it is the better file, measured with
+ * VMAF against the masters: 23% lighter at equal quality on every-layout, and
+ * 97.8 against 96.0 at equal size on 3d-cursors.
  */
 export function loopSources(name: LoopName, height: LoopHeight) {
 	return [
