@@ -952,7 +952,7 @@
     "message": "公開の前に"
   },
   "films.ship.title": {
-    "message": "どんな形式でも。プライベートは見せない。"
+    "message": "どんな形式にも合わせて。見せたくないものはぼかして。"
   },
   "films.ship.lead": {
     "message": "1 つのテイクが{formats}になり、見せたくないものは{blur}。"

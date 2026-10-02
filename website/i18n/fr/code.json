@@ -952,7 +952,7 @@
     "message": "Avant l'envoi"
   },
   "films.ship.title": {
-    "message": "Tous les formats. Rien de privé."
+    "message": "Adaptez à tous les formats. Floutez ce qui ne doit pas se voir."
   },
   "films.ship.lead": {
     "message": "Une prise devient {formats}, et ce qui ne doit pas être vu reste {blur}."

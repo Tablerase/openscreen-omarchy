@@ -952,7 +952,7 @@
     "message": "Antes de publicar"
   },
   "films.ship.title": {
-    "message": "Todos os formatos. Nada privado."
+    "message": "Adapte a qualquer formato. Desfoque o que não deve aparecer."
   },
   "films.ship.lead": {
     "message": "Uma tomada vira {formats}, e o que não deve aparecer fica {blur}."

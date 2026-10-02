@@ -246,7 +246,10 @@ export function getPair(): PairBlock {
 	return {
 		id: "ship",
 		kicker: translate({ id: "films.ship.kicker", message: "Before it ships" }),
-		title: translate({ id: "films.ship.title", message: "Every format. Nothing private." }),
+		title: translate({
+			id: "films.ship.title",
+			message: "Fit any format. Blur what should not be seen.",
+		}),
 		lead: (
 			<Translate
 				id="films.ship.lead"

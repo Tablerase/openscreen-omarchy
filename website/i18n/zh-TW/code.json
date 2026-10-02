@@ -952,7 +952,7 @@
     "message": "發布之前"
   },
   "films.ship.title": {
-    "message": "任何格式，不露隱私。"
+    "message": "適配任何格式，模糊不該露出的內容。"
   },
   "films.ship.lead": {
     "message": "一段素材可以變成{formats}，不該被看到的內容始終{blur}。"
