@@ -809,10 +809,6 @@
     "message": "Un formulaire de connexion en cours de saisie. Les champs e-mail et mot de passe restent floutés pendant la frappe.",
     "description": "Describes a short silent video loop of the app for screen readers."
   },
-  "demoLoop.camera-cutout": {
-    "message": "Une bulle de webcam sur un enregistrement d'écran. Son arrière-plan est ensuite retiré, et la personne apparaît devant l'écran.",
-    "description": "Describes a short silent video loop of the app for screen readers."
-  },
   "demoLoop.every-layout": {
     "message": "Un enregistrement avec webcam qui passe par les dispositions : incrustation, côte à côte, empilée, caméra plein écran, puis écran seul.",
     "description": "Describes a short silent video loop of the app for screen readers."
@@ -926,19 +922,13 @@
     "message": "Votre caméra, votre écran, ou les deux."
   },
   "films.camera.lead": {
-    "message": "Une prise avec webcam peut passer {layouts}, et l'arrière-plan de la caméra peut être {removed}, sans fond vert."
+    "message": "Une prise avec webcam peut passer {layouts}, et la pièce derrière vous peut être {blurred}, détourée ou remplacée sur votre propre ordinateur, sans fond vert."
   },
   "films.camera.lead.layouts": {
     "message": "en incrustation, côte à côte, empilée ou en plein écran"
   },
-  "films.camera.lead.removed": {
-    "message": "retiré sur votre ordinateur"
-  },
   "films.camera.tab.layouts": {
     "message": "Dispositions"
-  },
-  "films.camera.tab.cutout": {
-    "message": "Détouré"
   },
   "films.camera.note.layouts": {
     "message": "{t} Incrustation d'image, double cadre, empilement vertical, ou pas de webcam du tout."
@@ -956,7 +946,7 @@
     "message": "{t} Un modèle de segmentation vous sépare de la pièce, sur votre propre ordinateur. Rien n'est envoyé."
   },
   "films.camera.note.background.t": {
-    "message": "Détourer, flouter ou remplacer."
+    "message": "Flouter, détourer ou remplacer."
   },
   "films.ship.kicker": {
     "message": "Avant l'envoi"
@@ -988,5 +978,15 @@
   "films.label": {
     "message": "L'app en mouvement, en plus",
     "description": "Read by screen readers only: names the section of feature videos"
+  },
+  "films.camera.lead.blurred": {
+    "message": "floutée"
+  },
+  "films.camera.tab.blur": {
+    "message": "Flou d'arrière-plan"
+  },
+  "demoLoop.camera-blur": {
+    "message": "Une vignette de webcam carrée sur un enregistrement d'écran. La vue s'en rapproche pendant que la pièce derrière la personne se floute, puis recule.",
+    "description": "Describes a short silent video loop of the app for screen readers."
   }
 }

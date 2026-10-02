@@ -809,10 +809,6 @@
     "message": "Ein Anmeldeformular wird ausgefüllt. Die Felder für E-Mail und Passwort bleiben beim Tippen unscharf.",
     "description": "Describes a short silent video loop of the app for screen readers."
   },
-  "demoLoop.camera-cutout": {
-    "message": "Eine Webcam-Blase über einer Bildschirmaufnahme. Dann wird ihr Hintergrund entfernt, und die Person steht vor dem Bildschirm.",
-    "description": "Describes a short silent video loop of the app for screen readers."
-  },
   "demoLoop.every-layout": {
     "message": "Eine Aufnahme mit Webcam, die die Layouts durchläuft: Bild-im-Bild, nebeneinander, übereinander, Vollbild-Kamera und zuletzt nur der Bildschirm.",
     "description": "Describes a short silent video loop of the app for screen readers."
@@ -926,19 +922,13 @@
     "message": "Ihre Kamera, Ihr Bildschirm oder beides."
   },
   "films.camera.lead": {
-    "message": "Eine Aufnahme mit Webcam kann {layouts} sein, und der Hintergrund der Kamera kann {removed} werden, ohne Greenscreen."
+    "message": "Eine Aufnahme mit Webcam kann {layouts} sein, und der Raum hinter Ihnen kann auf Ihrem eigenen Computer {blurred}, freigestellt oder ersetzt werden, ohne Greenscreen."
   },
   "films.camera.lead.layouts": {
     "message": "Bild in Bild, nebeneinander, gestapelt oder im Vollbild"
   },
-  "films.camera.lead.removed": {
-    "message": "auf Ihrem Computer entfernt"
-  },
   "films.camera.tab.layouts": {
     "message": "Layouts"
-  },
-  "films.camera.tab.cutout": {
-    "message": "Freisteller"
   },
   "films.camera.note.layouts": {
     "message": "{t} Bild in Bild, Doppelrahmen, vertikal gestapelt oder ganz ohne Webcam."
@@ -956,7 +946,7 @@
     "message": "{t} Ein Segmentierungsmodell trennt Sie auf Ihrem eigenen Computer vom Raum. Nichts wird hochgeladen."
   },
   "films.camera.note.background.t": {
-    "message": "Freistellen, weichzeichnen oder ersetzen."
+    "message": "Weichzeichnen, freistellen oder ersetzen."
   },
   "films.ship.kicker": {
     "message": "Vor dem Versand"
@@ -988,5 +978,15 @@
   "films.label": {
     "message": "Mehr von der App, in Bewegung",
     "description": "Read by screen readers only: names the section of feature videos"
+  },
+  "demoLoop.camera-blur": {
+    "message": "Eine quadratische Webcam-Vignette über einer Bildschirmaufnahme. Die Ansicht fährt heran, während der Raum hinter der Person unscharf wird, und fährt dann zurück.",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "films.camera.lead.blurred": {
+    "message": "weichgezeichnet"
+  },
+  "films.camera.tab.blur": {
+    "message": "Hintergrundunschärfe"
   }
 }

@@ -21,10 +21,12 @@
 	object-fit: cover;
 }
 
+/* Top right: the bottom-right corner is where a webcam vignette sits. */
 .toggle {
 	position: absolute;
+	z-index: 2;
 	right: 10px;
-	bottom: 10px;
+	top: 10px;
 	display: grid;
 	place-items: center;
 	width: 34px;

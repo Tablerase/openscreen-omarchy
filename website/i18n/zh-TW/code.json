@@ -809,10 +809,6 @@
     "message": "正在填寫的登入表單。輸入時，電子郵件和密碼欄位始終保持模糊。",
     "description": "Describes a short silent video loop of the app for screen readers."
   },
-  "demoLoop.camera-cutout": {
-    "message": "螢幕錄製上方的網路攝影機泡泡。接著其背景被移除，人物出現在螢幕前方。",
-    "description": "Describes a short silent video loop of the app for screen readers."
-  },
   "demoLoop.every-layout": {
     "message": "一段含網路攝影機的錄製依序切換版面配置：子母畫面、左右並排、上下堆疊、攝影機全螢幕，最後僅顯示螢幕。",
     "description": "Describes a short silent video loop of the app for screen readers."
@@ -926,19 +922,13 @@
     "message": "你的攝影機、你的螢幕，或兩者兼具。"
   },
   "films.camera.lead": {
-    "message": "含網路攝影機的素材可以{layouts}，攝影機背景也可以{removed}，不需要綠幕。"
+    "message": "含網路攝影機的素材可以{layouts}，你身後的房間也可以在你自己的電腦上{blurred}、去背或替換，不需要綠幕。"
   },
   "films.camera.lead.layouts": {
     "message": "子母畫面、左右並排、上下堆疊或全螢幕"
   },
-  "films.camera.lead.removed": {
-    "message": "在你的電腦上移除"
-  },
   "films.camera.tab.layouts": {
     "message": "版面配置"
-  },
-  "films.camera.tab.cutout": {
-    "message": "去背"
   },
   "films.camera.note.layouts": {
     "message": "{t} 子母畫面、雙畫框、垂直堆疊，或完全不用網路攝影機。"
@@ -956,7 +946,7 @@
     "message": "{t} 分割模型在你自己的電腦上把你和房間分開，不會上傳任何東西。"
   },
   "films.camera.note.background.t": {
-    "message": "去背、模糊或替換。"
+    "message": "模糊、去背或替換。"
   },
   "films.ship.kicker": {
     "message": "發布之前"
@@ -988,5 +978,15 @@
   "films.label": {
     "message": "更多應用功能，動起來看",
     "description": "Read by screen readers only: names the section of feature videos"
+  },
+  "demoLoop.camera-blur": {
+    "message": "螢幕錄製上的方形攝影機小窗。畫面推近小窗，同時人物身後的房間變得模糊，接著再拉遠。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "films.camera.lead.blurred": {
+    "message": "模糊化"
+  },
+  "films.camera.tab.blur": {
+    "message": "背景模糊"
   }
 }

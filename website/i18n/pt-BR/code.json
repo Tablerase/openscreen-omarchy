@@ -809,10 +809,6 @@
     "message": "Um formulário de login sendo preenchido. Os campos de e-mail e senha continuam desfocados enquanto são digitados.",
     "description": "Describes a short silent video loop of the app for screen readers."
   },
-  "demoLoop.camera-cutout": {
-    "message": "Uma bolha de webcam sobre uma gravação de tela. Em seguida o fundo dela é removido, deixando a pessoa na frente da tela.",
-    "description": "Describes a short silent video loop of the app for screen readers."
-  },
   "demoLoop.every-layout": {
     "message": "Uma gravação com webcam passando pelos layouts: picture-in-picture, lado a lado, empilhado, câmera em tela cheia e, por fim, só a tela.",
     "description": "Describes a short silent video loop of the app for screen readers."
@@ -926,19 +922,13 @@
     "message": "Sua câmera, sua tela, ou as duas."
   },
   "films.camera.lead": {
-    "message": "Uma tomada com webcam pode ficar {layouts}, e o fundo da câmera pode ser {removed}, sem tela verde."
+    "message": "Uma tomada com webcam pode ficar {layouts}, e o ambiente atrás de você pode ser {blurred}, recortado ou substituído no seu próprio computador, sem tela verde."
   },
   "films.camera.lead.layouts": {
     "message": "em picture in picture, lado a lado, empilhada ou em tela cheia"
   },
-  "films.camera.lead.removed": {
-    "message": "removido no seu computador"
-  },
   "films.camera.tab.layouts": {
     "message": "Layouts"
-  },
-  "films.camera.tab.cutout": {
-    "message": "Recorte"
   },
   "films.camera.note.layouts": {
     "message": "{t} Picture in Picture, quadro duplo, empilhamento vertical ou nenhuma webcam."
@@ -956,7 +946,7 @@
     "message": "{t} Um modelo de segmentação separa você do ambiente no seu próprio computador. Nada é enviado."
   },
   "films.camera.note.background.t": {
-    "message": "Recortar, desfocar ou substituir."
+    "message": "Desfocar, recortar ou substituir."
   },
   "films.ship.kicker": {
     "message": "Antes de publicar"
@@ -988,5 +978,15 @@
   "films.label": {
     "message": "Mais do app, em movimento",
     "description": "Read by screen readers only: names the section of feature videos"
+  },
+  "films.camera.lead.blurred": {
+    "message": "desfocado"
+  },
+  "films.camera.tab.blur": {
+    "message": "Desfoque de fundo"
+  },
+  "demoLoop.camera-blur": {
+    "message": "Uma vinheta quadrada de webcam sobre uma gravação de tela. A visualização se aproxima enquanto o ambiente atrás da pessoa fica desfocado, e depois se afasta.",
+    "description": "Describes a short silent video loop of the app for screen readers."
   }
 }

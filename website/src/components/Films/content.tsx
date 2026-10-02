@@ -189,13 +189,11 @@ export function getBlocks(): Block[] {
 								picture in picture, side by side, stacked or full screen
 							</Translate>,
 						),
-						removed: b(
-							<Translate id="films.camera.lead.removed">removed on your computer</Translate>,
-						),
+						blurred: b(<Translate id="films.camera.lead.blurred">blurred</Translate>),
 					}}
 				>
 					{
-						"One take with a webcam can be {layouts}, and the camera's background can be {removed}, with no green screen."
+						"One take with a webcam can be {layouts}, and the room behind you can be {blurred}, cut out or replaced on your own computer, with no green screen."
 					}
 				</Translate>
 			),
@@ -205,8 +203,8 @@ export function getBlocks(): Block[] {
 					loop: "every-layout",
 				},
 				{
-					label: translate({ id: "films.camera.tab.cutout", message: "Cutout" }),
-					loop: "camera-cutout",
+					label: translate({ id: "films.camera.tab.blur", message: "Background blur" }),
+					loop: "camera-blur",
 				},
 			],
 			notes: [
@@ -231,7 +229,7 @@ export function getBlocks(): Block[] {
 					id="films.camera.note.background"
 					values={{
 						t: b(
-							<Translate id="films.camera.note.background.t">Cutout, blur or replace.</Translate>,
+							<Translate id="films.camera.note.background.t">Blur, cut out or replace.</Translate>,
 						),
 					}}
 				>

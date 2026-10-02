@@ -11,7 +11,7 @@
 
 import { translate } from "@docusaurus/Translate";
 import Heading from "@theme/Heading";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import DemoLoop from "../DemoLoop";
 import { type Block, getBlocks, getPair } from "./content";
@@ -19,9 +19,11 @@ import styles from "./styles.module.css";
 
 function Stage({ block }: { block: Block }) {
 	const [index, setIndex] = useState(0);
+	// The loop being left, kept on top while the next one loads, then faded out.
+	const [prev, setPrev] = useState<number | null>(null);
+	const [fading, setFading] = useState(false);
 	const bars = useRef<(HTMLSpanElement | null)[]>([]);
 	const many = block.tabs.length > 1;
-	const current = block.tabs[index];
 
 	// Straight to the DOM: a state update per frame would re-render the block.
 	const onProgress = useCallback(
@@ -29,9 +31,35 @@ function Stage({ block }: { block: Block }) {
 		[index],
 	);
 	const go = (i: number) => {
+		if (i === index) return;
 		bars.current.forEach((el) => el?.style.setProperty("--p", "0"));
+		setPrev(index);
+		setFading(false);
 		setIndex(i);
 	};
+
+	// Without a first frame (reduced motion fetches nothing until play), fade anyway.
+	useEffect(() => {
+		if (prev === null) return;
+		const t = window.setTimeout(() => setFading(true), 900);
+		return () => window.clearTimeout(t);
+	}, [prev]);
+
+	// Drop the outgoing layer once its fade (0.6 s in the CSS) is over. A timer,
+	// not transitionend: the layer's descendants transition too, and an event
+	// from any of them ended the fade early.
+	useEffect(() => {
+		if (!fading || prev === null) return;
+		const t = window.setTimeout(() => setPrev(null), 700);
+		return () => window.clearTimeout(t);
+	}, [fading, prev]);
+
+	// Both layers are keyed by their loop, so the outgoing one keeps its last
+	// frame instead of remounting from the start.
+	const layers = [
+		...(prev !== null && prev !== index ? [{ i: prev, out: true }] : []),
+		{ i: index, out: false },
+	];
 
 	return (
 		<div className={styles.stage}>
@@ -62,18 +90,26 @@ function Stage({ block }: { block: Block }) {
 				</div>
 			)}
 			<div
-				className={styles.frame}
+				className={`${styles.frame} ${styles.layers}`}
 				id={`${block.id}-panel`}
 				role={many ? "tabpanel" : undefined}
 				aria-labelledby={many ? `${block.id}-tab-${index}` : undefined}
 			>
-				<DemoLoop
-					key={current.loop}
-					name={current.loop}
-					loop={!many}
-					onProgress={many ? onProgress : undefined}
-					onEnded={many ? () => go((index + 1) % block.tabs.length) : undefined}
-				/>
+				{layers.map(({ i, out }) => (
+					<div
+						key={block.tabs[i].loop}
+						className={`${styles.layer} ${out ? styles.outgoing : ""} ${out && fading ? styles.gone : ""}`}
+						aria-hidden={out || undefined}
+					>
+						<DemoLoop
+							name={block.tabs[i].loop}
+							loop={!many}
+							onProgress={!out && many ? onProgress : undefined}
+							onEnded={!out && many ? () => go((index + 1) % block.tabs.length) : undefined}
+							onReady={!out ? () => setFading(true) : undefined}
+						/>
+					</div>
+				))}
 			</div>
 		</div>
 	);

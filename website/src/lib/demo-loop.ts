@@ -9,7 +9,7 @@
  * their `immutable` cache header.
  */
 
-export const LOOP_BASE = "https://media.getopenscreen.com/loops/2026-10";
+export const LOOP_BASE = "https://media.getopenscreen.com/loops/2026-10b";
 
 export const LOOP_NAMES = [
 	"classic-zoom",
@@ -22,7 +22,7 @@ export const LOOP_NAMES = [
 	"background-picker",
 	"every-format",
 	"sensitive-data-mask",
-	"camera-cutout",
+	"camera-blur",
 	"every-layout",
 	"device-frames",
 	"animated-backgrounds",

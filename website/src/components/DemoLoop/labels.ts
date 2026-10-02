@@ -85,12 +85,12 @@ export function loopLabel(name: LoopName): string {
 				message:
 					"A sign-in form being filled in. The email and password fields stay blurred while they are typed.",
 			});
-		case "camera-cutout":
+		case "camera-blur":
 			return translate({
-				id: "demoLoop.camera-cutout",
+				id: "demoLoop.camera-blur",
 				description: LOOP,
 				message:
-					"A webcam bubble over a screen recording. Its background is then removed, leaving the speaker in front of the screen.",
+					"A square webcam vignette over a screen recording. The view moves in on it while the room behind the speaker blurs, then pulls back.",
 			});
 		case "every-layout":
 			return translate({

@@ -809,10 +809,6 @@
     "message": "正在填写的登录表单。输入时，邮箱和密码字段始终保持模糊。",
     "description": "Describes a short silent video loop of the app for screen readers."
   },
-  "demoLoop.camera-cutout": {
-    "message": "屏幕录制上方的摄像头气泡。随后其背景被移除，人物出现在屏幕前方。",
-    "description": "Describes a short silent video loop of the app for screen readers."
-  },
   "demoLoop.every-layout": {
     "message": "一段带摄像头的录制依次切换布局：画中画、左右并排、上下堆叠、摄像头全屏，最后仅显示屏幕。",
     "description": "Describes a short silent video loop of the app for screen readers."
@@ -926,19 +922,13 @@
     "message": "你的摄像头、你的屏幕，或两者兼有。"
   },
   "films.camera.lead": {
-    "message": "带摄像头的素材可以{layouts}，摄像头背景也可以{removed}，无需绿幕。"
+    "message": "带摄像头的素材可以{layouts}，你身后的房间也可以在你自己的电脑上{blurred}、抠除或替换，无需绿幕。"
   },
   "films.camera.lead.layouts": {
     "message": "画中画、左右并排、上下堆叠或全屏"
   },
-  "films.camera.lead.removed": {
-    "message": "在你的电脑上移除"
-  },
   "films.camera.tab.layouts": {
     "message": "布局"
-  },
-  "films.camera.tab.cutout": {
-    "message": "抠图"
   },
   "films.camera.note.layouts": {
     "message": "{t} 画中画、双画框、垂直堆叠，或完全不用摄像头。"
@@ -956,7 +946,7 @@
     "message": "{t} 分割模型在你自己的电脑上把你和房间分开，什么都不会上传。"
   },
   "films.camera.note.background.t": {
-    "message": "抠图、模糊或替换。"
+    "message": "虚化、抠图或替换。"
   },
   "films.ship.kicker": {
     "message": "发布之前"
@@ -988,5 +978,15 @@
   "films.label": {
     "message": "更多应用功能，动起来看",
     "description": "Read by screen readers only: names the section of feature videos"
+  },
+  "demoLoop.camera-blur": {
+    "message": "屏幕录制上的方形摄像头小窗。画面推近小窗，同时人物身后的房间变得模糊，随后再拉远。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "films.camera.lead.blurred": {
+    "message": "虚化"
+  },
+  "films.camera.tab.blur": {
+    "message": "背景虚化"
   }
 }

@@ -809,10 +809,6 @@
     "message": "ログインフォームへの入力中。メールアドレスとパスワードの欄は、入力している間ぼかされたままです。",
     "description": "Describes a short silent video loop of the app for screen readers."
   },
-  "demoLoop.camera-cutout": {
-    "message": "画面録画の上に重なったウェブカメラのバブル。その後背景が取り除かれ、話し手が画面の前に立って見えます。",
-    "description": "Describes a short silent video loop of the app for screen readers."
-  },
   "demoLoop.every-layout": {
     "message": "ウェブカメラ付きの 1 つの録画で、レイアウトを順に切り替えます。ピクチャーインピクチャー、横並び、縦並び、カメラ全画面、最後に画面のみ。",
     "description": "Describes a short silent video loop of the app for screen readers."
@@ -926,19 +922,13 @@
     "message": "カメラも、画面も、その両方も。"
   },
   "films.camera.lead": {
-    "message": "ウェブカメラ付きのテイクは{layouts}にでき、カメラの背景は{removed}できます。グリーンバックは不要です。"
+    "message": "ウェブカメラ付きのテイクは{layouts}にでき、背後の部屋はお使いのコンピューター上で{blurred}、切り抜いたり、差し替えたりできます。グリーンバックは不要です。"
   },
   "films.camera.lead.layouts": {
     "message": "ピクチャーインピクチャ、横並び、縦並び、全画面"
   },
-  "films.camera.lead.removed": {
-    "message": "お使いのコンピューター上で削除"
-  },
   "films.camera.tab.layouts": {
     "message": "レイアウト"
-  },
-  "films.camera.tab.cutout": {
-    "message": "切り抜き"
   },
   "films.camera.note.layouts": {
     "message": "{t} ピクチャーインピクチャ、デュアルフレーム、縦並び、またはウェブカメラなし。"
@@ -956,7 +946,7 @@
     "message": "{t} セグメンテーションモデルが、お使いのコンピューター上であなたと部屋を切り分けます。何もアップロードされません。"
   },
   "films.camera.note.background.t": {
-    "message": "切り抜き、ぼかし、差し替え。"
+    "message": "ぼかし、切り抜き、差し替え。"
   },
   "films.ship.kicker": {
     "message": "公開の前に"
@@ -988,5 +978,15 @@
   "films.label": {
     "message": "動くアプリをもっと",
     "description": "Read by screen readers only: names the section of feature videos"
+  },
+  "demoLoop.camera-blur": {
+    "message": "画面録画の上の正方形のウェブカメラ枠。話し手の背後の部屋がぼけていく間にカメラが寄り、その後引いていきます。",
+    "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "films.camera.lead.blurred": {
+    "message": "ぼかしたり"
+  },
+  "films.camera.tab.blur": {
+    "message": "背景ぼかし"
   }
 }

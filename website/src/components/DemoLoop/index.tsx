@@ -44,6 +44,8 @@ type Props = {
 	onEnded?: () => void;
 	/** Called every frame while playing, with the share of the clip played. */
 	onProgress?: (fraction: number) => void;
+	/** Called once the first frame is decoded, so a stage can fade to it. */
+	onReady?: () => void;
 };
 
 /** Far enough ahead that the poster is there before the box is. */
@@ -60,7 +62,7 @@ function motionAllowed(): boolean {
 	}
 }
 
-export default function DemoLoop({ name, loop = true, onEnded, onProgress }: Props) {
+export default function DemoLoop({ name, loop = true, onEnded, onProgress, onReady }: Props) {
 	const box = useRef<HTMLDivElement>(null);
 	const video = useRef<HTMLVideoElement>(null);
 	const [height, setHeight] = useState<LoopHeight | null>(null);
@@ -155,6 +157,7 @@ export default function DemoLoop({ name, loop = true, onEnded, onProgress }: Pro
 					onPlay={() => setPlaying(true)}
 					onPause={() => setPlaying(false)}
 					onEnded={onEnded}
+					onLoadedData={onReady}
 				>
 					{height &&
 						loopSources(name, height).map((s) => <source key={s.src} src={s.src} type={s.type} />)}
