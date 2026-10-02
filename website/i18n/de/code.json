@@ -340,7 +340,7 @@
     "message": "Agent"
   },
   "showcase.agent.claim": {
-    "message": "Oder sag, welche Teile raus sollen."
+    "message": "Beschreib die Änderung. Der Agent setzt sie um."
   },
   "showcase.agent.body": {
     "message": "Der Zauberstab weiter oben auf dieser Seite setzt Zooms, indem er verfolgt, wohin dein Cursor ging. Der Agent geht weiter: Er liest das tatsächliche Transkript und die tatsächliche Zeitleiste und antwortet deshalb mit Timecodes, die du nachprüfen kannst, also welche Abschnitte er schneiden wird und wie viel das spart. Jede seiner Änderungen ist eine gewöhnliche, rückgängig machbare Änderung, und er braucht einen Anbieterschlüssel, den du selbst angibst. Nichts läuft, bis du einen verbindest."
@@ -844,19 +844,19 @@
     "message": "Gut aussehend ab der ersten Aufnahme."
   },
   "films.default.lead": {
-    "message": "Jede neue Aufnahme öffnet sich {zoomed}, auf einem Hintergrundbild, mit Rand, Schatten und abgerundeten Ecken. Ändern Sie, was Sie möchten, oder exportieren Sie sie so."
+    "message": "Jede neue Aufnahme öffnet sich {zoomed}, auf einem Hintergrundbild, mit Rand, Schatten und abgerundeten Ecken. Ändere, was du möchtest, oder exportiere sie so."
   },
   "films.default.lead.zoomed": {
-    "message": "bereits auf Ihre Klicks gezoomt"
+    "message": "bereits auf deine Klicks gezoomt"
   },
   "films.default.note.zooms": {
-    "message": "{t} Jede Aufnahme wird dort gezoomt, wo Sie geklickt haben, nach einer festen Regel: ohne KI, ohne Netzwerkaufruf. Abschaltbar im Modus Aufnahme."
+    "message": "{t} Jede Aufnahme wird dort gezoomt, wo du geklickt hast, nach einer festen Regel: ohne KI, ohne Netzwerkaufruf. Abschaltbar im Modus Aufnahme."
   },
   "films.default.note.zooms.t": {
-    "message": "Zooms aus Ihren Klicks."
+    "message": "Zooms aus deinen Klicks."
   },
   "films.default.note.frame": {
-    "message": "{t} Hintergrundbild, Rand, Schatten, abgerundete Ecken und etwas Bewegungsunschärfe sind aktiv, bevor Sie irgendetwas anfassen."
+    "message": "{t} Hintergrundbild, Rand, Schatten, abgerundete Ecken und etwas Bewegungsunschärfe sind aktiv, bevor du irgendetwas anfasst."
   },
   "films.default.note.frame.t": {
     "message": "Ein fertiger Rahmen."
@@ -874,10 +874,10 @@
     "message": "Tiefe, nicht nur Zoom."
   },
   "films.depth.lead": {
-    "message": "Neigen Sie den Bildschirm oder {orbit} beim Zoomen, zeichnen Sie den Zeiger als {cursor} mit Schatten und setzen Sie die ganze Aufnahme {device}, vor einen Hintergrund, der sich bewegt."
+    "message": "Neige den Bildschirm oder {orbit} beim Zoomen, zeichne den Zeiger als {cursor} mit Schatten und setze die ganze Aufnahme {device}, vor einen Hintergrund, der sich bewegt."
   },
   "films.depth.lead.orbit": {
-    "message": "umkreisen Sie ihn"
+    "message": "umkreise ihn"
   },
   "films.depth.lead.cursor": {
     "message": "3D-Cursor"
@@ -919,10 +919,10 @@
     "message": "Kamera"
   },
   "films.camera.title": {
-    "message": "Ihre Kamera, Ihr Bildschirm oder beides."
+    "message": "Deine Kamera, dein Bildschirm oder beides."
   },
   "films.camera.lead": {
-    "message": "Eine Aufnahme mit Webcam kann {layouts} sein, und der Raum hinter Ihnen kann auf Ihrem eigenen Computer {blurred}, freigestellt oder ersetzt werden, ohne Greenscreen."
+    "message": "Eine Aufnahme mit Webcam kann {layouts} sein, und der Raum hinter dir kann auf deinem eigenen Computer {blurred}, freigestellt oder ersetzt werden, ohne Greenscreen."
   },
   "films.camera.lead.layouts": {
     "message": "Bild in Bild, nebeneinander, gestapelt oder im Vollbild"
@@ -937,13 +937,13 @@
     "message": "Vier Layouts."
   },
   "films.camera.note.full": {
-    "message": "{t} Geben Sie der Kamera einen Abschnitt der Zeitleiste: Sie wird zum Vollbild und gleitet dann zurück."
+    "message": "{t} Gib der Kamera einen Abschnitt der Zeitleiste: Sie wird zum Vollbild und gleitet dann zurück."
   },
   "films.camera.note.full.t": {
     "message": "Vollbild-Kamera."
   },
   "films.camera.note.background": {
-    "message": "{t} Ein Segmentierungsmodell trennt Sie auf Ihrem eigenen Computer vom Raum. Nichts wird hochgeladen."
+    "message": "{t} Ein Segmentierungsmodell trennt dich auf deinem eigenen Computer vom Raum. Nichts wird hochgeladen."
   },
   "films.camera.note.background.t": {
     "message": "Weichzeichnen, freistellen oder ersetzen."

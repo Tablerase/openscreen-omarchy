@@ -282,7 +282,7 @@
     "message": "agente"
   },
   "showcase.agent.claim": {
-    "message": "Ou diga quais partes cortar."
+    "message": "Descreva a edição. O agente faz."
   },
   "showcase.agent.body": {
     "message": "A varinha mágica mais acima nesta página posiciona zooms observando por onde o seu cursor passou. O agente vai além: ele lê a transcrição real e a linha do tempo real, então responde com timecodes que você pode conferir — quais trechos vai cortar e quanto isso economiza. Cada edição que ele faz é uma edição comum, que pode ser desfeita, e ele precisa de uma chave de provedor fornecida por você. Nada roda até você conectar uma."

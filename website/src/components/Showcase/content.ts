@@ -160,7 +160,10 @@ export function getFeatures(): Feature[] {
 		{
 			id: "agent",
 			kicker: translate({ id: "showcase.agent.kicker", message: "agent" }),
-			claim: translate({ id: "showcase.agent.claim", message: "Or say which parts to cut." }),
+			claim: translate({
+				id: "showcase.agent.claim",
+				message: "Describe the edit. The agent makes it.",
+			}),
 			body: translate({
 				id: "showcase.agent.body",
 				message:

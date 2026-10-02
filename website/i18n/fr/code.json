@@ -327,7 +327,7 @@
     "message": "agent"
   },
   "showcase.agent.claim": {
-    "message": "Ou dites-lui quoi couper."
+    "message": "Décrivez la modification. L'agent s'en charge."
   },
   "showcase.agent.body": {
     "message": "La baguette magique, plus haut sur cette page, place les zooms en observant où votre curseur est passé. L'agent va plus loin : il lit la vraie transcription et la vraie timeline, et répond donc avec des timecodes que vous pouvez aller vérifier, en indiquant quels passages il va couper et combien de temps cela fait gagner. Chaque modification qu'il fait est une modification ordinaire, annulable, et il a besoin d'une clé de fournisseur que vous apportez. Rien ne tourne tant que vous n'en avez pas connecté une."

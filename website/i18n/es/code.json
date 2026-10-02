@@ -327,7 +327,7 @@
     "message": "agente"
   },
   "showcase.agent.claim": {
-    "message": "O indica qué partes cortar."
+    "message": "Describe la edición. El agente la hace."
   },
   "showcase.agent.body": {
     "message": "El asistente de más arriba en esta página coloca zooms observando por dónde pasó tu cursor. El agente va más allá: lee la transcripción real y la línea de tiempo real, así que responde con códigos de tiempo que puedes ir a comprobar (qué tramos va a cortar y cuánto tiempo ahorra eso). Cada edición que hace es una edición normal que se puede deshacer, y necesita una clave de proveedor que tú proporcionas. No se ejecuta nada hasta que conectes una."
