@@ -143,9 +143,13 @@ video capture, no encoding.
 It exists because `screen.getCursorScreenPoint()` returns `{0,0}` under Wayland.
 `TelemetryRecordingSession` therefore produced well-formed recordings whose every
 cursor sample sat in the top-left corner of the screen. The ScreenCast portal's
-METADATA cursor mode is the only source of a real pointer position on Wayland:
+METADATA cursor mode is the usual source of a real pointer position on Wayland:
 the compositor keeps the cursor out of the captured pixels and attaches it to
-each frame as `SPA_META_Cursor` instead.
+each frame as `SPA_META_Cursor` instead. Hyprland's portal does not advertise
+METADATA, so the helper reads positions from Hyprland IPC for editable-overlay
+recordings. It also collects those positions in system-cursor mode while the
+portal embeds the real cursor in the video; that mode still has no editable
+cursor sidecar or editor auto-zoom, by design.
 
 Helper locations, in resolution order:
 

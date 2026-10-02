@@ -339,12 +339,28 @@ fn main() {
         cursor_mode,
         audio: request.audio_sources(),
         defer_start: request.defer_start,
-        hyprland_cursor: cursor_mode.reports_cursor()
-            && !cursor_metadata_supported
-            && hyprland_active,
+        // Hyprland can provide cursor positions independently of portal cursor
+        // mode. In system mode the portal still embeds the real cursor in the
+        // video, while this sampler also keeps telemetry available to callers.
+        // Editable mode uses the sampler when METADATA is unavailable.
+        hyprland_cursor: use_hyprland_cursor_sampler(
+            cursor_mode,
+            cursor_metadata_supported,
+            hyprland_active,
+        ),
     };
     let exit_code = run(&mut emitter, receiver, sender, session);
     std::process::exit(exit_code);
+}
+
+fn use_hyprland_cursor_sampler(
+    cursor_mode: portal::CursorMode,
+    cursor_metadata_supported: bool,
+    hyprland_active: bool,
+) -> bool {
+    hyprland_active
+        && (cursor_mode == portal::CursorMode::Embedded
+            || (cursor_mode.reports_cursor() && !cursor_metadata_supported))
 }
 
 struct RunConfig {
@@ -1558,6 +1574,26 @@ fn resolve_microphone_node(label: &str, sources: &[shim::AudioSourceInfo]) -> Op
 #[cfg(test)]
 mod cursor_sample_tests {
     use super::*;
+
+    #[test]
+    fn hyprland_samples_both_editable_and_system_cursor_modes() {
+        assert!(use_hyprland_cursor_sampler(
+            portal::CursorMode::Metadata,
+            false,
+            true,
+        ));
+        assert!(use_hyprland_cursor_sampler(
+            portal::CursorMode::Embedded,
+            false,
+            true,
+        ));
+        // Other Wayland compositors still need actual portal metadata.
+        assert!(!use_hyprland_cursor_sampler(
+            portal::CursorMode::Embedded,
+            true,
+            false,
+        ));
+    }
 
     fn sample_json(cursor: (i32, i32), content: Option<shim::CropRect>) -> serde_json::Value {
         let mut buffer = Vec::new();

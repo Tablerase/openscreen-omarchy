@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>OpenScreen cursor calibration</title>
+		<style>
+			:root {
+				color-scheme: dark;
+				font: 16px/1.4 system-ui, sans-serif;
+				background: #10131a;
+				color: #fff;
+			}
+			* { box-sizing: border-box; }
+			html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+			main { position: relative; width: 100%; height: 100%; }
+			svg { display: block; width: 100%; height: 100%; }
+			#readout {
+				position: absolute;
+				left: 50%;
+				bottom: 1rem;
+				transform: translateX(-50%);
+				padding: 0.45rem 0.8rem;
+				border: 1px solid #586174;
+				border-radius: 0.5rem;
+				background: #10131add;
+				color: #fff;
+				font: 14px/1.4 ui-monospace, monospace;
+				white-space: nowrap;
+				pointer-events: none;
+			}
+			.marker { cursor: crosshair; }
+			.marker .ring { fill: #10131a; stroke: #f4cb44; stroke-width: 4; }
+			.marker .center { fill: #ff4b5c; stroke: white; stroke-width: 2; }
+			.marker text {
+				fill: white;
+				stroke: #10131a;
+				stroke-width: 5px;
+				paint-order: stroke;
+				font: 700 22px system-ui, sans-serif;
+				text-anchor: middle;
+				dominant-baseline: hanging;
+			}
+			.marker:focus .ring, .marker:hover .ring { stroke: #48d7ff; }
+		</style>
+	</head>
+	<body>
+		<main aria-label="Cursor calibration targets">
+			<svg id="targets" viewBox="0 0 1000 1000" preserveAspectRatio="none" role="img" aria-label="Five labeled cursor calibration targets">
+				<defs>
+					<pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
+						<path d="M 50 0 L 0 0 0 50" fill="none" stroke="#303846" stroke-width="1" />
+				</pattern>
+			</defs>
+			<rect width="1000" height="1000" fill="#151a23" />
+			<rect width="1000" height="1000" fill="url(#grid)" />
+			<path d="M500 0V1000M0 500H1000" stroke="#718099" stroke-width="2" stroke-dasharray="10 10" />
+			<g class="marker" tabindex="0" role="button" aria-label="Target A, 10 percent from the left and top" data-label="A" transform="translate(100 100)">
+				<circle class="ring" r="25" /><path d="M-36 0H36M0-36V36" stroke="white" stroke-width="2" /><circle class="center" r="6" /><text y="34">A · 10%, 10%</text>
+			</g>
+			<g class="marker" tabindex="0" role="button" aria-label="Target B, 90 percent from the left and 10 percent from the top" data-label="B" transform="translate(900 100)">
+				<circle class="ring" r="25" /><path d="M-36 0H36M0-36V36" stroke="white" stroke-width="2" /><circle class="center" r="6" /><text y="34">B · 90%, 10%</text>
+			</g>
+			<g class="marker" tabindex="0" role="button" aria-label="Target C, viewport center" data-label="C" transform="translate(500 500)">
+				<circle class="ring" r="25" /><path d="M-36 0H36M0-36V36" stroke="white" stroke-width="2" /><circle class="center" r="6" /><text y="34">C · 50%, 50%</text>
+			</g>
+			<g class="marker" tabindex="0" role="button" aria-label="Target D, 10 percent from the left and 90 percent from the top" data-label="D" transform="translate(100 900)">
+				<circle class="ring" r="25" /><path d="M-36 0H36M0-36V36" stroke="white" stroke-width="2" /><circle class="center" r="6" /><text y="34">D · 10%, 90%</text>
+			</g>
+			<g class="marker" tabindex="0" role="button" aria-label="Target E, 90 percent from the left and bottom" data-label="E" transform="translate(900 900)">
+				<circle class="ring" r="25" /><path d="M-36 0H36M0-36V36" stroke="white" stroke-width="2" /><circle class="center" r="6" /><text y="34">E · 90%, 90%</text>
+			</g>
+			</svg>
+			<output id="readout" aria-live="polite">Click target centers in order: A, B, C, D, E</output>
+		</main>
+		<script>
+			const readout = document.querySelector("#readout");
+			const markers = [...document.querySelectorAll(".marker")];
+			const records = [];
+			let clickNumber = 0;
+			for (const marker of markers) {
+				marker.addEventListener("click", (event) => {
+					clickNumber += 1;
+					const box = document.querySelector("#targets").getBoundingClientRect();
+					const record = {
+						n: clickNumber,
+						target: marker.dataset.label,
+						page: [Math.round(event.clientX), Math.round(event.clientY)],
+						normalized: [
+							Number(((event.clientX - box.left) / box.width).toFixed(4)),
+							Number(((event.clientY - box.top) / box.height).toFixed(4)),
+						],
+						screen: [event.screenX, event.screenY],
+						viewport: [Math.round(box.width), Math.round(box.height)],
+						devicePixelRatio: window.devicePixelRatio,
+						screenSize: [window.screen.width, window.screen.height],
+				};
+					records.push(record);
+					readout.textContent = `${record.n}. ${record.target} · page ${record.page.join(", ")} · normalized ${record.normalized.join(", ")} · screen ${record.screen.join(", ")} · viewport ${record.viewport.join("×")}`;
+					console.log("OpenScreen cursor calibration", JSON.stringify(record));
+				});
+			}
+			document.addEventListener("keydown", (event) => {
+				if (event.key.toLowerCase() !== "d" || !records.length) return;
+				const file = new Blob([JSON.stringify(records, null, 2)], { type: "application/json" });
+				const link = document.createElement("a");
+				link.href = URL.createObjectURL(file);
+				link.download = "openscreen-cursor-calibration.json";
+				link.click();
+				URL.revokeObjectURL(link.href);
+			});
+		</script>
+	</body>
+</html>

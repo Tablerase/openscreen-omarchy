@@ -85,6 +85,77 @@ pub fn get_cursor_pos() -> Option<(f64, f64)> {
     Some((pos.x, pos.y))
 }
 
+fn to_stream_position(
+    cursor: (f64, f64),
+    monitor: &MonitorInfo,
+    stream_origin: Option<(i32, i32)>,
+) -> (i32, i32) {
+    // Some portal backends report (0, 0) for every monitor. Trust a stream
+    // origin only when it falls on the monitor selected for this stream.
+    let (origin_x, origin_y) = stream_origin
+        .filter(|(x, y)| monitor_contains(monitor, *x as f64, *y as f64))
+        .map(|(x, y)| (x as f64, y as f64))
+        .unwrap_or((monitor.x as f64, monitor.y as f64));
+    (
+        ((cursor.0 - origin_x) * monitor.scale).round() as i32,
+        ((cursor.1 - origin_y) * monitor.scale).round() as i32,
+    )
+}
+
+fn monitor_contains(monitor: &MonitorInfo, x: f64, y: f64) -> bool {
+    let logical_w = monitor.width as f64 / monitor.scale;
+    let logical_h = monitor.height as f64 / monitor.scale;
+    x >= monitor.x as f64
+        && x < monitor.x as f64 + logical_w
+        && y >= monitor.y as f64
+        && y < monitor.y as f64 + logical_h
+}
+
+fn matching_monitor_for_size<'a>(
+    monitors: &'a [MonitorInfo],
+    size: (i32, i32),
+    cursor: (f64, f64),
+) -> Option<&'a MonitorInfo> {
+    let matching: Vec<_> = monitors
+        .iter()
+        .filter(|monitor| monitor.width == size.0 && monitor.height == size.1)
+        .collect();
+    match matching.as_slice() {
+        [monitor] => Some(*monitor),
+        [] => None,
+        _ => matching
+            .iter()
+            .copied()
+            .find(|monitor| monitor_contains(monitor, cursor.0, cursor.1))
+            .or_else(|| matching.iter().copied().find(|monitor| monitor.focused)),
+    }
+}
+
+fn target_monitor<'a>(
+    monitors: &'a [MonitorInfo],
+    stream_origin: Option<(i32, i32)>,
+    stream_size: Option<(i32, i32)>,
+    cursor: (f64, f64),
+) -> Option<&'a MonitorInfo> {
+    let monitor_at_origin = stream_origin.and_then(|(x, y)| {
+        monitors.iter().find(|monitor| {
+            (monitor.x == x && monitor.y == y) || monitor_contains(monitor, x as f64, y as f64)
+        })
+    });
+    let monitor_by_size =
+        stream_size.and_then(|size| matching_monitor_for_size(monitors, size, cursor));
+
+    monitor_at_origin
+        .or(monitor_by_size)
+        .or_else(|| {
+            monitors
+                .iter()
+                .find(|monitor| monitor_contains(monitor, cursor.0, cursor.1))
+        })
+        .or_else(|| monitors.iter().find(|monitor| monitor.focused))
+        .or_else(|| monitors.first())
+}
+
 pub struct HyprlandSampler {
     running: Arc<AtomicBool>,
 }
@@ -98,10 +169,14 @@ impl HyprlandSampler {
     ) -> Self {
         let running = Arc::new(AtomicBool::new(true));
         let thread_running = Arc::clone(&running);
+        let debug = std::env::var("OPENSCREEN_PIPEWIRE_DEBUG")
+            .map(|value| !matches!(value.as_str(), "" | "0" | "false"))
+            .unwrap_or(false);
 
         thread::spawn(move || {
             let mut monitors = get_monitors();
             let mut last_monitors_fetch = std::time::Instant::now();
+            let mut logged_mapping = false;
 
             while thread_running.load(Ordering::Relaxed) {
                 thread::sleep(interval);
@@ -119,46 +194,18 @@ impl HyprlandSampler {
                 let pos = *stream_position.lock().unwrap();
                 let size = *stream_size.lock().unwrap();
 
-                // Find matching monitor by portal position or stream size
-                let target_monitor = if let Some((px, py)) = pos {
-                    monitors.iter().find(|m| m.x == px && m.y == py)
-                } else if let Some((sw, sh)) = size {
-                    let matching: Vec<_> = monitors
-                        .iter()
-                        .filter(|m| m.width == sw && m.height == sh)
-                        .collect();
-                    if matching.len() == 1 {
-                        Some(matching[0])
-                    } else if matching.len() > 1 {
-                        // If multiple monitors share the same resolution, pick the one the cursor is inside
-                        matching
-                            .into_iter()
-                            .find(|m| {
-                                let logical_w = m.width as f64 / m.scale;
-                                let logical_h = m.height as f64 / m.scale;
-                                cx >= m.x as f64
-                                    && cx < m.x as f64 + logical_w
-                                    && cy >= m.y as f64
-                                    && cy < m.y as f64 + logical_h
-                            })
-                            .or_else(|| monitors.iter().find(|m| m.focused))
-                    } else {
-                        monitors
-                            .iter()
-                            .find(|m| m.focused)
-                            .or_else(|| monitors.first())
-                    }
-                } else {
-                    monitors
-                        .iter()
-                        .find(|m| m.focused)
-                        .or_else(|| monitors.first())
-                };
+                // Prefer a portal origin that belongs to a monitor. Some
+                // backends report (0, 0) even when the chosen monitor is
+                // elsewhere in Hyprland's global layout, so try the stream
+                // dimensions before falling back to the focused output.
+                let target_monitor = target_monitor(&monitors, pos, size, (cx, cy));
 
                 let (stream_x, stream_y) = if let Some(m) = target_monitor {
-                    let sx = ((cx - m.x as f64) * m.scale).round() as i32;
-                    let sy = ((cy - m.y as f64) * m.scale).round() as i32;
-                    (sx, sy)
+                    // Portal position is the region's logical origin. For a
+                    // full monitor it equals m.x/m.y; for a selected region it
+                    // is inside the monitor and must be subtracted before
+                    // scaling into the region's pixel coordinates.
+                    to_stream_position((cx, cy), m, pos)
                 } else if let Some((px, py)) = pos {
                     // Fallback using portal position if monitor list is empty
                     (
@@ -168,6 +215,15 @@ impl HyprlandSampler {
                 } else {
                     (cx.round() as i32, cy.round() as i32)
                 };
+
+                if debug && !logged_mapping && (pos.is_some() || size.is_some()) {
+                    eprintln!(
+                        "[hyprland-cursor] raw=({cx:.2},{cy:.2}) stream_origin={pos:?} \
+                         stream_size={size:?} monitor={target_monitor:?} \
+                         mapped=({stream_x},{stream_y})"
+                    );
+                    logged_mapping = true;
+                }
 
                 let _ = sender.send(Message::Stream(StreamEvent::Cursor(CursorEvent {
                     x: stream_x,
@@ -230,9 +286,63 @@ mod tests {
         };
         let cx = 1078.0;
         let cy = 551.0;
-        let sx = ((cx - m.x as f64) * m.scale).round() as i32;
-        let sy = ((cy - m.y as f64) * m.scale).round() as i32;
+        let (sx, sy) = to_stream_position((cx, cy), &m, None);
         assert_eq!(sx, 805);
         assert_eq!(sy, 882);
+    }
+
+    #[test]
+    fn region_origin_is_subtracted_before_scaling() {
+        let monitor = MonitorInfo {
+            name: "eDP-1".to_string(),
+            x: 575,
+            y: 0,
+            width: 2256,
+            height: 1504,
+            scale: 1.6,
+            focused: true,
+        };
+
+        // A selected region begins at logical (700, 100); the pointer at
+        // (750, 150) must be 80x80 px into its 1.6x scaled stream.
+        assert_eq!(
+            to_stream_position((750.0, 150.0), &monitor, Some((700, 100))),
+            (80, 80)
+        );
+    }
+
+    #[test]
+    fn unmatched_portal_origin_falls_back_to_unique_stream_size() {
+        let monitors = vec![
+            MonitorInfo {
+                name: "DP-3".to_string(),
+                x: 0,
+                y: -1440,
+                width: 2560,
+                height: 1440,
+                scale: 1.0,
+                focused: true,
+            },
+            MonitorInfo {
+                name: "eDP-1".to_string(),
+                x: 575,
+                y: 0,
+                width: 2256,
+                height: 1504,
+                scale: 1.6,
+                focused: false,
+            },
+        ];
+
+        // This mirrors the observed session: the portal reports (0, 0) for
+        // the 2256x1504 eDP stream, although Hyprland places that monitor at
+        // (575, 0). A bogus origin must not force the scale-1 DP-3 fallback.
+        let target = target_monitor(&monitors, Some((0, 0)), Some((2256, 1504)), (726.0, 207.0))
+            .expect("unique stream-size match after unmatched origin");
+        assert_eq!(target.name, "eDP-1");
+        assert_eq!(
+            to_stream_position((726.0, 207.0), target, Some((0, 0))),
+            (242, 331)
+        );
     }
 }

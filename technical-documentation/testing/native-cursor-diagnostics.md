@@ -70,6 +70,32 @@ npm run dev
 
 macOS recording requires Screen Recording permission, except on macOS 15.2+ where sources are picked in Apple's system picker, which needs none. Accessibility permission is optional and enables text and pointer affordance detection. After changing either permission, fully quit and relaunch the development app so the process observes the new state. The app's permissions window (tray → *Permissions…*) shows both and opens the matching System Settings pane.
 
+## Linux / Hyprland region alignment
+
+Use the [cursor calibration page](./cursor-calibration.html) when the cursor is
+consistently offset in a Hyprland region recording. It draws five targets at
+known viewport fractions. Each real click logs page, normalized, screen, and
+viewport coordinates; press **D** after the clicks to download those readings.
+
+1. Open `technical-documentation/testing/cursor-calibration.html` in a browser,
+   maximize it, and leave its zoom unchanged.
+2. Start OpenScreen through the wrapper that points to the locally built helper.
+   Record in **editable cursor** mode and select the region containing the page.
+3. Click the target centers in order A, B, C, D, E, then stop the recording.
+   Press **D** in the calibration page to save its coordinate JSON.
+4. Keep the video, its `.cursor.json` sidecar, the calibration JSON, and the
+   helper's `portal-stream` and `crop` debug lines together. Those values show
+   whether the error is a constant region-origin shift or a scale mismatch.
+
+Enable helper diagnostics in the wrapper's launch environment with
+`OPENSCREEN_PIPEWIRE_DEBUG=1`. System-cursor mode embeds the cursor in the video
+and does not write an editable cursor sidecar, so use editable cursor mode for
+this comparison. The `[hyprland-cursor]` line reports the raw Hyprland point,
+portal origin and stream size, selected monitor and scale, and mapped point.
+Some Hyprland portal sessions report `(0, 0)` as the stream origin for a monitor
+whose Hyprland layout origin differs; the helper then identifies the output by
+the unique stream dimensions and uses that monitor's origin and scale.
+
 ## Reading the JSON report
 
 The generated cursor sidecar is stored beside the video as `<videoPath>.cursor.json`. A healthy native sidecar has `version: 2`, `provider: "native"`, a non-empty `assets` array, and `samples` with increasing `timeMs` values and normalized `cx`/`cy` positions. Native samples may reference an asset by `assetId`; the full bitmap is emitted once per unique asset. Click samples carry the interaction marker used by click-bounce rendering.
