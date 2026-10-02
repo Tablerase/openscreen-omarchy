@@ -36,7 +36,15 @@ import {
 import { loopLabel } from "./labels";
 import styles from "./styles.module.css";
 
-type Props = { name: LoopName };
+type Props = {
+	name: LoopName;
+	/** Off when the loop is one of several taking turns on a stage: it plays
+	 *  once, then `onEnded` hands over to the next. */
+	loop?: boolean;
+	onEnded?: () => void;
+	/** Called every frame while playing, with the share of the clip played. */
+	onProgress?: (fraction: number) => void;
+};
 
 /** Far enough ahead that the poster is there before the box is. */
 const NEAR = "100% 0px";
@@ -52,7 +60,7 @@ function motionAllowed(): boolean {
 	}
 }
 
-export default function DemoLoop({ name }: Props) {
+export default function DemoLoop({ name, loop = true, onEnded, onProgress }: Props) {
 	const box = useRef<HTMLDivElement>(null);
 	const video = useRef<HTMLVideoElement>(null);
 	const [height, setHeight] = useState<LoopHeight | null>(null);
@@ -111,6 +119,20 @@ export default function DemoLoop({ name }: Props) {
 		};
 	}, [height, wanted]);
 
+	// Progress for a stage's tab bar, per frame rather than per `timeupdate`,
+	// which fires four times a second and would step the bar visibly.
+	useEffect(() => {
+		const v = video.current;
+		if (!v || !onProgress || !playing) return;
+		let raf = 0;
+		const tick = () => {
+			if (v.duration > 0) onProgress(Math.min(v.currentTime / v.duration, 1));
+			raf = requestAnimationFrame(tick);
+		};
+		raf = requestAnimationFrame(tick);
+		return () => cancelAnimationFrame(raf);
+	}, [playing, onProgress]);
+
 	const label = loopLabel(name);
 	const toggle = playing
 		? translate({ id: "demoLoop.pause", message: "Pause video" })
@@ -125,13 +147,14 @@ export default function DemoLoop({ name }: Props) {
 					aria-label={label}
 					poster={height ? loopPoster(name) : undefined}
 					muted
-					loop
+					loop={loop}
 					playsInline
 					preload={height && auto.current ? "auto" : "none"}
 					disablePictureInPicture
 					disableRemotePlayback
 					onPlay={() => setPlaying(true)}
 					onPause={() => setPlaying(false)}
+					onEnded={onEnded}
 				>
 					{height &&
 						loopSources(name, height).map((s) => <source key={s.src} src={s.src} type={s.type} />)}

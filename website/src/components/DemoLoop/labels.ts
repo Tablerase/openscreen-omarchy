@@ -48,7 +48,7 @@ export function loopLabel(name: LoopName): string {
 				id: "demoLoop.caption-styles",
 				description: LOOP,
 				message:
-					"One caption shown in five styles: a plain caption, a bold yellow one, a handwritten one, a monospaced one, and one highlighted word by word.",
+					"One caption shown in five styles: a plain caption, a bold yellow one, a handwritten one, a monospaced one, and one showing a single word at a time.",
 			});
 		case "edit-by-transcript":
 			return translate({

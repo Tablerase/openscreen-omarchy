@@ -278,10 +278,6 @@
     "message": "ローカル字幕の比較",
     "description": "Link label under the panel."
   },
-  "showcase.captions.label": {
-    "message": "字幕パネルのイラスト：動画の上に「amber day on the validator, and it」という一行が大きく表示されています。その横では字幕がオンになっていて、7 行の字幕が文字起こしからリアルタイムに生成されているという注記と、元の文字起こしと Français のボタン、Translate ボタン、翻訳を削除するオプションが並ぶ言語の行があります。",
-    "description": "Describes a drawing of the app for screen readers. The drawing is in English: keep the quoted words as drawn."
-  },
   "showcase.agent.kicker": {
     "message": "エージェント"
   },
@@ -300,10 +296,6 @@
   "showcase.agent.link.feature": {
     "message": "自動ズームの仕組み",
     "description": "Link label under the panel."
-  },
-  "showcase.agent.label": {
-    "message": "エージェントの返答のイラスト。無音部分のカットを頼まれ、タイムコードで答えています。「Hi」の前の導入部 0〜2.19 秒と、「think.」の後の末尾 35.12〜40.03 秒をカットし、再生できる映像を 40 秒から 33 秒にします。既存のズームは同じ場面に残ります。最後に「applied: added 2 trims」という緑色の行があります。",
-    "description": "Describes a drawing of the app for screen readers. The drawing is in English: keep the quoted words as drawn."
   },
   "showcase.title": {
     "message": "レコーダー、字幕、エージェント、エンコーダー。"
@@ -794,7 +786,7 @@
     "description": "Describes a short silent video loop of the app for screen readers."
   },
   "demoLoop.caption-styles": {
-    "message": "同じ字幕を 5 つのスタイルで表示します。シンプルな字幕、太字の黄色、手書き風、等幅、そして単語ごとのハイライトです。",
+    "message": "同じ字幕を 5 つのスタイルで表示します。シンプルな字幕、太字の黄色、手書き風、等幅、そして 1 語ずつ表示するスタイルです。",
     "description": "Describes a short silent video loop of the app for screen readers."
   },
   "demoLoop.edit-by-transcript": {
@@ -848,5 +840,153 @@
   "demoLoop.ask-the-agent": {
     "message": "エディターのチャットパネルに入力した依頼と、エージェントによる編集がタイムラインに現れる様子。",
     "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "films.default.kicker": {
+    "message": "最初から"
+  },
+  "films.default.title": {
+    "message": "最初のテイクから見栄えよく。"
+  },
+  "films.default.lead": {
+    "message": "新しい録画はどれも{zoomed}状態で開き、壁紙、余白、影、角丸もついています。好きなところを変えても、そのまま書き出しても構いません。"
+  },
+  "films.default.lead.zoomed": {
+    "message": "クリックした箇所にすでにズームした"
+  },
+  "films.default.note.zooms": {
+    "message": "{t} 各テイクはクリックした位置で、決まったルールに従ってズームされます。AI もネットワーク通信も使いません。録画モードでオフにできます。"
+  },
+  "films.default.note.zooms.t": {
+    "message": "クリックからズーム。"
+  },
+  "films.default.note.frame": {
+    "message": "{t} 壁紙、余白、影、角丸、少しのモーションブラーが、何も触らないうちから適用されています。"
+  },
+  "films.default.note.frame.t": {
+    "message": "仕上がったフレーム。"
+  },
+  "films.default.note.cursor": {
+    "message": "{t} ポインターはピクセルとは別に記録されるので、テイクの後でもサイズとスタイルを変えられます。"
+  },
+  "films.default.note.cursor.t": {
+    "message": "やり直せるカーソル。"
+  },
+  "films.depth.kicker": {
+    "message": "3D"
+  },
+  "films.depth.title": {
+    "message": "ズームだけでなく、奥行きを。"
+  },
+  "films.depth.lead": {
+    "message": "ズームしながら画面を傾けたり{orbit}、ポインターを影つきの{cursor}として描いたり、テイク全体を{device}、動く背景の上に置いたりできます。"
+  },
+  "films.depth.lead.orbit": {
+    "message": "周りを回ったり"
+  },
+  "films.depth.lead.cursor": {
+    "message": "3D カーソル"
+  },
+  "films.depth.lead.device": {
+    "message": "デバイスの中に収めて"
+  },
+  "films.depth.tab.camera": {
+    "message": "3D カメラ"
+  },
+  "films.depth.tab.cursors": {
+    "message": "カーソル"
+  },
+  "films.depth.tab.frames": {
+    "message": "デバイスフレーム"
+  },
+  "films.depth.tab.backgrounds": {
+    "message": "アニメーション背景"
+  },
+  "films.depth.note.camera": {
+    "message": "{t} 各ズームは平面のまま、画面を左右に回転、またはズームの焦点を追いながら周りを回ることができます。被写界深度が奥側をぼかします。"
+  },
+  "films.depth.note.camera.t": {
+    "message": "3D カメラ。"
+  },
+  "films.depth.note.cursors": {
+    "message": "{t} Studio Ink, Prism Glow, Pop Coral, Pixel Candy、Star Sprout の 5 種類。どれも影つきの 3D オブジェクトとして描けます。"
+  },
+  "films.depth.note.cursors.t": {
+    "message": "5 つのカーソルパック。"
+  },
+  "films.depth.note.frames": {
+    "message": "{t} ウィンドウ、ノート PC、スマートフォン、ディスプレイをライトかダークで。背景はドリフト、オーロラ、ウェーブでアニメーションできます。"
+  },
+  "films.depth.note.frames.t": {
+    "message": "フレームと動き。"
+  },
+  "films.camera.kicker": {
+    "message": "カメラ"
+  },
+  "films.camera.title": {
+    "message": "カメラも、画面も、その両方も。"
+  },
+  "films.camera.lead": {
+    "message": "ウェブカメラ付きのテイクは{layouts}にでき、カメラの背景は{removed}できます。グリーンバックは不要です。"
+  },
+  "films.camera.lead.layouts": {
+    "message": "ピクチャーインピクチャ、横並び、縦並び、全画面"
+  },
+  "films.camera.lead.removed": {
+    "message": "お使いのコンピューター上で削除"
+  },
+  "films.camera.tab.layouts": {
+    "message": "レイアウト"
+  },
+  "films.camera.tab.cutout": {
+    "message": "切り抜き"
+  },
+  "films.camera.note.layouts": {
+    "message": "{t} ピクチャーインピクチャ、デュアルフレーム、縦並び、またはウェブカメラなし。"
+  },
+  "films.camera.note.layouts.t": {
+    "message": "4 つのレイアウト。"
+  },
+  "films.camera.note.full": {
+    "message": "{t} タイムラインの一区間をカメラに任せると、全画面に広がってから滑らかに戻ります。"
+  },
+  "films.camera.note.full.t": {
+    "message": "フルスクリーンカメラ。"
+  },
+  "films.camera.note.background": {
+    "message": "{t} セグメンテーションモデルが、お使いのコンピューター上であなたと部屋を切り分けます。何もアップロードされません。"
+  },
+  "films.camera.note.background.t": {
+    "message": "切り抜き、ぼかし、差し替え。"
+  },
+  "films.ship.kicker": {
+    "message": "公開の前に"
+  },
+  "films.ship.title": {
+    "message": "どんな形式でも。プライベートは見せない。"
+  },
+  "films.ship.lead": {
+    "message": "1 つのテイクが{formats}になり、見せたくないものは{blur}。"
+  },
+  "films.ship.lead.formats": {
+    "message": "横長、正方形、縦長"
+  },
+  "films.ship.lead.blur": {
+    "message": "ぼかしの下に隠れたまま"
+  },
+  "films.ship.formats": {
+    "message": "{t} 同じテイクを 16:9、9:16、1:1、4:3、4:5、16:10、10:16 で構成します。"
+  },
+  "films.ship.formats.t": {
+    "message": "あらゆるアスペクト比。"
+  },
+  "films.ship.blur": {
+    "message": "{t} ガウスまたはモザイクで、長方形、楕円、フリーハンドの形に。メールアドレス、キー、パスワードの上に。"
+  },
+  "films.ship.blur.t": {
+    "message": "ぼかし領域。"
+  },
+  "films.label": {
+    "message": "動くアプリをもっと",
+    "description": "Read by screen readers only: names the section of feature videos"
   }
 }

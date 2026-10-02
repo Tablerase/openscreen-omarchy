@@ -20,9 +20,18 @@
  * here is a drawing, it is labelled as one, and nothing in this section asks to
  * be believed on the strength of it. The specification line under each claim is
  * still doing the work.
+ *
+ * Two of the four are no longer drawn. Captions and the agent are filmed:
+ * loops exported from the app itself, lazy and served from R2 (see DemoLoop),
+ * which the films section above this one already pays the set-up cost for. A
+ * film shows what a drawing could only quote — the captions changing language,
+ * the agent's edits landing on the timeline. The recorder and the encoder have
+ * no film yet and keep their drawings.
  */
 
 import { translate } from "@docusaurus/Translate";
+
+import type { LoopName } from "../../lib/demo-loop";
 
 export type Feature = {
 	id: string;
@@ -34,8 +43,11 @@ export type Feature = {
 	 *  believe it; the reference is where the specification line can be
 	 *  checked. A feature page, where one exists, follows it. */
 	links: { to: string; label: string }[];
-	/** What the drawn panel depicts, for anyone who cannot see it. */
-	label: string;
+	/** What the drawn panel depicts, for anyone who cannot see it. Only on a
+	 *  drawn band: a filmed one carries its loop's own label. */
+	label?: string;
+	/** A loop of the app in place of the drawing. */
+	video?: LoopName;
 	/** Layout only — the copy stays first in the DOM either way. */
 	flip?: boolean;
 };
@@ -143,12 +155,7 @@ export function getFeatures(): Feature[] {
 					}),
 				},
 			],
-			label: translate({
-				id: "showcase.captions.label",
-				description: DRAWING,
-				message:
-					"A drawing of the captions panel: the line “amber day on the validator, and it” set large over the video, and beside it captions switched on, a note that seven caption lines are derived live from the transcript, and a language row showing the original transcript and Français as buttons, a Translate button and the option to delete a translation.",
-			}),
+			video: "automatic-subtitles",
 		},
 		{
 			id: "agent",
@@ -178,12 +185,7 @@ export function getFeatures(): Feature[] {
 					}),
 				},
 			],
-			label: translate({
-				id: "showcase.agent.label",
-				description: DRAWING,
-				message:
-					"A drawing of the agent's reply. Asked to cut the dead air, it answers with timecodes: 0 to 2.19 seconds of lead-in before “Hi” and 35.12 to 40.03 seconds of tail after “think.”, taking the video from 40 seconds to 33 seconds of playable footage, with the existing zooms left on the same moments — then a green line reading “applied: added 2 trims”.",
-			}),
+			video: "ask-the-agent",
 			flip: true,
 		},
 	];

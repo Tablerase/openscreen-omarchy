@@ -278,10 +278,6 @@
     "message": "Como as legendas locais se comparam",
     "description": "Link label under the panel."
   },
-  "showcase.captions.label": {
-    "message": "Um desenho do painel de legendas: a frase “amber day on the validator, and it” em letras grandes sobre o vídeo e, ao lado, as legendas ativadas, uma nota de que sete linhas de legenda são derivadas ao vivo a partir da transcrição e uma linha de idiomas que mostra a transcrição original e Français como botões, um botão Translate e a opção de excluir uma tradução.",
-    "description": "Describes a drawing of the app for screen readers. The drawing is in English: keep the quoted words as drawn."
-  },
   "showcase.agent.kicker": {
     "message": "agente"
   },
@@ -300,10 +296,6 @@
   "showcase.agent.link.feature": {
     "message": "Como funcionam os zooms automáticos",
     "description": "Link label under the panel."
-  },
-  "showcase.agent.label": {
-    "message": "Um desenho da resposta do agente. Ao receber o pedido de cortar o tempo morto, ele responde com timecodes: de 0 a 2,19 segundos de abertura antes de “Hi” e de 35,12 a 40,03 segundos de final depois de “think.”, levando o vídeo de 40 para 33 segundos reproduzíveis, com os zooms existentes mantidos nos mesmos momentos — e depois uma linha verde com “applied: added 2 trims”.",
-    "description": "Describes a drawing of the app for screen readers. The drawing is in English: keep the quoted words as drawn."
   },
   "showcase.title": {
     "message": "Gravador, legendas, agente, codificador."
@@ -794,7 +786,7 @@
     "description": "Describes a short silent video loop of the app for screen readers."
   },
   "demoLoop.caption-styles": {
-    "message": "Uma mesma legenda em cinco estilos: uma simples, uma amarela em negrito, uma manuscrita, uma monoespaçada e uma destacada palavra por palavra.",
+    "message": "Uma mesma legenda em cinco estilos: uma simples, uma amarela em negrito, uma manuscrita, uma monoespaçada e uma que mostra uma palavra de cada vez.",
     "description": "Describes a short silent video loop of the app for screen readers."
   },
   "demoLoop.edit-by-transcript": {
@@ -848,5 +840,153 @@
   "demoLoop.ask-the-agent": {
     "message": "Um pedido digitado no painel de chat do editor, e as edições do agente aparecendo na linha do tempo.",
     "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "films.default.kicker": {
+    "message": "Pronto de fábrica"
+  },
+  "films.default.title": {
+    "message": "Bonito desde a primeira tomada."
+  },
+  "films.default.lead": {
+    "message": "Cada nova gravação abre {zoomed}, sobre um papel de parede, com margem, sombra e cantos arredondados. Mude o que quiser ou exporte como está."
+  },
+  "films.default.lead.zoomed": {
+    "message": "já com zoom nos seus cliques"
+  },
+  "films.default.note.zooms": {
+    "message": "{t} Cada tomada recebe zoom onde você clicou, por uma regra fixa: sem IA e sem chamada de rede. Desative no modo Gravar."
+  },
+  "films.default.note.zooms.t": {
+    "message": "Zooms a partir dos seus cliques."
+  },
+  "films.default.note.frame": {
+    "message": "{t} Papel de parede, margem, sombra, cantos arredondados e um pouco de desfoque de movimento já estão ativos antes de você mexer em algo."
+  },
+  "films.default.note.frame.t": {
+    "message": "Um enquadramento pronto."
+  },
+  "films.default.note.cursor": {
+    "message": "{t} O ponteiro é gravado separado dos pixels, então o tamanho e o estilo dele podem mudar depois da tomada."
+  },
+  "films.default.note.cursor.t": {
+    "message": "Um cursor que dá para refazer."
+  },
+  "films.depth.kicker": {
+    "message": "3D"
+  },
+  "films.depth.title": {
+    "message": "Profundidade, não só zoom."
+  },
+  "films.depth.lead": {
+    "message": "Incline a tela ou {orbit} durante o zoom, desenhe o ponteiro como {cursor} com sombra e coloque a tomada inteira {device}, sobre um fundo que se move."
+  },
+  "films.depth.lead.orbit": {
+    "message": "gire ao redor dela"
+  },
+  "films.depth.lead.cursor": {
+    "message": "um cursor 3D"
+  },
+  "films.depth.lead.device": {
+    "message": "dentro de um dispositivo"
+  },
+  "films.depth.tab.camera": {
+    "message": "Câmera 3D"
+  },
+  "films.depth.tab.cursors": {
+    "message": "Cursores"
+  },
+  "films.depth.tab.frames": {
+    "message": "Molduras de dispositivo"
+  },
+  "films.depth.tab.backgrounds": {
+    "message": "Fundos animados"
+  },
+  "films.depth.note.camera": {
+    "message": "{t} Cada zoom pode ficar plano, girar a tela para a esquerda ou para a direita, ou orbitar ao redor dela seguindo o foco do zoom. A profundidade de campo suaviza o lado mais distante."
+  },
+  "films.depth.note.camera.t": {
+    "message": "Câmera 3D."
+  },
+  "films.depth.note.cursors": {
+    "message": "{t} Studio Ink, Prism Glow, Pop Coral, Pixel Candy e Star Sprout, e cada um pode ser desenhado como um objeto 3D com sombra."
+  },
+  "films.depth.note.cursors.t": {
+    "message": "Cinco pacotes de cursores."
+  },
+  "films.depth.note.frames": {
+    "message": "{t} Uma janela, um notebook, um celular ou uma tela, clara ou escura, sobre um fundo animado com Deriva, Aurora ou Ondas."
+  },
+  "films.depth.note.frames.t": {
+    "message": "Molduras e movimento."
+  },
+  "films.camera.kicker": {
+    "message": "Câmera"
+  },
+  "films.camera.title": {
+    "message": "Sua câmera, sua tela, ou as duas."
+  },
+  "films.camera.lead": {
+    "message": "Uma tomada com webcam pode ficar {layouts}, e o fundo da câmera pode ser {removed}, sem tela verde."
+  },
+  "films.camera.lead.layouts": {
+    "message": "em picture in picture, lado a lado, empilhada ou em tela cheia"
+  },
+  "films.camera.lead.removed": {
+    "message": "removido no seu computador"
+  },
+  "films.camera.tab.layouts": {
+    "message": "Layouts"
+  },
+  "films.camera.tab.cutout": {
+    "message": "Recorte"
+  },
+  "films.camera.note.layouts": {
+    "message": "{t} Picture in Picture, quadro duplo, empilhamento vertical ou nenhuma webcam."
+  },
+  "films.camera.note.layouts.t": {
+    "message": "Quatro layouts."
+  },
+  "films.camera.note.full": {
+    "message": "{t} Dê um trecho da linha do tempo para a câmera: ela vai para tela cheia e depois volta suavemente."
+  },
+  "films.camera.note.full.t": {
+    "message": "Câmera em tela cheia."
+  },
+  "films.camera.note.background": {
+    "message": "{t} Um modelo de segmentação separa você do ambiente no seu próprio computador. Nada é enviado."
+  },
+  "films.camera.note.background.t": {
+    "message": "Recortar, desfocar ou substituir."
+  },
+  "films.ship.kicker": {
+    "message": "Antes de publicar"
+  },
+  "films.ship.title": {
+    "message": "Todos os formatos. Nada privado."
+  },
+  "films.ship.lead": {
+    "message": "Uma tomada vira {formats}, e o que não deve aparecer fica {blur}."
+  },
+  "films.ship.lead.formats": {
+    "message": "horizontal, quadrada ou vertical"
+  },
+  "films.ship.lead.blur": {
+    "message": "sob um desfoque"
+  },
+  "films.ship.formats": {
+    "message": "{t} A mesma tomada, enquadrada em 16:9, 9:16, 1:1, 4:3, 4:5, 16:10 ou 10:16."
+  },
+  "films.ship.formats.t": {
+    "message": "Qualquer proporção."
+  },
+  "films.ship.blur": {
+    "message": "{t} Gaussiano ou mosaico, em retângulo, oval ou à mão livre, sobre um e-mail, uma chave ou uma senha."
+  },
+  "films.ship.blur.t": {
+    "message": "Regiões de desfoque."
+  },
+  "films.label": {
+    "message": "Mais do app, em movimento",
+    "description": "Read by screen readers only: names the section of feature videos"
   }
 }

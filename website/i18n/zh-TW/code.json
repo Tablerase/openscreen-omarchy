@@ -291,10 +291,6 @@
     "message": "本機字幕功能比較",
     "description": "Link label under the panel."
   },
-  "showcase.captions.label": {
-    "message": "字幕面板的示意圖：影片上以大字顯示「amber day on the validator, and it」這一行；旁邊的字幕已開啟，註明有七行字幕是從逐字稿即時產生，還有一列語言選項，以按鈕顯示原始逐字稿與 Français，還有 Translate 按鈕，以及刪除翻譯的選項。",
-    "description": "Describes a drawing of the app for screen readers. The drawing is in English: keep the quoted words as drawn."
-  },
   "showcase.agent.kicker": {
     "message": "代理"
   },
@@ -313,10 +309,6 @@
   "showcase.agent.link.feature": {
     "message": "自動縮放的運作方式",
     "description": "Link label under the panel."
-  },
-  "showcase.agent.label": {
-    "message": "代理回覆的示意圖。被要求剪掉空檔時，它以時間碼回答：「Hi」之前 0 到 2.19 秒的開場，以及「think.」之後 35.12 到 40.03 秒的結尾，讓影片的可播放長度從 40 秒變成 33 秒，既有的縮放仍留在相同的時刻；最後是一行綠字「applied: added 2 trims」。",
-    "description": "Describes a drawing of the app for screen readers. The drawing is in English: keep the quoted words as drawn."
   },
   "showcase.title": {
     "message": "錄影工具、字幕、代理、編碼器。"
@@ -794,7 +786,7 @@
     "description": "Describes a short silent video loop of the app for screen readers."
   },
   "demoLoop.caption-styles": {
-    "message": "同一則字幕的五種樣式：一般字幕、黃色粗體、手寫體、等寬字型，以及逐字醒目標示。",
+    "message": "同一則字幕的五種樣式：一般字幕、黃色粗體、手寫體、等寬字型，以及一次只顯示一個詞的樣式。",
     "description": "Describes a short silent video loop of the app for screen readers."
   },
   "demoLoop.edit-by-transcript": {
@@ -848,5 +840,153 @@
   "demoLoop.ask-the-agent": {
     "message": "在編輯器聊天面板中輸入的請求，以及代理所做的編輯出現在時間軸上。",
     "description": "Describes a short silent video loop of the app for screen readers."
+  },
+  "films.default.kicker": {
+    "message": "開箱即用"
+  },
+  "films.default.title": {
+    "message": "第一段素材就好看。"
+  },
+  "films.default.lead": {
+    "message": "每段新錄製開啟時都{zoomed}，帶有桌布、邊距、陰影和圓角。想改哪裡都可以，也能直接匯出。"
+  },
+  "films.default.lead.zoomed": {
+    "message": "已經在你的點擊處放大"
+  },
+  "films.default.note.zooms": {
+    "message": "{t} 每段素材都依固定規則在你點擊的位置放大：不用 AI，也不連網。可在錄製模式中關閉。"
+  },
+  "films.default.note.zooms.t": {
+    "message": "依點擊放大。"
+  },
+  "films.default.note.frame": {
+    "message": "{t} 桌布、邊距、陰影、圓角和一點動態模糊，在你動手之前就已到位。"
+  },
+  "films.default.note.frame.t": {
+    "message": "現成的畫面。"
+  },
+  "films.default.note.cursor": {
+    "message": "{t} 指標與像素分開記錄，所以錄完後仍可更改它的大小和樣式。"
+  },
+  "films.default.note.cursor.t": {
+    "message": "可以重做的游標。"
+  },
+  "films.depth.kicker": {
+    "message": "3D"
+  },
+  "films.depth.title": {
+    "message": "不只是縮放，還有縱深。"
+  },
+  "films.depth.lead": {
+    "message": "放大時可以傾斜螢幕或{orbit}，把指標畫成帶陰影的{cursor}，再把整段素材{device}，放在會動的背景上。"
+  },
+  "films.depth.lead.orbit": {
+    "message": "繞著它旋轉"
+  },
+  "films.depth.lead.cursor": {
+    "message": "3D 游標"
+  },
+  "films.depth.lead.device": {
+    "message": "放進裝置裡"
+  },
+  "films.depth.tab.camera": {
+    "message": "3D 攝影機"
+  },
+  "films.depth.tab.cursors": {
+    "message": "游標"
+  },
+  "films.depth.tab.frames": {
+    "message": "裝置外框"
+  },
+  "films.depth.tab.backgrounds": {
+    "message": "動態背景"
+  },
+  "films.depth.note.camera": {
+    "message": "{t} 每次縮放都可以保持平面、把螢幕向左或向右轉，或跟隨縮放焦點環繞螢幕。景深會柔化遠側。"
+  },
+  "films.depth.note.camera.t": {
+    "message": "3D 攝影機。"
+  },
+  "films.depth.note.cursors": {
+    "message": "{t} Studio Ink, Prism Glow, Pop Coral, Pixel Candy 和 Star Sprout，每一套都能畫成帶陰影的 3D 物件。"
+  },
+  "films.depth.note.cursors.t": {
+    "message": "五套游標。"
+  },
+  "films.depth.note.frames": {
+    "message": "{t} 視窗、筆記型電腦、手機或螢幕，淺色或深色，背景可用漂移、極光或波浪動畫。"
+  },
+  "films.depth.note.frames.t": {
+    "message": "外框與動態。"
+  },
+  "films.camera.kicker": {
+    "message": "攝影機"
+  },
+  "films.camera.title": {
+    "message": "你的攝影機、你的螢幕，或兩者兼具。"
+  },
+  "films.camera.lead": {
+    "message": "含網路攝影機的素材可以{layouts}，攝影機背景也可以{removed}，不需要綠幕。"
+  },
+  "films.camera.lead.layouts": {
+    "message": "子母畫面、左右並排、上下堆疊或全螢幕"
+  },
+  "films.camera.lead.removed": {
+    "message": "在你的電腦上移除"
+  },
+  "films.camera.tab.layouts": {
+    "message": "版面配置"
+  },
+  "films.camera.tab.cutout": {
+    "message": "去背"
+  },
+  "films.camera.note.layouts": {
+    "message": "{t} 子母畫面、雙畫框、垂直堆疊，或完全不用網路攝影機。"
+  },
+  "films.camera.note.layouts.t": {
+    "message": "四種版面配置。"
+  },
+  "films.camera.note.full": {
+    "message": "{t} 把時間軸上的一段交給攝影機：它會放大到全螢幕，然後平順地縮回。"
+  },
+  "films.camera.note.full.t": {
+    "message": "全螢幕攝影機。"
+  },
+  "films.camera.note.background": {
+    "message": "{t} 分割模型在你自己的電腦上把你和房間分開，不會上傳任何東西。"
+  },
+  "films.camera.note.background.t": {
+    "message": "去背、模糊或替換。"
+  },
+  "films.ship.kicker": {
+    "message": "發布之前"
+  },
+  "films.ship.title": {
+    "message": "任何格式，不露隱私。"
+  },
+  "films.ship.lead": {
+    "message": "一段素材可以變成{formats}，不該被看到的內容始終{blur}。"
+  },
+  "films.ship.lead.formats": {
+    "message": "橫式、方形或直式"
+  },
+  "films.ship.lead.blur": {
+    "message": "藏在模糊之下"
+  },
+  "films.ship.formats": {
+    "message": "{t} 同一段素材，可依 16:9、9:16、1:1、4:3、4:5、16:10 或 10:16 構圖。"
+  },
+  "films.ship.formats.t": {
+    "message": "任意長寬比。"
+  },
+  "films.ship.blur": {
+    "message": "{t} 高斯或馬賽克，矩形、橢圓或手繪形狀，蓋住電子郵件、金鑰或密碼。"
+  },
+  "films.ship.blur.t": {
+    "message": "模糊區域。"
+  },
+  "films.label": {
+    "message": "更多應用功能，動起來看",
+    "description": "Read by screen readers only: names the section of feature videos"
   }
 }
