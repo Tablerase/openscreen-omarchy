@@ -137,6 +137,17 @@ fn target_monitor<'a>(
     stream_size: Option<(i32, i32)>,
     cursor: (f64, f64),
 ) -> Option<&'a MonitorInfo> {
+    // A uniquely matching negotiated stream size identifies full-monitor
+    // captures more reliably than the portal origin. Some portal backends
+    // report (0, 0) for every stream, which can accidentally point at a real
+    // monitor at the top-left of a multi-monitor layout.
+    let unique_monitor_by_size = stream_size.and_then(|size| {
+        let mut matching = monitors
+            .iter()
+            .filter(|monitor| monitor.width == size.0 && monitor.height == size.1);
+        let first = matching.next()?;
+        matching.next().is_none().then_some(first)
+    });
     let monitor_at_origin = stream_origin.and_then(|(x, y)| {
         monitors.iter().find(|monitor| {
             (monitor.x == x && monitor.y == y) || monitor_contains(monitor, x as f64, y as f64)
@@ -145,7 +156,8 @@ fn target_monitor<'a>(
     let monitor_by_size =
         stream_size.and_then(|size| matching_monitor_for_size(monitors, size, cursor));
 
-    monitor_at_origin
+    unique_monitor_by_size
+        .or(monitor_at_origin)
         .or(monitor_by_size)
         .or_else(|| {
             monitors
@@ -343,6 +355,58 @@ mod tests {
         assert_eq!(
             to_stream_position((726.0, 207.0), target, Some((0, 0))),
             (242, 331)
+        );
+    }
+
+    #[test]
+    fn unique_stream_size_beats_bogus_origin_on_another_monitor() {
+        let monitors = vec![
+            MonitorInfo {
+                name: "DP-1".to_string(),
+                x: 0,
+                y: 0,
+                width: 1920,
+                height: 1080,
+                scale: 1.0,
+                focused: true,
+            },
+            MonitorInfo {
+                name: "DP-2".to_string(),
+                x: 1920,
+                y: 0,
+                width: 2560,
+                height: 1440,
+                scale: 1.25,
+                focused: false,
+            },
+        ];
+
+        // A portal reporting (0, 0) must not make a capture of DP-2 inherit
+        // DP-1's origin and scale just because DP-1 occupies the top-left.
+        let target = target_monitor(&monitors, Some((0, 0)), Some((2560, 1440)), (2200.0, 200.0))
+            .expect("unique stream-size match");
+        assert_eq!(target.name, "DP-2");
+        assert_eq!(
+            to_stream_position((2200.0, 200.0), target, Some((0, 0))),
+            (350, 250)
+        );
+    }
+
+    #[test]
+    fn negative_monitor_origins_and_fractional_scales_map_to_stream_pixels() {
+        let monitor = MonitorInfo {
+            name: "DP-3".to_string(),
+            x: -1600,
+            y: -180,
+            width: 2560,
+            height: 1440,
+            scale: 1.25,
+            focused: true,
+        };
+
+        assert_eq!(
+            to_stream_position((-1520.0, -100.0), &monitor, None),
+            (100, 100)
         );
     }
 }
